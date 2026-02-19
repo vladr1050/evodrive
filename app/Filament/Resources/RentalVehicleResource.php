@@ -34,8 +34,8 @@ class RentalVehicleResource extends Resource
                         Forms\Components\TextInput::make('transmission')->required()->maxLength(50)->default('Auto'),
                         Forms\Components\TextInput::make('consumption')->required()->maxLength(50)->placeholder('4.5L or 14kWh'),
                         Forms\Components\TextInput::make('seats')->numeric()->default(5)->minValue(1)->maxValue(9),
-                        Forms\Components\TextInput::make('price')->required()->numeric()->prefix('€')->suffix('/wk'),
-                        Forms\Components\TextInput::make('deposit')->required()->numeric()->prefix('€'),
+                        Forms\Components\TextInput::make('price')->required()->numeric()->integer()->minValue(0)->prefix('€')->suffix('/wk'),
+                        Forms\Components\TextInput::make('deposit')->required()->numeric()->integer()->minValue(0)->prefix('€'),
                     ])
                     ->columns(2),
                 Forms\Components\Section::make('Image')

@@ -17,6 +17,11 @@ class RentalVehicle extends Model
         'categories' => 'array',
         'description' => 'array',
         'is_active' => 'boolean',
+        'year' => 'integer',
+        'seats' => 'integer',
+        'price' => 'integer',
+        'deposit' => 'integer',
+        'sort_order' => 'integer',
     ];
 
     public function getImageUrlAttribute(): ?string
