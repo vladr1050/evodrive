@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    /* EvoDrive brand - accent #2563eb only for primary CTA */
+    --color-brand-50: #eff6ff;
+    --color-brand-100: #dbeafe;
+    --color-brand-600: #2563eb;
+    --color-brand-700: #1d4ed8;
+    --color-brand-900: #1e3a8a;
+    /* Content & radius tokens */
+    --evodrive-content: 80rem;
+    --evodrive-content-narrow: 48rem;
+    --evodrive-radius: 2rem;
+}

@@ -1,0 +1,6 @@
+# Caddy: automatic HTTPS, reverse proxy to Nginx.
+# Replace domains below if different. After edit: docker compose up -d caddy
+
+evodrive.lv, www.evodrive.lv {
+    reverse_proxy nginx:80
+}
