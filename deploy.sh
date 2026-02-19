@@ -15,6 +15,9 @@ npm run build
 echo "→ migrations"
 php artisan migrate --force
 
+echo "→ storage link (public/storage → storage/app/public)"
+php artisan storage:link 2>/dev/null || true
+
 echo "→ caches"
 php artisan config:cache
 php artisan route:cache

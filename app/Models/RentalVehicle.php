@@ -27,12 +27,19 @@ class RentalVehicle extends Model
     public function getImageUrlAttribute(): ?string
     {
         if ($this->image_path) {
-            return '/storage/' . ltrim($this->image_path, '/');
+            $path = '/storage/' . ltrim($this->image_path, '/');
+            return url($path);
         }
         $url = $this->attributes['image_url'] ?? null;
-        if ($url && (str_starts_with($url, 'http://localhost') || str_starts_with($url, 'https://localhost'))) {
+        if (! $url) {
+            return null;
+        }
+        if (str_starts_with($url, 'http://localhost') || str_starts_with($url, 'https://localhost')) {
             $path = parse_url($url, PHP_URL_PATH);
-            return $path ?: $url;
+            return $path ? url($path) : $url;
+        }
+        if (! str_starts_with($url, 'http')) {
+            return url($url);
         }
         return $url;
     }
