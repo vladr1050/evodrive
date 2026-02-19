@@ -47,7 +47,8 @@ class RentalVehicleResource extends Resource
                             ->directory('rental')
                             ->maxSize(2048)
                             ->imagePreviewHeight(200)
-                            ->helperText('Optional. If empty, image_url is used.'),
+                            ->orientImagesFromExif(false)
+                            ->helperText('Optional. If empty, image_url is used. Original file is stored as-is (no resize/compress).'),
                         Forms\Components\TextInput::make('image_url')
                             ->label('Or image URL')
                             ->url()
