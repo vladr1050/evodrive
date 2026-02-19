@@ -27,7 +27,7 @@ jobs:
             APP_DIR="${{ secrets.DEPLOY_PATH }}"
             if [ -z "$APP_DIR" ]; then APP_DIR=/var/www/evodrive; fi
             cd "$APP_DIR"
-            git fetch origin && git reset --hard origin/main
+            GIT_SSH_COMMAND="ssh -i /root/.ssh/evodrive_deploy -o StrictHostKeyChecking=no" git fetch origin && git reset --hard origin/main
             docker compose build --no-cache app
             docker compose up -d
             docker compose exec -T app php artisan migrate --force
