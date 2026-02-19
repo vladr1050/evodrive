@@ -1,6 +1,6 @@
 # Деплой EvoDrive (Docker + CI/CD)
 
-Основа под **Ride-Hailing SaaS**: один раз поднимаешь сервер скриптом, дальше деплой — через push в `main` (GitHub Actions). Ручной SSH нужен только для первичной настройки и при сбоях.
+Основа под **Ride-Hailing SaaS** (деплой по push в main через GitHub Actions): один раз поднимаешь сервер скриптом, дальше деплой — через push в `main` (GitHub Actions). Ручной SSH нужен только для первичной настройки и при сбоях.
 
 - **Сервер:** 89.167.74.32 (Hetzner)  
 - **Домен:** www.evodrive.lv  
