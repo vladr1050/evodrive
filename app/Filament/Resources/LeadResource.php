@@ -17,6 +17,11 @@ class LeadResource extends Resource
 {
     protected static ?string $model = Lead::class;
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canAccessResource('leads') ?? false;
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
 
     protected static ?string $navigationGroup = 'Leads';

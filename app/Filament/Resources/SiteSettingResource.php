@@ -13,6 +13,11 @@ class SiteSettingResource extends Resource
 {
     protected static ?string $model = SiteSetting::class;
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canAccessResource('site_settings') ?? false;
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
 
     protected static ?string $navigationGroup = 'Settings';

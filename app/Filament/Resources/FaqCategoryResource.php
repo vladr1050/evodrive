@@ -15,6 +15,11 @@ class FaqCategoryResource extends Resource
 {
     protected static ?string $model = FaqCategory::class;
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canAccessResource('faq_categories') ?? false;
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-question-mark-circle';
 
     protected static ?string $navigationGroup = 'Content';

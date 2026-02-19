@@ -15,6 +15,11 @@ class PageResource extends Resource
 {
     protected static ?string $model = Page::class;
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canAccessResource('pages') ?? false;
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
 
     protected static ?string $navigationGroup = 'Content';

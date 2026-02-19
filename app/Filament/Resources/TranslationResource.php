@@ -14,6 +14,11 @@ class TranslationResource extends Resource
 {
     protected static ?string $model = Translation::class;
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canAccessResource('translations') ?? false;
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-language';
 
     protected static ?string $navigationGroup = 'Content';

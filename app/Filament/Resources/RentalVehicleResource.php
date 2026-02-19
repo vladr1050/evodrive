@@ -15,6 +15,11 @@ class RentalVehicleResource extends Resource
 {
     protected static ?string $model = RentalVehicle::class;
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->canAccessResource('rental_vehicles') ?? false;
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-truck';
 
     protected static ?string $navigationGroup = 'Rental';

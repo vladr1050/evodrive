@@ -24,6 +24,7 @@ class User extends Authenticatable implements FilamentUser
         'email',
         'password',
         'role',
+        'allowed_resources',
     ];
 
     /**
@@ -46,7 +47,33 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'allowed_resources' => 'array',
         ];
+    }
+
+    /**
+     * Permission keys for manager access (resource slugs used in canAccess).
+     */
+    public static function resourcePermissionKeys(): array
+    {
+        return [
+            'leads' => 'Leads',
+            'rental_vehicles' => 'Rental vehicles',
+            'pages' => 'Pages',
+            'translations' => 'Translations',
+            'faq_categories' => 'FAQ categories',
+            'site_settings' => 'Site settings',
+        ];
+    }
+
+    public function canAccessResource(string $key): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+        $allowed = $this->allowed_resources ?? [];
+
+        return in_array($key, $allowed, true);
     }
 
     public function canAccessPanel(Panel $panel): bool
