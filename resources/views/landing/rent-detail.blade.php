@@ -20,7 +20,7 @@
             <div class="hidden sm:block text-center">
                 <h1 class="text-sm font-black text-slate-900 uppercase tracking-tight">{{ $car['make'] }} {{ $car['model'] }}</h1>
             </div>
-            <div class="text-xl font-black text-brand-600">€{{ $car['price'] }}<span class="text-[10px] font-bold text-slate-400 ml-1">/WK</span></div>
+            <div class="text-xl font-black text-brand-600">€{{ $car['price'] }}<span class="text-[10px] font-bold text-slate-400 ml-1">{{ __('ui.rent_price_week_suffix') }}</span></div>
         </div>
     </div>
 

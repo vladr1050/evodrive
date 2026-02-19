@@ -34,7 +34,7 @@ class RentalVehicleResource extends Resource
                         Forms\Components\TextInput::make('transmission')->required()->maxLength(50)->default('Auto'),
                         Forms\Components\TextInput::make('consumption')->required()->maxLength(50)->placeholder('4.5L or 14kWh'),
                         Forms\Components\TextInput::make('seats')->numeric()->default(5)->minValue(1)->maxValue(9),
-                        Forms\Components\TextInput::make('price')->required()->numeric()->integer()->minValue(0)->prefix('€')->suffix('/wk'),
+                        Forms\Components\TextInput::make('price')->required()->numeric()->integer()->minValue(0)->prefix('€')->suffix(fn () => __('ui.rent_price_week_suffix')),
                         Forms\Components\TextInput::make('deposit')->required()->numeric()->integer()->minValue(0)->prefix('€'),
                     ])
                     ->columns(2),
@@ -109,7 +109,7 @@ class RentalVehicleResource extends Resource
                 Tables\Columns\TextColumn::make('model')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('year')->sortable(),
                 Tables\Columns\TextColumn::make('type')->badge(),
-                Tables\Columns\TextColumn::make('price')->money('EUR')->suffix('/wk'),
+                Tables\Columns\TextColumn::make('price')->money('EUR')->suffix(fn () => ' ' . __('ui.rent_price_week_suffix')),
                 Tables\Columns\IconColumn::make('is_active')->boolean()->sortable(),
             ])
             ->defaultSort('sort_order')

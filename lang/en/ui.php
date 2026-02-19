@@ -122,6 +122,7 @@ return [
     'rent_energy' => 'Energy',
     'rent_seats' => 'Seats',
     'rent_weekly' => 'per week',
+    'rent_price_week_suffix' => '/wk',
     'rent_deposit' => 'Deposit',
     'rent_now' => 'Rent Now',
     'rent_back_to_fleet' => 'Back to fleet',

@@ -62,9 +62,15 @@ class TranslationResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('group')->badge()->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('key')->searchable()->sortable()->copyable(),
-                Tables\Columns\TextColumn::make('en')->limit(40)->wrap()->searchable()->toggleable(),
-                Tables\Columns\TextColumn::make('ru')->limit(40)->wrap()->searchable()->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('lv')->limit(40)->wrap()->searchable()->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('en')
+                    ->label('English')
+                    ->limit(50)
+                    ->wrap()
+                    ->searchable()
+                    ->placeholder('—')
+                    ->tooltip(fn ($record) => $record->en),
+                Tables\Columns\TextColumn::make('ru')->label('RU')->limit(40)->wrap()->searchable()->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('lv')->label('LV')->limit(40)->wrap()->searchable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('group')
             ->filters([

@@ -122,6 +122,7 @@ return [
     'rent_energy' => 'Enerģija',
     'rent_seats' => 'Vietas',
     'rent_weekly' => 'nedēļā',
+    'rent_price_week_suffix' => '/ned',
     'rent_deposit' => 'Drošības nauda',
     'rent_now' => 'Īrēt tagad',
     'rent_back_to_fleet' => 'Atpakaļ uz floti',

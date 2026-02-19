@@ -47,7 +47,7 @@
                     <div class="space-y-6">
                         <div class="flex justify-between items-center py-3 border-b border-white/10">
                             <span class="text-slate-400 font-bold">{{ $exampleCar }}</span>
-                            <span class="font-black">€{{ $examplePriceFormatted }} <span class="text-[10px] uppercase text-slate-500">/wk</span></span>
+                            <span class="font-black">€{{ $examplePriceFormatted }} <span class="text-[10px] uppercase text-slate-500">{{ __('ui.rent_price_week_suffix') }}</span></span>
                         </div>
                         <div class="flex justify-between items-center py-3 border-b border-white/10">
                             <span class="text-slate-400 font-bold">{{ __('ui.rent_insurance') }}</span>
@@ -59,7 +59,7 @@
                         </div>
                         <div class="pt-4 flex justify-between items-center">
                             <span class="text-lg font-black uppercase tracking-widest text-slate-500">{{ __('ui.rent_fixed_cost') }}</span>
-                            <span class="text-2xl font-black text-brand-600">€{{ $examplePriceFormatted }} <span class="text-[10px] uppercase text-slate-500">/wk</span></span>
+                            <span class="text-2xl font-black text-brand-600">€{{ $examplePriceFormatted }} <span class="text-[10px] uppercase text-slate-500">{{ __('ui.rent_price_week_suffix') }}</span></span>
                         </div>
                     </div>
                 </div>

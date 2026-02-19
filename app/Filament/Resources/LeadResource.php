@@ -40,11 +40,11 @@ class LeadResource extends Resource
                             ->label('Rental Vehicle')
                             ->options(
                                 fn () => RentalVehicle::where('is_active', true)->orderBy('make')->get()
-                                    ->mapWithKeys(fn (RentalVehicle $r) => [$r->id => $r->make . ' ' . $r->model . ' (€' . $r->price . '/wk)'])
+                                    ->mapWithKeys(fn (RentalVehicle $r) => [$r->id => $r->make . ' ' . $r->model . ' (€' . $r->price . __('ui.rent_price_week_suffix') . ')'])
                                     ->all()
                             )
                             ->searchable()
-                            ->getOptionLabelUsing(fn ($value): ?string => $value ? (($r = RentalVehicle::find($value)) ? $r->make . ' ' . $r->model . ' (€' . $r->price . '/wk)' : '—') : null),
+                            ->getOptionLabelUsing(fn ($value): ?string => $value ? (($r = RentalVehicle::find($value)) ? $r->make . ' ' . $r->model . ' (€' . $r->price . __('ui.rent_price_week_suffix') . ')' : '—') : null),
                         Forms\Components\Toggle::make('atd_license')->label('ATD License'),
                         Forms\Components\TextInput::make('atd_number')->label('ATD Card Number')->maxLength(50),
                         Forms\Components\TextInput::make('driving_experience')->maxLength(20),

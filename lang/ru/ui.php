@@ -122,6 +122,7 @@ return [
     'rent_energy' => 'Топливо',
     'rent_seats' => 'Мест',
     'rent_weekly' => 'в неделю',
+    'rent_price_week_suffix' => '/нед',
     'rent_deposit' => 'Залог',
     'rent_now' => 'Арендовать',
     'rent_back_to_fleet' => 'Назад к автопарку',
