@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', __('apply.personal_info')) — EvoDrive.lv</title>
+    @php
+        $siteFavicon = \App\Models\SiteSetting::first()?->favicon_path;
+        $faviconUrl = $siteFavicon ? asset(\Illuminate\Support\Facades\Storage::url($siteFavicon)) : asset('images/logo.png');
+    @endphp
+    <link rel="icon" type="image/png" href="{{ $faviconUrl }}">
     @include('layouts.seo')
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800" rel="stylesheet" />

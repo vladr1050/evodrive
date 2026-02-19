@@ -7,6 +7,13 @@
 
     <title>@yield('title', config('app.name'))</title>
 
+    @php
+        $siteFavicon = \App\Models\SiteSetting::first()?->favicon_path;
+        $faviconUrl = $siteFavicon ? asset(\Illuminate\Support\Facades\Storage::url($siteFavicon)) : asset('images/logo.png');
+    @endphp
+    <link rel="icon" type="image/png" href="{{ $faviconUrl }}">
+    <link rel="shortcut icon" href="{{ $faviconUrl }}">
+
     @include('layouts.seo')
 
     <link rel="preconnect" href="https://fonts.bunny.net">
