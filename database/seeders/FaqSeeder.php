@@ -84,14 +84,12 @@ class FaqSeeder extends Seeder
         foreach ($data as $idx => $cat) {
             $items = $cat['items'];
             unset($cat['items']);
-            $category = FaqCategory::create($cat);
+            $category = FaqCategory::firstOrCreate(['slug' => $cat['slug']], $cat);
             foreach ($items as $i => $item) {
-                FaqItem::create([
-                    'faq_category_id' => $category->id,
-                    'sort_order' => $i,
-                    'question' => $item['question'],
-                    'answer' => $item['answer'],
-                ]);
+                FaqItem::updateOrCreate(
+                    ['faq_category_id' => $category->id, 'sort_order' => $i],
+                    ['question' => $item['question'], 'answer' => $item['answer']]
+                );
             }
         }
     }
