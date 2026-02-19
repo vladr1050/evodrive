@@ -42,7 +42,7 @@ class LeadResource extends Resource
                                 titleAttribute: 'model',
                                 modifyQueryUsing: fn ($q) => $q->where('is_active', true)->orderBy('make'),
                             )
-                            ->getOptionLabelFromRecordUsing(fn ($r) => $r->make . ' ' . $r->model . ' (€' . $r->price . '/wk)')
+                            ->getOptionLabelFromRecordUsing(fn ($r) => $r ? $r->make . ' ' . $r->model . ' (€' . $r->price . '/wk)' : '—')
                             ->searchable(['make', 'model'])
                             ->preload(),
                         Forms\Components\Toggle::make('atd_license')->label('ATD License'),
