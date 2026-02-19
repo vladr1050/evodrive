@@ -11,6 +11,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Check deploy secrets
+        run: |
+          if [ -z "${{ secrets.DEPLOY_HOST }}" ]; then echo "::error::Add secret DEPLOY_HOST (e.g. 89.167.74.32) in Settings → Secrets → Actions"; exit 1; fi
+          if [ -z "${{ secrets.DEPLOY_USER }}" ]; then echo "::error::Add secret DEPLOY_USER (e.g. root)"; exit 1; fi
+          if [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ]; then echo "::error::Add secret DEPLOY_SSH_KEY (private key for SSH to server)"; exit 1; fi
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
