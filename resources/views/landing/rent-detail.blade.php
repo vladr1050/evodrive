@@ -27,10 +27,14 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-16">
             <div class="lg:col-span-8 space-y-16">
-                <div class="rounded-[48px] overflow-hidden shadow-2xl shadow-slate-200/50 bg-slate-100 aspect-[16/10] w-full">
+                <div class="rounded-[48px] overflow-hidden shadow-2xl shadow-slate-200/50 bg-slate-100 aspect-[16/10] w-full relative">
                     @if(!empty($car['image']))
                         <img src="{{ $car['image'] }}" alt="{{ $car['make'] }} {{ $car['model'] }}" loading="eager"
-                             class="w-full h-full object-contain object-center">
+                             class="w-full h-full object-contain object-center vehicle-image"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="w-full h-full flex items-center justify-center text-slate-300 absolute inset-0 bg-slate-100" style="display: none;">
+                            <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        </div>
                     @else
                         <div class="w-full h-full flex items-center justify-center text-slate-300">
                             <svg class="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
