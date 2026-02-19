@@ -22,7 +22,7 @@ class TranslationSeeder extends Seeder
         $keys = array_unique(array_merge(array_keys($en), array_keys($ru), array_keys($lv)));
 
         foreach ($keys as $key) {
-            Translation::updateOrCreate(
+            Translation::firstOrCreate(
                 ['group' => $group, 'key' => $key],
                 [
                     'en' => $en[$key] ?? null,
