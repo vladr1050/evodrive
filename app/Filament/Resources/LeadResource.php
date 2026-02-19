@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\LeadResource\Pages;
 use App\Models\Lead;
+use App\Models\RentalVehicle;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -37,14 +38,13 @@ class LeadResource extends Resource
                         Forms\Components\Select::make('intent')->options(['work' => 'Work', 'rent' => 'Rent']),
                         Forms\Components\Select::make('rent_car_id')
                             ->label('Rental Vehicle')
-                            ->relationship(
-                                name: 'rentalVehicle',
-                                titleAttribute: 'model',
-                                modifyQueryUsing: fn ($q) => $q->where('is_active', true)->orderBy('make'),
+                            ->options(
+                                fn () => RentalVehicle::where('is_active', true)->orderBy('make')->get()
+                                    ->mapWithKeys(fn (RentalVehicle $r) => [$r->id => $r->make . ' ' . $r->model . ' (€' . $r->price . '/wk)'])
+                                    ->all()
                             )
-                            ->getOptionLabelFromRecordUsing(fn ($r) => $r ? $r->make . ' ' . $r->model . ' (€' . $r->price . '/wk)' : '—')
-                            ->searchable(['make', 'model'])
-                            ->preload(),
+                            ->searchable()
+                            ->getOptionLabelUsing(fn ($value): ?string => $value ? (($r = RentalVehicle::find($value)) ? $r->make . ' ' . $r->model . ' (€' . $r->price . '/wk)' : '—') : null),
                         Forms\Components\Toggle::make('atd_license')->label('ATD License'),
                         Forms\Components\TextInput::make('atd_number')->label('ATD Card Number')->maxLength(50),
                         Forms\Components\TextInput::make('driving_experience')->maxLength(20),
