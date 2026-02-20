@@ -104,8 +104,12 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             TranslationSeeder::class,
-            RentalVehicleSeeder::class,
             FaqSeeder::class,
         ]);
+
+        // Rental vehicles only from config on local/staging; prod manages them in admin
+        if (! app()->environment('production')) {
+            $this->call(RentalVehicleSeeder::class);
+        }
     }
 }
