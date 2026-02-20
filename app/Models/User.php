@@ -71,7 +71,11 @@ class User extends Authenticatable implements FilamentUser
         if ($this->isAdmin()) {
             return true;
         }
-        $allowed = $this->allowed_resources ?? [];
+        $allowed = $this->allowed_resources;
+        // Legacy: manager with never-set permissions (null) had full access before the feature
+        if ($allowed === null) {
+            return true;
+        }
 
         return in_array($key, $allowed, true);
     }
