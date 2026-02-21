@@ -33,6 +33,7 @@ jobs:
             docker compose exec -T app php artisan migrate --force
             docker compose exec -T app php artisan db:seed --force
             docker compose exec -T app php artisan storage:link || true
+            docker compose exec -T app sh -c 'mkdir -p /shared/public && rm -f /shared/public/storage && ln -sf /var/www/html/storage/app/public /shared/public/storage'
             docker compose exec -T app php artisan config:cache
             docker compose exec -T app php artisan route:cache
             docker compose exec -T app php artisan view:cache

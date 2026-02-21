@@ -7,10 +7,10 @@ if [ -d /var/www/html/public/build ] && [ -n "$(ls -A /var/www/html/public/build
   cp -rn /var/www/html/public/. /shared/public/ 2>/dev/null || true
   chown -R www-data:www-data /shared/public 2>/dev/null || true
 fi
-# Ensure storage symlink exists in shared public (nginx serves from this volume; needs symlink + storage_app mount).
-if [ -L /var/www/html/public/storage ]; then
-  rm -f /shared/public/storage 2>/dev/null || true
-  cp -a /var/www/html/public/storage /shared/public/ 2>/dev/null || true
-  chown -h www-data:www-data /shared/public/storage 2>/dev/null || true
-fi
+# Ensure storage symlink exists in shared public so nginx can serve uploads (logo, favicon).
+# ln -sf so it works after every deploy; target must be path nginx resolves (it has storage_app at /var/www/html/storage).
+mkdir -p /shared/public
+rm -f /shared/public/storage
+ln -sf /var/www/html/storage/app/public /shared/public/storage
+chown -h www-data:www-data /shared/public/storage 2>/dev/null || true
 exec "$@"
