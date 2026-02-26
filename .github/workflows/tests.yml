@@ -45,6 +45,15 @@ jobs:
           touch database/testing.sqlite
           php artisan migrate --force
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Build assets (required for views in tests)
+        run: npm ci && npm run build
+
       - name: PHPUnit
         run: php artisan test --testsuite=Feature
         env:
@@ -52,10 +61,6 @@ jobs:
           DB_DATABASE: database/testing.sqlite
 
   # E2E and pgsql disabled temporarily - unblock deploy for timezone/Create Shifts
-  # - name: Install npm dependencies
-  #   run: npm ci
-  # - name: Build assets
-  #   run: npm run build
   # - name: Install Playwright
   #   run: npx playwright install chromium --with-deps
   # - name: Playwright E2E
