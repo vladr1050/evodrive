@@ -31,6 +31,8 @@ class FleetVehicle extends Model
         'registration_number',
         'home_station_id',
         'status',
+        'imei',
+        'sim',
     ];
 
     protected function casts(): array

@@ -69,6 +69,12 @@ class FleetVehicleResource extends Resource
                             ->options(collect(VehicleStatus::cases())->mapWithKeys(fn ($c) => [$c->value => ucfirst($c->value)]))
                             ->default(VehicleStatus::Active)
                             ->required(),
+                        Forms\Components\TextInput::make('imei')
+                            ->label('IMEI')
+                            ->maxLength(20),
+                        Forms\Components\TextInput::make('sim')
+                            ->label('SIM')
+                            ->maxLength(50),
                     ])
                     ->columns(2),
             ]);
@@ -92,6 +98,14 @@ class FleetVehicleResource extends Resource
                 Tables\Columns\TextColumn::make('homeStation.name')
                     ->label('Home station')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('imei')
+                    ->label('IMEI')
+                    ->searchable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('sim')
+                    ->label('SIM')
+                    ->searchable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn ($state) => $state instanceof VehicleStatus ? ucfirst($state->value) : (string) $state)
