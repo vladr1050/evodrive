@@ -3,13 +3,20 @@
 # Multi-stage: composer → frontend build → final runtime.
 
 # ---------------------------------------------------------------------------
-# Stage 1: Composer dependencies
+# Stage 1: Composer dependencies (PHP 8.4 to match composer.lock)
 # ---------------------------------------------------------------------------
-FROM composer:2.8 AS composer
+FROM php:8.4-cli-bookworm AS composer
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    unzip \
+    libzip-dev \
+    libicu-dev \
+    && docker-php-ext-install intl zip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
-
-RUN apk add --no-cache icu-dev && docker-php-ext-install intl
 
 COPY composer.json composer.lock ./
 RUN composer install \
