@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
 class RentalVehicle extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'make', 'model', 'year', 'type', 'transmission', 'consumption',
         'seats', 'price', 'deposit', 'image_path', 'image_url', 'categories', 'description',

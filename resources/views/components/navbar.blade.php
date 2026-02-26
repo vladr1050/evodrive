@@ -4,10 +4,12 @@
     $isWorkActive = str_ends_with($path, 'g');
     $isRentActive = str_ends_with($path, 'm');
     $isFaqActive = str_contains($path, 'faq');
+    $isDriverPortalActive = str_contains($path, 'driverportal');
     $settings = $siteSettings ?? \App\Models\SiteSetting::first();
     $navLinks = [
         ['name' => __('ui.nav_work_fleet'), 'path' => route('work', ['locale' => $locale]), 'icon' => 'briefcase'],
         ['name' => __('ui.nav_rent_taxi'), 'path' => route('rent', ['locale' => $locale]), 'icon' => 'car'],
+        ['name' => __('ui.nav_driver_portal'), 'path' => route('driverportal.login', ['locale' => $locale]), 'icon' => 'user'],
         ['name' => __('ui.faq_title'), 'path' => route('landing.faq', ['locale' => $locale]), 'icon' => 'faq'],
     ];
     $langLabels = ['lv' => 'LV', 'en' => 'ENG', 'ru' => 'RUS'];
@@ -24,7 +26,7 @@
             <div class="hidden md:flex items-center space-x-8">
                 @foreach($navLinks as $link)
                     <a href="{{ $link['path'] }}"
-                       class="text-sm font-semibold transition-colors flex items-center gap-1.5 {{ ($link['icon'] === 'briefcase' ? $isWorkActive : ($link['icon'] === 'car' ? $isRentActive : $isFaqActive)) ? 'text-brand-600' : 'text-slate-500 hover:text-slate-900' }}">
+                       class="text-sm font-semibold transition-colors flex items-center gap-1.5 {{ ($link['icon'] === 'briefcase' ? $isWorkActive : ($link['icon'] === 'car' ? $isRentActive : ($link['icon'] === 'user' ? $isDriverPortalActive : $isFaqActive))) ? 'text-brand-600' : 'text-slate-500 hover:text-slate-900' }}">
                         {{ $link['name'] }}
                     </a>
                 @endforeach
@@ -56,11 +58,13 @@
     <div id="navbar-mobile-menu" class="hidden md:hidden bg-white border-b border-slate-100">
         <div class="px-4 pt-2 pb-6 space-y-1">
             @foreach($navLinks as $link)
-                <a href="{{ $link['path'] }}" class="block px-3 py-3 rounded-lg text-base font-bold flex items-center gap-3 {{ ($link['icon'] === 'briefcase' ? $isWorkActive : ($link['icon'] === 'car' ? $isRentActive : $isFaqActive)) ? 'text-brand-600' : 'text-slate-500 hover:text-slate-900' }}">
+                <a href="{{ $link['path'] }}" class="block px-3 py-3 rounded-lg text-base font-bold flex items-center gap-3 {{ ($link['icon'] === 'briefcase' ? $isWorkActive : ($link['icon'] === 'car' ? $isRentActive : ($link['icon'] === 'user' ? $isDriverPortalActive : $isFaqActive))) ? 'text-brand-600' : 'text-slate-500 hover:text-slate-900' }}">
                     @if($link['icon'] === 'briefcase')
                         <x-icon-briefcase class="w-5 h-5" />
                     @elseif($link['icon'] === 'car')
                         <x-icon-car class="w-5 h-5" />
+                    @elseif($link['icon'] === 'user')
+                        <x-icon-user class="w-5 h-5" />
                     @else
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     @endif

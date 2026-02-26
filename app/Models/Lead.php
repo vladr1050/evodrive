@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Lead extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'source', 'intent', 'rent_car_id', 'phone', 'name', 'email', 'atd_license', 'atd_number',
         'driving_experience', 'shift_preference', 'area',

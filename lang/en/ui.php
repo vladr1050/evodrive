@@ -40,6 +40,7 @@ return [
     'apply_in_2_minutes' => 'Apply in 2 Minutes',
     'nav_work_fleet' => 'Work with Fleet',
     'nav_rent_taxi' => 'Rent for Taxi',
+    'nav_driver_portal' => 'Driver Portal',
     'apply_now' => 'Apply Now',
     'every_contacted_24h' => 'Every applicant contacted within 24 hours',
     'modern_fleet' => 'Modern Fleet',

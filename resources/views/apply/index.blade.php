@@ -61,11 +61,11 @@
                     </div>
                     <div class="relative group">
                         <div class="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xl group-focus-within:text-brand-600 transition-colors">+371</div>
-                        <input type="tel" name="phone" required minlength="8" maxlength="15" autofocus
+                        <input type="tel" name="phone" data-testid="apply-phone" required minlength="8" maxlength="15" autofocus
                                class="w-full pl-24 pr-6 py-6 bg-slate-50 border-2 border-slate-200 focus:border-brand-600 focus:bg-white rounded-[24px] outline-none text-2xl font-black transition-all shadow-sm focus:shadow-xl focus:shadow-brand-600/5"
                                placeholder="2XXXXXXX" value="{{ old('phone', $sessionData['phone'] ?? '') }}">
                     </div>
-                    <button type="button" id="next-btn" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-5 rounded-2xl text-lg min-h-[72px] hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-600/20" disabled>{{ __('apply.next_step') }}</button>
+                    <button type="button" id="next-btn" data-testid="apply-next" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-5 rounded-2xl text-lg min-h-[72px] hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-600/20" disabled>{{ __('apply.next_step') }}</button>
                 </div>
 
                 <div data-step class="hidden space-y-8">
@@ -74,7 +74,7 @@
                         <p class="text-slate-400 font-medium">{{ __('apply.step_path_sub') }}</p>
                     </div>
                     <div class="grid grid-cols-1 gap-4">
-                        <button type="button" data-goto data-intent="work" class="p-6 text-left rounded-[28px] border-2 border-slate-50 bg-slate-50 hover:bg-slate-100 transition-all flex items-center gap-5">
+                        <button type="button" data-goto data-intent="work" data-testid="apply-intent-work" class="p-6 text-left rounded-[28px] border-2 border-slate-50 bg-slate-50 hover:bg-slate-100 transition-all flex items-center gap-5">
                             <div class="w-14 h-14 rounded-2xl flex items-center justify-center bg-white text-slate-400">
                                 <x-icon-briefcase class="w-7 h-7" />
                             </div>
@@ -83,7 +83,7 @@
                                 <div class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">{{ __('apply.path_company_fleet_sub') }}</div>
                             </div>
                         </button>
-                        <button type="button" data-goto data-intent="rent" class="p-6 text-left rounded-[28px] border-2 border-slate-50 bg-slate-50 hover:bg-slate-100 transition-all flex items-center gap-5">
+                        <button type="button" data-goto data-intent="rent" data-testid="apply-intent-rent" class="p-6 text-left rounded-[28px] border-2 border-slate-50 bg-slate-50 hover:bg-slate-100 transition-all flex items-center gap-5">
                             <div class="w-14 h-14 rounded-2xl flex items-center justify-center bg-white text-slate-400">
                                 <x-icon-car class="w-7 h-7" />
                             </div>
@@ -121,7 +121,7 @@
                             </div>
                         </div>
                     </div>
-                    <button type="button" id="next-btn-3" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-5 rounded-2xl text-lg min-h-[72px] hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>{{ __('apply.continue') }}</button>
+                    <button type="button" id="next-btn-3" data-testid="apply-next-3" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-5 rounded-2xl text-lg min-h-[72px] hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>{{ __('apply.continue') }}</button>
                 </div>
 
                 <div data-step class="hidden space-y-8">
@@ -132,18 +132,18 @@
                     <div class="space-y-5">
                         <div class="relative group">
                             <x-icon-user class="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-brand-600 transition-colors" />
-                            <input type="text" name="name" required
+                            <input type="text" name="name" data-testid="apply-name" required
                                    class="w-full pl-16 pr-6 py-5 bg-slate-50 border-2 border-transparent focus:border-brand-600 focus:bg-white rounded-[24px] outline-none text-xl font-black transition-all shadow-sm"
                                    placeholder="{{ __('apply.name_placeholder') }}" value="{{ old('name', $sessionData['name'] ?? '') }}">
                         </div>
                         <div class="relative group">
                             <x-icon-map-pin class="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-brand-600 transition-colors" />
-                            <input type="text" name="area" required
+                            <input type="text" name="area" data-testid="apply-area" required
                                    class="w-full pl-16 pr-6 py-5 bg-slate-50 border-2 border-transparent focus:border-brand-600 focus:bg-white rounded-[24px] outline-none text-xl font-black transition-all shadow-sm"
                                    placeholder="{{ __('apply.area_placeholder') }}" value="{{ old('area', $sessionData['area'] ?? '') }}">
                         </div>
                     </div>
-                    <button type="button" id="next-btn-4" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-5 rounded-2xl text-lg min-h-[72px] hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>{{ __('apply.final_step') }}</button>
+                    <button type="button" id="next-btn-4" data-testid="apply-next-4" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-5 rounded-2xl text-lg min-h-[72px] hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all" disabled>{{ __('apply.final_step') }}</button>
                 </div>
 
                 <div data-step class="hidden space-y-10 text-center py-6">
@@ -155,7 +155,7 @@
                         <p class="text-slate-500 text-lg font-medium leading-relaxed max-w-sm mx-auto">{{ __('apply.step_ready_sub') }}</p>
                     </div>
                     <div class="pt-2">
-                        <button type="button" id="submit-btn" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-6 rounded-2xl text-xl min-h-[80px] shadow-2xl shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95">{{ __('apply.submit_button') }}</button>
+                        <button type="button" id="submit-btn" data-testid="apply-submit" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-6 rounded-2xl text-xl min-h-[80px] shadow-2xl shadow-brand-600/20 hover:bg-brand-700 transition-all active:scale-95">{{ __('apply.submit_button') }}</button>
                         <p class="mt-6 text-[10px] font-bold text-slate-300 uppercase tracking-widest">{{ __('apply.submit_terms') }}</p>
                     </div>
                 </div>

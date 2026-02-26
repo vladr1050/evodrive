@@ -1,5 +1,6 @@
 *.log
 .DS_Store
+.deploy.lock
 .env
 .env.backup
 .env.production
@@ -19,6 +20,8 @@
 /storage/*.key
 /storage/pail
 /vendor
+database/testing.sqlite
+database/e2e.sqlite
 Homestead.json
 Homestead.yaml
 Thumbs.db

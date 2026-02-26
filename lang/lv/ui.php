@@ -40,6 +40,7 @@ return [
     'apply_in_2_minutes' => 'Pieteikties 2 minūtēs',
     'nav_work_fleet' => 'Strādāt ar floti',
     'nav_rent_taxi' => 'Īre taksometram',
+    'nav_driver_portal' => 'Šoferu portāls',
     'apply_now' => 'Pieteikties',
     'every_contacted_24h' => 'Katrai pieteicējam sazināsimies 24 stundu laikā',
     'modern_fleet' => 'Mūsdienīga flote',

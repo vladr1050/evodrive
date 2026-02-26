@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="/Users/vladimir/evodrive/evodrive-app/phpunit.xml" tests="16" assertions="41" errors="0" failures="0" skipped="0" time="0.935472">
+    <testsuite name="Feature" tests="16" assertions="41" errors="0" failures="0" skipped="0" time="0.935472">
+      <testsuite name="Tests\Feature\DriverPortalAccessTest" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalAccessTest.php" tests="7" assertions="13" errors="0" failures="0" skipped="0" time="0.727790">
+        <testcase name="test_unauthenticated_dashboard_redirects_to_login" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalAccessTest.php" line="13" class="Tests\Feature\DriverPortalAccessTest" classname="Tests.Feature.DriverPortalAccessTest" assertions="2" time="0.434104"/>
+        <testcase name="test_unauthenticated_shifts_redirects_to_login" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalAccessTest.php" line="19" class="Tests\Feature\DriverPortalAccessTest" classname="Tests.Feature.DriverPortalAccessTest" assertions="2" time="0.018143"/>
+        <testcase name="test_unauthenticated_profile_redirects_to_login" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalAccessTest.php" line="25" class="Tests\Feature\DriverPortalAccessTest" classname="Tests.Feature.DriverPortalAccessTest" assertions="2" time="0.014590"/>
+        <testcase name="test_authenticated_driver_sees_dashboard" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalAccessTest.php" line="31" class="Tests\Feature\DriverPortalAccessTest" classname="Tests.Feature.DriverPortalAccessTest" assertions="1" time="0.204035"/>
+        <testcase name="test_authenticated_driver_sees_shifts" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalAccessTest.php" line="41" class="Tests\Feature\DriverPortalAccessTest" classname="Tests.Feature.DriverPortalAccessTest" assertions="1" time="0.023035"/>
+        <testcase name="test_authenticated_driver_sees_profile" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalAccessTest.php" line="53" class="Tests\Feature\DriverPortalAccessTest" classname="Tests.Feature.DriverPortalAccessTest" assertions="1" time="0.014953"/>
+        <testcase name="test_logout_invalidates_session_and_redirects" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalAccessTest.php" line="63" class="Tests\Feature\DriverPortalAccessTest" classname="Tests.Feature.DriverPortalAccessTest" assertions="4" time="0.018931"/>
+      </testsuite>
+      <testsuite name="Tests\Feature\DriverPortalProfileTest" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalProfileTest.php" tests="1" assertions="3" errors="0" failures="0" skipped="0" time="0.023279">
+        <testcase name="test_profile_update_persists_atd_number" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalProfileTest.php" line="13" class="Tests\Feature\DriverPortalProfileTest" classname="Tests.Feature.DriverPortalProfileTest" assertions="3" time="0.023279"/>
+      </testsuite>
+      <testsuite name="Tests\Feature\DriverPortalShiftCancelTest" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalShiftCancelTest.php" tests="4" assertions="13" errors="0" failures="0" skipped="0" time="0.091690">
+        <testcase name="test_driver_can_cancel_own_future_shift" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalShiftCancelTest.php" line="40" class="Tests\Feature\DriverPortalShiftCancelTest" classname="Tests.Feature.DriverPortalShiftCancelTest" assertions="5" time="0.026702"/>
+        <testcase name="test_driver_cannot_cancel_other_drivers_shift" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalShiftCancelTest.php" line="69" class="Tests\Feature\DriverPortalShiftCancelTest" classname="Tests.Feature.DriverPortalShiftCancelTest" assertions="3" time="0.021872"/>
+        <testcase name="test_driver_cannot_cancel_past_shift" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalShiftCancelTest.php" line="96" class="Tests\Feature\DriverPortalShiftCancelTest" classname="Tests.Feature.DriverPortalShiftCancelTest" assertions="3" time="0.020972"/>
+        <testcase name="test_driver_cannot_cancel_already_cancelled_shift" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalShiftCancelTest.php" line="123" class="Tests\Feature\DriverPortalShiftCancelTest" classname="Tests.Feature.DriverPortalShiftCancelTest" assertions="2" time="0.022144"/>
+      </testsuite>
+      <testsuite name="Tests\Feature\DriverPortalShiftFlowTest" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalShiftFlowTest.php" tests="4" assertions="12" errors="0" failures="0" skipped="0" time="0.092713">
+        <testcase name="test_check_availability_returns_count_when_vehicles_available" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalShiftFlowTest.php" line="41" class="Tests\Feature\DriverPortalShiftFlowTest" classname="Tests.Feature.DriverPortalShiftFlowTest" assertions="2" time="0.023109"/>
+        <testcase name="test_confirm_booking_creates_shift_with_booked_status" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalShiftFlowTest.php" line="62" class="Tests\Feature\DriverPortalShiftFlowTest" classname="Tests.Feature.DriverPortalShiftFlowTest" assertions="4" time="0.023672"/>
+        <testcase name="test_driver_can_cancel_own_future_shift" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalShiftFlowTest.php" line="84" class="Tests\Feature\DriverPortalShiftFlowTest" classname="Tests.Feature.DriverPortalShiftFlowTest" assertions="3" time="0.023084"/>
+        <testcase name="test_driver_cannot_cancel_other_drivers_shift" file="/Users/vladimir/evodrive/evodrive-app/tests/Feature/DriverPortalShiftFlowTest.php" line="111" class="Tests\Feature\DriverPortalShiftFlowTest" classname="Tests.Feature.DriverPortalShiftFlowTest" assertions="3" time="0.022848"/>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>

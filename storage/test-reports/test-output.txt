@@ -1,0 +1,228 @@
+
+   PASS  Tests\Feature\CompleteShiftsCommandTest
+  ✓ past ended booked shift becomes completed                            0.16s  
+  ✓ future shift unchanged                                               0.02s  
+  ✓ cancelled shift unchanged                                            0.02s  
+
+   PASS  Tests\Feature\DriverPortalProfileTest
+  ✓ profile update persists atd number                                   0.04s  
+
+   PASS  Tests\Feature\DriverPortalShiftCancelTest
+  ✓ driver can cancel own future shift                                   0.02s  
+  ✓ driver cannot cancel other drivers shift                             0.02s  
+  ✓ driver cannot cancel past shift                                      0.02s  
+  ✓ driver cannot cancel already cancelled shift                         0.02s  
+
+   PASS  Tests\Feature\ShiftAvailabilityPerformanceTest
+  ✓ check availability no n plus one with many vehicles and shifts       0.10s  
+
+   PASS  Tests\Feature\ShiftBookingTest
+  ✓ two drivers same station time only one succeeds                      0.02s  
+  ✓ downtime makes vehicle unavailable so second booking fails           0.02s  
+  ✓ daily limit violation                                                0.02s  
+  ✓ vehicle 24h cap                                                      0.02s  
+  ✓ invalid duration                                                     0.01s  
+  ✓ downtime gap exactly equals downtime allowed                         0.02s  
+  ✓ downtime gap one minute less blocked                                 0.02s  
+  ✓ downtime requested ends at next start blocked                        0.02s  
+  ✓ concurrent booking same slot exactly one shift second fails          0.24s  
+
+   FAIL  Tests\Feature\ShiftCopyWeekTest
+  ⨯ copy week happy path
+  ⨯ copy week partial conflict
+  ⨯ copy week race condition
+  ⨯ copy week invalid duration due to policy change
+
+   FAIL  Tests\Feature\ShiftTimezoneWeekBoundaryTest
+  ⨯ copy week uses iso week start in policy timezone
+  ⨯ planning window respects policy timezone not server timezone
+
+   FAIL  Tests\Feature\ShiftVehicle24hCapTest
+  ⨯ vehicle cap exact 24h blocks any additional
+  ⨯ vehicle cap cross midnight counts per day
+  ⨯ vehicle cap near 24h boundary
+  ⨯ vehicle cap uses policy timezone for calendar day
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ShiftCopyWeekTest > copy week happy…  QueryException   
+  SQLSTATE[HY000]: General error: 1 cannot VACUUM from within a transaction (Connection: sqlite, Database: :memory:, SQL: vacuum "main")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+38 vendor frames [22m
+  39  tests/Feature/ShiftCopyWeekTest.php:28
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ShiftCopyWeekTest > copy week parti…  QueryException   
+  SQLSTATE[HY000]: General error: 1 table "migrations" already exists (Connection: sqlite, Database: :memory:, SQL: create table "migrations" ("id" integer primary key autoincrement not null, "migration" varchar not null, "batch" integer not null))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+53 vendor frames [22m
+  54  tests/Feature/ShiftCopyWeekTest.php:28
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ShiftCopyWeekTest > copy week race…   QueryException   
+  SQLSTATE[HY000]: General error: 1 table "migrations" already exists (Connection: sqlite, Database: :memory:, SQL: create table "migrations" ("id" integer primary key autoincrement not null, "migration" varchar not null, "batch" integer not null))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+53 vendor frames [22m
+  54  tests/Feature/ShiftCopyWeekTest.php:28
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ShiftCopyWeekTest > copy week inval…  QueryException   
+  SQLSTATE[HY000]: General error: 1 table "migrations" already exists (Connection: sqlite, Database: :memory:, SQL: create table "migrations" ("id" integer primary key autoincrement not null, "migration" varchar not null, "batch" integer not null))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+53 vendor frames [22m
+  54  tests/Feature/ShiftCopyWeekTest.php:28
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ShiftTimezoneWeekBoundaryTest > cop…  QueryException   
+  SQLSTATE[HY000]: General error: 1 table "migrations" already exists (Connection: sqlite, Database: :memory:, SQL: create table "migrations" ("id" integer primary key autoincrement not null, "migration" varchar not null, "batch" integer not null))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+53 vendor frames [22m
+  54  tests/Feature/ShiftTimezoneWeekBoundaryTest.php:27
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ShiftTimezoneWeekBoundaryTest > pla…  QueryException   
+  SQLSTATE[HY000]: General error: 1 table "migrations" already exists (Connection: sqlite, Database: :memory:, SQL: create table "migrations" ("id" integer primary key autoincrement not null, "migration" varchar not null, "batch" integer not null))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+53 vendor frames [22m
+  54  tests/Feature/ShiftTimezoneWeekBoundaryTest.php:27
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ShiftVehicle24hCapTest > vehicle ca…  QueryException   
+  SQLSTATE[HY000]: General error: 1 table "migrations" already exists (Connection: sqlite, Database: :memory:, SQL: create table "migrations" ("id" integer primary key autoincrement not null, "migration" varchar not null, "batch" integer not null))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+53 vendor frames [22m
+  54  tests/Feature/ShiftVehicle24hCapTest.php:27
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ShiftVehicle24hCapTest > vehicle ca…  QueryException   
+  SQLSTATE[HY000]: General error: 1 table "migrations" already exists (Connection: sqlite, Database: :memory:, SQL: create table "migrations" ("id" integer primary key autoincrement not null, "migration" varchar not null, "batch" integer not null))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+53 vendor frames [22m
+  54  tests/Feature/ShiftVehicle24hCapTest.php:27
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ShiftVehicle24hCapTest > vehicle ca…  QueryException   
+  SQLSTATE[HY000]: General error: 1 table "migrations" already exists (Connection: sqlite, Database: :memory:, SQL: create table "migrations" ("id" integer primary key autoincrement not null, "migration" varchar not null, "batch" integer not null))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+53 vendor frames [22m
+  54  tests/Feature/ShiftVehicle24hCapTest.php:27
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ShiftVehicle24hCapTest > vehicle ca…  QueryException   
+  SQLSTATE[HY000]: General error: 1 table "migrations" already exists (Connection: sqlite, Database: :memory:, SQL: create table "migrations" ("id" integer primary key autoincrement not null, "migration" varchar not null, "batch" integer not null))
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:838
+    834▕             $exceptionType = $this->isUniqueConstraintError($e)
+    835▕                 ? UniqueConstraintViolationException::class
+    836▕                 : QueryException::class;
+    837▕ 
+  ➜ 838▕             throw new $exceptionType(
+    839▕                 $this->getNameWithReadWriteType(),
+    840▕                 $query,
+    841▕                 $this->prepareBindings($bindings),
+    842▕                 $e,
+
+      [2m+53 vendor frames [22m
+  54  tests/Feature/ShiftVehicle24hCapTest.php:27
+
+
+  Tests:    10 failed, 18 passed (50 assertions)
+  Duration: 1.05s
+

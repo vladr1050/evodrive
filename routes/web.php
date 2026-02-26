@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ApplyController;
+use App\Http\Controllers\DriverPortalController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LandingController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,23 @@ Route::prefix('{locale}')
         Route::get('faq', [LandingController::class, 'faq'])->name('landing.faq');
         Route::get('privacy', fn () => view('legal.privacy'))->name('legal.privacy');
         Route::get('terms', fn () => view('legal.terms'))->name('legal.terms');
+
+        // Driver Portal (Fleet)
+        Route::get('driverportal', [DriverPortalController::class, 'login'])->name('driverportal.login');
+        Route::post('driverportal', [DriverPortalController::class, 'loginSubmit'])->name('driverportal.login.submit');
+        Route::middleware('auth:driver')->group(function () {
+            Route::get('driverportal/dashboard', [DriverPortalController::class, 'dashboard'])->name('driverportal.dashboard');
+            Route::get('driverportal/shifts', [DriverPortalController::class, 'shifts'])->name('driverportal.shifts');
+            Route::post('driverportal/shifts/check-availability', [DriverPortalController::class, 'checkAvailability'])->name('driverportal.shifts.check-availability');
+            Route::post('driverportal/shifts/confirm', [DriverPortalController::class, 'confirmShift'])->name('driverportal.shifts.confirm');
+            Route::post('driverportal/shifts/copy-week', [DriverPortalController::class, 'copyWeek'])->name('driverportal.shifts.copy-week');
+            Route::post('driverportal/shifts/copy-previous-week-preview', [DriverPortalController::class, 'copyPreviousWeekPreview'])->name('driverportal.shifts.copy-previous-week-preview');
+            Route::post('driverportal/shifts/copy-previous-week-confirm', [DriverPortalController::class, 'copyPreviousWeekConfirm'])->name('driverportal.shifts.copy-previous-week-confirm');
+            Route::post('driverportal/shifts/{shift}/cancel', [DriverPortalController::class, 'cancelShift'])->name('driverportal.shifts.cancel');
+            Route::get('driverportal/profile', [DriverPortalController::class, 'profile'])->name('driverportal.profile');
+            Route::post('driverportal/profile', [DriverPortalController::class, 'updateProfile'])->name('driverportal.profile.update');
+            Route::post('driverportal/logout', [DriverPortalController::class, 'logout'])->name('driverportal.logout');
+        });
     });
 
 Route::get('/sitemap.xml', function () {
