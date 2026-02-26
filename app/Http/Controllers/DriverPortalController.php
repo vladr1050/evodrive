@@ -114,17 +114,18 @@ class DriverPortalController extends Controller
         }
         $weekStart = $startOfWeek->copy();
         $weekEnd = $startOfWeek->copy()->addDays(6)->endOfDay();
-        $shifts = Shift::where('driver_id', $driver->id)
-            ->whereIn('status', [\App\Enums\ShiftStatus::Booked, \App\Enums\ShiftStatus::Completed])
+        $driverId = $driver->id;
+        $shifts = Shift::whereIn('status', [\App\Enums\ShiftStatus::Booked, \App\Enums\ShiftStatus::Completed])
             ->where('starts_at', '>=', $weekStart)
             ->where('ends_at', '<=', $weekEnd)
             ->with(['vehicle', 'station'])
             ->orderBy('starts_at')
             ->get()
-            ->map(function (Shift $s) use ($days, $tz, $nowInTz) {
+            ->map(function (Shift $s) use ($days, $tz, $nowInTz, $driverId) {
                 $startsAtInTz = $s->starts_at->copy()->setTimezone($tz);
                 $endsAtInTz = $s->ends_at->copy()->setTimezone($tz);
-                $cancellable = $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz);
+                $isMine = (int) $s->driver_id === (int) $driverId;
+                $cancellable = $isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz);
                 return [
                     'id' => (string) $s->id,
                     'day' => $days[$startsAtInTz->dayOfWeek === 0 ? 6 : $startsAtInTz->dayOfWeek - 1],
@@ -134,6 +135,7 @@ class DriverPortalController extends Controller
                     'vehicle' => $s->vehicle?->label ?? '-',
                     'station' => $s->station?->name ?? '-',
                     'status' => $s->status->value,
+                    'is_mine' => $isMine,
                     'cancellable' => $cancellable,
                 ];
             })

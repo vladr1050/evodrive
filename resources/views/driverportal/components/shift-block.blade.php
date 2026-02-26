@@ -1,9 +1,10 @@
 @props(['shift'])
 @php
-    $isBooked = ($shift['status'] ?? '') === 'booked';
+    $isMine = (bool) ($shift['is_mine'] ?? false);
+    $isMyShift = $isMine && (($shift['status'] ?? '') === 'booked');
     $cancellable = (bool) ($shift['cancellable'] ?? false);
 @endphp
-<div class="shift-card relative p-3 rounded-2xl border transition-all hover:scale-[1.02] {{ $isBooked ? 'bg-green-50 border-green-200 shadow-sm' : 'bg-slate-200/50 border-slate-300/50 opacity-80' }}" data-shift-id="{{ $shift['id'] ?? '' }}" data-station-name="{{ $shift['station'] ?? '' }}">
+<div class="shift-card relative p-3 rounded-2xl border transition-all hover:scale-[1.02] {{ $isMyShift ? 'bg-green-50 border-green-200 shadow-sm' : 'bg-slate-200/50 border-slate-300/50 opacity-80' }}" data-shift-id="{{ $shift['id'] ?? '' }}" data-station-name="{{ $shift['station'] ?? '' }}">
     <div class="flex justify-between items-start mb-2">
         <div class="flex flex-col">
             <span class="text-base font-bold text-slate-900 leading-none">{{ $shift['start'] }}</span>
@@ -15,8 +16,8 @@
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             @endif
-            <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full whitespace-nowrap {{ $isBooked ? 'bg-green-100 text-green-700' : 'bg-slate-300 text-slate-600' }}">
-                {{ $isBooked ? __('portal.my_shift') : __('portal.reserved') }}
+            <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full whitespace-nowrap {{ $isMyShift ? 'bg-green-100 text-green-700' : 'bg-slate-300 text-slate-600' }}">
+                {{ $isMyShift ? __('portal.my_shift') : __('portal.reserved') }}
             </span>
         </div>
     </div>
