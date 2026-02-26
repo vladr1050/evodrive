@@ -42,7 +42,7 @@ class DriverPortalController extends Controller
     {
         $driver = Auth::guard('driver')->user();
         $locale = $request->route('locale', 'en');
-        $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
+        $tz = ShiftPolicy::active()?->timezone ?: 'Europe/Riga';
         $upcomingShifts = Shift::where('driver_id', $driver->id)
             ->where('status', \App\Enums\ShiftStatus::Booked)
             ->where('starts_at', '>=', now())
@@ -97,7 +97,7 @@ class DriverPortalController extends Controller
         $view = $request->get('view', 'current');
         $days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         $policyForTz = ShiftPolicy::active();
-        $tz = $policyForTz?->timezone ?? 'Europe/Riga';
+        $tz = $policyForTz?->timezone ?: 'Europe/Riga';
         $nowInTz = now($tz);
         $dayOfWeek = $nowInTz->dayOfWeek;
         $diffToMonday = $dayOfWeek === 0 ? -6 : 1 - $dayOfWeek;
@@ -175,7 +175,7 @@ class DriverPortalController extends Controller
             'duration_hours' => 'required|numeric|min:1',
         ]);
         try {
-            $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
+            $tz = ShiftPolicy::active()?->timezone ?: 'Europe/Riga';
             $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
             if ($startsAt->lte(now($tz))) {
                 return response()->json([
@@ -216,7 +216,7 @@ class DriverPortalController extends Controller
         ]);
         $driver = Auth::guard('driver')->user();
         try {
-            $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
+            $tz = ShiftPolicy::active()?->timezone ?: 'Europe/Riga';
             $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
             if ($startsAt->lte(now($tz))) {
                 return response()->json([

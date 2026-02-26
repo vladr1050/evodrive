@@ -31,7 +31,9 @@ class ShiftBookingService
 
         return DB::transaction(function () use ($driverId, $stationId, $startsAt, $durationHours, $policy) {
             $endsAt = $startsAt->copy()->addMinutes((int) round($durationHours * 60));
-            $vehicleId = $this->selectAvailableVehicleUnderLock($stationId, $startsAt, $endsAt, $policy);
+            $startsAtUtc = $startsAt->copy()->utc();
+            $endsAtUtc = $endsAt->copy()->utc();
+            $vehicleId = $this->selectAvailableVehicleUnderLock($stationId, $startsAtUtc, $endsAtUtc, $policy);
             if (! $vehicleId) {
                 throw ShiftBookingException::noVehiclesAvailable();
             }
@@ -45,8 +47,8 @@ class ShiftBookingService
                 'driver_id' => $driverId,
                 'vehicle_id' => $vehicleId,
                 'station_id' => $stationId,
-                'starts_at' => $startsAt,
-                'ends_at' => $endsAt,
+                'starts_at' => $startsAtUtc,
+                'ends_at' => $endsAtUtc,
                 'status' => ShiftStatus::Booked,
             ]);
 
