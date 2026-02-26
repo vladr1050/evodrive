@@ -116,6 +116,8 @@ class ShiftResource extends Resource
                     ->options(collect(ShiftStatus::cases())->mapWithKeys(fn ($c) => [$c->value => ucfirst($c->value)])),
             ])
             ->actions([
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn () => auth()->user()?->isAdmin() ?? false),
                 Tables\Actions\Action::make('cancel')
                     ->label('Cancel shift')
                     ->icon('heroicon-o-x-circle')
@@ -134,7 +136,10 @@ class ShiftResource extends Resource
                             ->send();
                     }),
             ])
-            ->bulkActions([]);
+            ->bulkActions([
+                Tables\Actions\DeleteBulkAction::make()
+                    ->visible(fn () => auth()->user()?->isAdmin() ?? false),
+            ]);
     }
 
     public static function getPages(): array
