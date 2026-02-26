@@ -41,6 +41,11 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --prefer-dist --no-progress
 
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
       - name: Prepare SQLite
         run: |
           touch database/testing.sqlite
@@ -106,6 +111,11 @@ jobs:
 
       - name: Install PHP dependencies
         run: composer install --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
 
       - name: Migrate
         run: php artisan migrate --force
