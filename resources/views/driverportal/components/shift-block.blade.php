@@ -28,10 +28,10 @@
         </div>
         <div class="flex items-start gap-1.5 text-[10px] text-slate-500 font-medium">
             <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 mt-0.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <div class="min-w-0 flex-1">
-                <span class="block truncate">{{ $shift['station'] }}</span>
+            <div class="min-w-0 flex-1 break-words">
+                <span class="block">{{ $shift['station'] }}</span>
                 @if(!empty($shift['station_address']))
-                    <span class="block truncate text-slate-400 mt-0.5">{{ $shift['station_address'] }}</span>
+                    <span class="block text-slate-400 mt-0.5 break-words">{{ $shift['station_address'] }}</span>
                 @endif
             </div>
         </div>
