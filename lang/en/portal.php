@@ -74,6 +74,7 @@ return [
     'not_available' => 'Not available',
     'check_failed' => 'Could not check availability.',
     'confirm_failed' => 'Could not book shift.',
+    'shift_start_must_be_future' => 'Shift must start in the future.',
     'copied' => 'Shifts copied.',
 
     // Copy previous week modal

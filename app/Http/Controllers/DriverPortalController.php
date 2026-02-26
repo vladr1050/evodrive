@@ -96,10 +96,12 @@ class DriverPortalController extends Controller
         $driver = Auth::guard('driver')->user();
         $view = $request->get('view', 'current');
         $days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        $now = now();
-        $dayOfWeek = $now->dayOfWeek;
+        $policyForTz = ShiftPolicy::active();
+        $tz = $policyForTz?->timezone ?? 'Europe/Riga';
+        $nowInTz = now($tz);
+        $dayOfWeek = $nowInTz->dayOfWeek;
         $diffToMonday = $dayOfWeek === 0 ? -6 : 1 - $dayOfWeek;
-        $startOfWeek = $now->copy()->addDays($diffToMonday + ($view === 'next' ? 7 : 0));
+        $startOfWeek = $nowInTz->copy()->addDays($diffToMonday + ($view === 'next' ? 7 : 0))->startOfDay();
         $weekDates = [];
         for ($i = 0; $i < 7; $i++) {
             $d = $startOfWeek->copy()->addDays($i);
@@ -110,11 +112,8 @@ class DriverPortalController extends Controller
                 'iso' => $d->format('Y-m-d'),
             ];
         }
-        $weekStart = $startOfWeek->copy()->startOfDay();
+        $weekStart = $startOfWeek->copy();
         $weekEnd = $startOfWeek->copy()->addDays(6)->endOfDay();
-        $policyForTz = ShiftPolicy::active();
-        $tz = $policyForTz?->timezone ?? 'UTC';
-        $nowInTz = now($tz);
         $shifts = Shift::where('driver_id', $driver->id)
             ->whereIn('status', [\App\Enums\ShiftStatus::Booked, \App\Enums\ShiftStatus::Completed])
             ->where('starts_at', '>=', $weekStart)
@@ -144,8 +143,16 @@ class DriverPortalController extends Controller
         $allowedDurations = $policy ? $policy->allowedDurations() : [4, 6, 8, 10, 12];
         $timeSlotMinutes = $policy->time_slot_minutes ?? 15;
         $planningWindowDays = $policy->planning_window_days ?? 14;
-        $minDate = now()->format('Y-m-d');
-        $maxDate = now()->addDays($planningWindowDays)->format('Y-m-d');
+        $minDate = $nowInTz->format('Y-m-d');
+        $maxDate = $nowInTz->copy()->addDays($planningWindowDays)->format('Y-m-d');
+        $minTimeToday = null;
+        if ($timeSlotMinutes > 0) {
+            $minutes = $nowInTz->hour * 60 + $nowInTz->minute;
+            $nextSlot = (int) (ceil(($minutes + 1) / $timeSlotMinutes) * $timeSlotMinutes);
+            if ($nextSlot < 24 * 60) {
+                $minTimeToday = sprintf('%02d:%02d', (int) floor($nextSlot / 60), $nextSlot % 60);
+            }
+        }
         return view('driverportal.shifts', [
             'view' => $view,
             'weekDates' => $weekDates,
@@ -155,6 +162,7 @@ class DriverPortalController extends Controller
             'timeSlotMinutes' => $timeSlotMinutes,
             'minDate' => $minDate,
             'maxDate' => $maxDate,
+            'minTimeToday' => $minTimeToday,
         ]);
     }
 
@@ -169,6 +177,14 @@ class DriverPortalController extends Controller
         try {
             $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
             $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
+            if ($startsAt->lte(now($tz))) {
+                return response()->json([
+                    'available' => false,
+                    'count' => 0,
+                    'error' => __('portal.shift_start_must_be_future'),
+                    'reason_code' => 'SHIFT_IN_PAST',
+                ], 422);
+            }
             $durationHours = (float) $request->input('duration_hours');
             $result = app(ShiftAvailabilityService::class)->checkAvailability(
                 (int) $request->input('station_id'),
@@ -202,6 +218,13 @@ class DriverPortalController extends Controller
         try {
             $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
             $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
+            if ($startsAt->lte(now($tz))) {
+                return response()->json([
+                    'success' => false,
+                    'error' => __('portal.shift_start_must_be_future'),
+                    'reason_code' => 'SHIFT_IN_PAST',
+                ], 422);
+            }
             $durationHours = (float) $request->input('duration_hours');
             $shift = app(ShiftBookingService::class)->bookShift(
                 $driver->id,

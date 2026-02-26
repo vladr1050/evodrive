@@ -74,6 +74,7 @@ return [
     'not_available' => 'Nav pieejams',
     'check_failed' => 'Neizdevās pārbaudīt pieejamību.',
     'confirm_failed' => 'Neizdevās rezervēt maiņu.',
+    'shift_start_must_be_future' => 'Maiņas sākumam jābūt nākotnē.',
     'copied' => 'Maiņas nokopētas.',
 
     'copy_modal_title' => 'Kopēt iepriekšējo nedēļu',

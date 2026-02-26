@@ -60,7 +60,7 @@
                 {{ __('portal.copy_prev_week') }}
             </button>
 
-            <button type="button" data-testid="shift-create-btn" onclick="document.getElementById('create-modal').classList.remove('hidden')" class="bg-brand-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-brand-600/20 hover:bg-brand-700 active:scale-95 transition-all flex items-center gap-2">
+            <button type="button" data-testid="shift-create-btn" onclick="document.getElementById('create-modal').classList.remove('hidden'); window.updateStartTimeOptions&&window.updateStartTimeOptions();" class="bg-brand-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-brand-600/20 hover:bg-brand-700 active:scale-95 transition-all flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
                 {{ __('portal.create_shift') }}
             </button>
@@ -124,7 +124,7 @@
     </div>
 
     <!-- Create Shift Modal (reference UI 1:1) -->
-    <div id="create-modal" data-testid="shift-create-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" role="dialog" aria-modal="true" onclick="if(event.target===this)this.classList.add('hidden')">
+    <div id="create-modal" data-testid="shift-create-modal" data-min-date="{{ $minDate }}" data-min-time-today="{{ $minTimeToday ?? '' }}" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" role="dialog" aria-modal="true" onclick="if(event.target===this)this.classList.add('hidden')">
         <div class="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative">
             <button type="button" data-testid="shift-create-modal-close" onclick="document.getElementById('create-modal').classList.add('hidden')" class="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-900 transition-colors" aria-label="Close">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
@@ -229,14 +229,34 @@
         const stationNames = @json($stations->pluck('name', 'id'));
         const reasonLabels = @json($copyReasonLabels);
 
+        function updateStartTimeOptions() {
+            var modal = document.getElementById('create-modal');
+            var dateEl = document.getElementById('create-date');
+            var startEl = document.getElementById('create-start');
+            var minDate = modal?.dataset.minDate || '';
+            var minTimeToday = modal?.dataset.minTimeToday || '';
+            if (!dateEl || !startEl || !minDate || !minTimeToday) return;
+            var isToday = dateEl.value === minDate;
+            var firstValid = null;
+            for (var i = 0; i < startEl.options.length; i++) {
+                var opt = startEl.options[i];
+                var disabled = isToday && opt.value < minTimeToday;
+                opt.disabled = disabled;
+                if (!disabled && firstValid === null) firstValid = opt.value;
+            }
+            if (isToday && firstValid && startEl.value < minTimeToday) startEl.value = firstValid;
+        }
         function openCreateModalForDate(isoDate) {
             document.getElementById('create-modal').classList.remove('hidden');
             var dateEl = document.getElementById('create-date');
             if (dateEl && isoDate) dateEl.value = isoDate;
+            updateStartTimeOptions();
             document.getElementById('availability-message').classList.add('hidden');
             document.getElementById('confirm-shift-btn').disabled = true;
         }
         window.openCreateModalForDate = openCreateModalForDate;
+        window.updateStartTimeOptions = updateStartTimeOptions;
+        document.getElementById('create-date')?.addEventListener('change', updateStartTimeOptions);
 
         function getPayload() {
             return {
