@@ -5,7 +5,6 @@ namespace App\Filament\Resources;
 use App\Enums\VehicleStatus;
 use App\Filament\Resources\FleetVehicleResource\Pages;
 use App\Models\FleetVehicle;
-use App\Models\Station;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -60,8 +59,9 @@ class FleetVehicleResource extends Resource
                         Forms\Components\Select::make('home_station_id')
                             ->label('Home station')
                             ->relationship(
-                                fn () => Station::where('is_active', true)->orderBy('name'),
-                                'name'
+                                'homeStation',
+                                'name',
+                                fn ($query) => $query->where('is_active', true)->orderBy('name')
                             )
                             ->required()
                             ->searchable(),
