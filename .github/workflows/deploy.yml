@@ -1,14 +1,18 @@
-# Deploy to production VPS on push to main.
+# Deploy to production VPS after Tests succeed on main.
 # Requires secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (private key), optional DEPLOY_PATH.
 
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Tests"]
+    types:
+      - completed
     branches: [main]
 
 jobs:
   deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check deploy secrets
