@@ -134,6 +134,7 @@ class DriverPortalController extends Controller
                     'duration' => (int) $s->durationHours(),
                     'vehicle' => $s->vehicle?->label ?? '-',
                     'station' => $s->station?->name ?? '-',
+                    'station_address' => $s->station?->address ?: null,
                     'status' => $s->status->value,
                     'is_mine' => $isMine,
                     'cancellable' => $cancellable,
