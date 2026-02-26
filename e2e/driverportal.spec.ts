@@ -37,10 +37,13 @@ test.describe('Driver Portal', () => {
     await page.getByTestId('shift-create-btn').click();
     await page.getByTestId('shift-create-modal').waitFor({ state: 'visible', timeout: 5000 });
 
-    // Use date from input min (deterministic: first valid day)
+    // Use tomorrow so 08:00 is always valid (past-time validation would block today+08:00)
     const dateInput = page.getByTestId('shift-create-date');
     const minDate = await dateInput.getAttribute('min');
-    const dateStr = minDate ?? new Date().toISOString().slice(0, 10);
+    const baseDate = minDate ?? new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(baseDate + 'T12:00:00');
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateStr = tomorrow.toISOString().slice(0, 10);
 
     await dateInput.fill(dateStr);
     await page.locator('#create-station').selectOption({ index: 0 });
