@@ -57,6 +57,7 @@ class DriverPortalController extends Controller
                     'id' => (string) $s->id,
                     'vehicle' => $s->vehicle?->label ?? '-',
                     'station' => $s->station?->name ?? '-',
+                    'station_address' => $s->station?->address ?: null,
                     'time' => $startsAt->format('H:i') . ' - ' . $endsAt->format('H:i'),
                     'date' => $startsAt->format('Y-m-d'),
                     'duration' => (int) $s->durationHours() . 'h',
@@ -85,6 +86,7 @@ class DriverPortalController extends Controller
             'nextShiftCountdown' => $nextShift ? $nextShift->starts_at->diffForHumans(null, true) : '--:--:--',
             'nextShiftVehicle' => $nextShift?->vehicle?->label ?? '--',
             'nextShiftStation' => $nextShift?->station?->name ?? '--',
+            'nextShiftStationAddress' => $nextShift?->station?->address ?: null,
             'weeklyTotalHours' => (int) $weeklyTotalHours,
             'weeklyShiftsDone' => (int) $weeklyShiftsDone,
             'weeklyShiftsTotal' => max(1, $weeklyShiftsTotal),
@@ -142,7 +144,7 @@ class DriverPortalController extends Controller
             })
             ->all();
         $policy = $policyForTz;
-        $stations = Station::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $stations = Station::where('is_active', true)->orderBy('name')->get(['id', 'name', 'address']);
         $allowedDurations = $policy ? $policy->allowedDurations() : [4, 6, 8, 10, 12];
         $timeSlotMinutes = $policy->time_slot_minutes ?? 15;
         $planningWindowDays = $policy->planning_window_days ?? 14;

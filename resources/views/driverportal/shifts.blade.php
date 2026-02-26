@@ -45,9 +45,14 @@
                         <svg x-show="filterStation === 'All'" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </button>
                     @foreach($stations as $s)
-                    <button type="button" @click="filterStation = '{{ addslashes($s->name) }}'; isStationDropdownOpen = false" class="w-full px-5 py-3 text-left text-sm font-bold transition-colors flex items-center justify-between" :class="filterStation === '{{ addslashes($s->name) }}' ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
-                        <span>{{ $s->name }}</span>
-                        <svg x-show="filterStation === '{{ addslashes($s->name) }}'" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <button type="button" @click="filterStation = '{{ addslashes($s->name) }}'; isStationDropdownOpen = false" class="w-full px-5 py-3 text-left text-sm font-bold transition-colors flex items-center justify-between gap-2" :class="filterStation === '{{ addslashes($s->name) }}' ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                        <div class="min-w-0 flex-1 text-left">
+                            <span class="block">{{ $s->name }}</span>
+                            @if(!empty($s->address))
+                                <span class="block text-xs font-normal text-slate-400 mt-0.5 break-words">{{ $s->address }}</span>
+                            @endif
+                        </div>
+                        <svg x-show="filterStation === '{{ addslashes($s->name) }}'" class="shrink-0" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </button>
                     @endforeach
                 </div>
@@ -139,8 +144,9 @@
                     <div>
                         <label for="create-station" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">{{ __('portal.station') }}</label>
                         <select id="create-station" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all font-bold text-slate-700">
-                            @foreach($stations as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach
+                            @foreach($stations as $s)<option value="{{ $s->id }}" data-address="{{ e($s->address ?? '') }}">{{ $s->name }}</option>@endforeach
                         </select>
+                        <p id="create-station-address" class="mt-1.5 text-xs text-slate-500 break-words min-h-[1.25rem]"></p>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
@@ -227,6 +233,7 @@
         const confirmCopyUrl = '{{ route("driverportal.shifts.copy-previous-week-confirm", ["locale" => app()->getLocale()]) }}';
         const csrf = '{{ csrf_token() }}';
         const stationNames = @json($stations->pluck('name', 'id'));
+        const stationAddresses = @json($stations->pluck('address', 'id'));
         const reasonLabels = @json($copyReasonLabels);
 
         function updateStartTimeOptions() {
@@ -251,12 +258,22 @@
             var dateEl = document.getElementById('create-date');
             if (dateEl && isoDate) dateEl.value = isoDate;
             updateStartTimeOptions();
+            updateCreateStationAddress();
             document.getElementById('availability-message').classList.add('hidden');
             document.getElementById('confirm-shift-btn').disabled = true;
+        }
+        function updateCreateStationAddress() {
+            var sel = document.getElementById('create-station');
+            var addrEl = document.getElementById('create-station-address');
+            if (!sel || !addrEl) return;
+            var opt = sel.options[sel.selectedIndex];
+            var addr = opt ? (opt.getAttribute('data-address') || '') : '';
+            addrEl.textContent = addr;
         }
         window.openCreateModalForDate = openCreateModalForDate;
         window.updateStartTimeOptions = updateStartTimeOptions;
         document.getElementById('create-date')?.addEventListener('change', updateStartTimeOptions);
+        document.getElementById('create-station')?.addEventListener('change', updateCreateStationAddress);
 
         function getPayload() {
             return {
@@ -354,13 +371,15 @@
                     proposed.forEach(function(item, index) {
                         var li = document.createElement('li');
                         var stationName = stationNames[item.station_id] || ('#' + item.station_id);
+                        var stationAddr = (stationAddresses && stationAddresses[item.station_id]) ? stationAddresses[item.station_id] : '';
+                        var addrHtml = stationAddr ? '<span class="block text-slate-400 text-xs mt-0.5 break-words">' + stationAddr + '</span>' : '';
                         li.className = 'flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50/50';
-                        li.innerHTML = '<label class="flex items-center gap-3 flex-1 cursor-pointer">' +
-                            '<input type="checkbox" class="copy-proposed-cb rounded border-slate-300 text-brand-600 focus:ring-brand-500" data-index="' + index + '" checked>' +
+                        li.innerHTML = '<label class="flex items-center gap-3 flex-1 cursor-pointer min-w-0">' +
+                            '<input type="checkbox" class="copy-proposed-cb rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0" data-index="' + index + '" checked>' +
                             '<span class="font-medium text-slate-800">' + item.date + ' ' + item.start_time + '</span>' +
-                            '<span class="text-slate-500 text-sm">' + item.duration_hours + 'h</span>' +
-                            '<span class="text-slate-500 text-sm">' + stationName + '</span>' +
-                            '<span class="text-slate-400 text-xs">(' + (item.available_vehicle_count || 0) + ' {{ __("portal.copy_vehicle_count") }})</span>' +
+                            '<span class="text-slate-500 text-sm shrink-0">' + item.duration_hours + 'h</span>' +
+                            '<span class="text-slate-500 text-sm min-w-0"><span class="block">' + stationName + '</span>' + addrHtml + '</span>' +
+                            '<span class="text-slate-400 text-xs shrink-0">(' + (item.available_vehicle_count || 0) + ' {{ __("portal.copy_vehicle_count") }})</span>' +
                             '</label>';
                         proposedList.appendChild(li);
                         li.dataset.date = item.date;
