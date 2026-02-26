@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ShiftStatus;
 use App\Filament\Resources\ShiftResource\Pages;
 use App\Models\Shift;
+use App\Models\ShiftPolicy;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -39,9 +40,11 @@ class ShiftResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('starts_at')
                     ->dateTime()
+                    ->timezone(fn () => ShiftPolicy::active()?->timezone ?: 'Europe/Riga')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('ends_at')
                     ->dateTime()
+                    ->timezone(fn () => ShiftPolicy::active()?->timezone ?: 'Europe/Riga')
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('duration_hours')
                     ->label('Duration (h)')
@@ -82,6 +85,7 @@ class ShiftResource extends Resource
                     }),
                 Tables\Columns\TextColumn::make('confirmed_at')
                     ->dateTime()
+                    ->timezone(fn () => ShiftPolicy::active()?->timezone ?: 'Europe/Riga')
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('starts_at', 'desc')
