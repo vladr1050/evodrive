@@ -42,6 +42,7 @@ class DriverPortalController extends Controller
     {
         $driver = Auth::guard('driver')->user();
         $locale = $request->route('locale', 'en');
+        $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
         $upcomingShifts = Shift::where('driver_id', $driver->id)
             ->where('status', \App\Enums\ShiftStatus::Booked)
             ->where('starts_at', '>=', now())
@@ -49,15 +50,19 @@ class DriverPortalController extends Controller
             ->orderBy('starts_at')
             ->limit(5)
             ->get()
-            ->map(fn (Shift $s) => [
-                'id' => (string) $s->id,
-                'vehicle' => $s->vehicle?->label ?? '-',
-                'station' => $s->station?->name ?? '-',
-                'time' => $s->starts_at->format('H:i') . ' - ' . $s->ends_at->format('H:i'),
-                'date' => $s->starts_at->format('Y-m-d'),
-                'duration' => (int) $s->durationHours() . 'h',
-                'status' => $s->status->value === 'booked' ? 'Confirmed' : $s->status->value,
-            ])
+            ->map(function (Shift $s) use ($tz) {
+                $startsAt = $s->starts_at->copy()->setTimezone($tz);
+                $endsAt = $s->ends_at->copy()->setTimezone($tz);
+                return [
+                    'id' => (string) $s->id,
+                    'vehicle' => $s->vehicle?->label ?? '-',
+                    'station' => $s->station?->name ?? '-',
+                    'time' => $startsAt->format('H:i') . ' - ' . $endsAt->format('H:i'),
+                    'date' => $startsAt->format('Y-m-d'),
+                    'duration' => (int) $s->durationHours() . 'h',
+                    'status' => $s->status->value === 'booked' ? 'Confirmed' : $s->status->value,
+                ];
+            })
             ->all();
         $nextShift = Shift::where('driver_id', $driver->id)
             ->where('status', \App\Enums\ShiftStatus::Booked)
@@ -119,12 +124,13 @@ class DriverPortalController extends Controller
             ->get()
             ->map(function (Shift $s) use ($days, $tz, $nowInTz) {
                 $startsAtInTz = $s->starts_at->copy()->setTimezone($tz);
+                $endsAtInTz = $s->ends_at->copy()->setTimezone($tz);
                 $cancellable = $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz);
                 return [
                     'id' => (string) $s->id,
-                    'day' => $days[$s->starts_at->dayOfWeek === 0 ? 6 : $s->starts_at->dayOfWeek - 1],
-                    'start' => $s->starts_at->format('H:i'),
-                    'end' => $s->ends_at->format('H:i'),
+                    'day' => $days[$startsAtInTz->dayOfWeek === 0 ? 6 : $startsAtInTz->dayOfWeek - 1],
+                    'start' => $startsAtInTz->format('H:i'),
+                    'end' => $endsAtInTz->format('H:i'),
                     'duration' => (int) $s->durationHours(),
                     'vehicle' => $s->vehicle?->label ?? '-',
                     'station' => $s->station?->name ?? '-',
@@ -161,7 +167,8 @@ class DriverPortalController extends Controller
             'duration_hours' => 'required|numeric|min:1',
         ]);
         try {
-            $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'));
+            $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
+            $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
             $durationHours = (float) $request->input('duration_hours');
             $result = app(ShiftAvailabilityService::class)->checkAvailability(
                 (int) $request->input('station_id'),
@@ -193,7 +200,8 @@ class DriverPortalController extends Controller
         ]);
         $driver = Auth::guard('driver')->user();
         try {
-            $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'));
+            $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
+            $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
             $durationHours = (float) $request->input('duration_hours');
             $shift = app(ShiftBookingService::class)->bookShift(
                 $driver->id,
