@@ -141,41 +141,13 @@
                         <label for="create-date" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">{{ __('portal.date') }}</label>
                         <input id="create-date" data-testid="shift-create-date" type="date" min="{{ $minDate }}" max="{{ $maxDate }}" value="{{ $minDate }}" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all font-bold text-slate-700">
                     </div>
-                    <div class="relative" x-data="{
-                            createStationId: {{ $stations->first()?->id ?? 0 }},
-                            createStationOpen: false,
-                            createStations: @json($stations->map(fn($s) => ['id' => $s->id, 'name' => $s->name, 'address' => $s->address ?? ''])->values())
-                        }" x-effect="document.getElementById('create-station') && (document.getElementById('create-station').value = createStationId)">
+                    <div>
                         <label for="create-station" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">{{ __('portal.station') }}</label>
-                        <select id="create-station" class="sr-only" aria-hidden="true" tabindex="-1">
-                            @foreach($stations as $s)<option value="{{ $s->id }}">{{ $s->name }}</option>@endforeach
-                        </select>
-                        <button type="button" @click="createStationOpen = !createStationOpen" @click.outside="createStationOpen = false"
-                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all font-bold text-slate-700 text-left flex items-center justify-between">
-                            <div class="min-w-0 flex-1">
-                                <span class="block" x-text="createStations.find(s => s.id == createStationId)?.name || ''"></span>
-                                <template x-if="createStations.find(s => s.id == createStationId)?.address">
-                                    <span class="block text-xs font-normal text-slate-500 mt-0.5 break-words" x-text="createStations.find(s => s.id == createStationId)?.address"></span>
-                                </template>
-                            </div>
-                            <svg class="shrink-0 w-4 h-4 text-slate-400 transition-transform" :class="createStationOpen ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                        </button>
-                        <div x-show="createStationOpen" x-cloak
-                            class="absolute top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1">
+                        <select id="create-station" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all font-bold text-slate-700">
                             @foreach($stations as $s)
-                            <button type="button" @click="createStationId = {{ $s->id }}; createStationOpen = false"
-                                class="w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors flex items-center justify-between"
-                                :class="createStationId === {{ $s->id }} ? 'bg-brand-50 text-brand-600' : 'text-slate-700'">
-                                <div class="min-w-0 flex-1">
-                                    <span class="block font-bold">{{ $s->name }}</span>
-                                    @if(!empty($s->address))
-                                        <span class="block text-xs font-normal text-slate-500 mt-0.5 break-words">{{ $s->address }}</span>
-                                    @endif
-                                </div>
-                                <svg x-show="createStationId === {{ $s->id }}" class="shrink-0 w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                            </button>
+                                <option value="{{ $s->id }}">{{ $s->name }}{{ !empty($s->address) ? ' — ' . $s->address : '' }}</option>
                             @endforeach
-                        </div>
+                        </select>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
