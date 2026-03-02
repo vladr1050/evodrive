@@ -57,7 +57,6 @@
                     @endforeach
                 </div>
             </div>
-            <select id="filter-station" class="sr-only" aria-hidden="true" x-effect="$nextTick(()=>{const s=$el;if(s){s.value=filterStation==='All'?'':filterStation;s.dispatchEvent(new Event('change'))}})"><option value="">{{ __('portal.all_stations') }}</option>@foreach($stations as $s)<option value="{{ $s->name }}">{{ $s->name }}</option>@endforeach</select>
 
             <!-- Copy Previous Week (reference: plus icon rotate-45) -->
             <button type="button" id="copy-prev-week" class="flex items-center gap-2 px-5 py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-all text-sm border border-slate-200">
@@ -94,7 +93,9 @@
                     <div class="space-y-3 min-h-[200px]">
                         @php $dayShifts = collect($shifts)->where('day', $dayInfo['name'])->sortBy(fn($s) => (int)str_replace(':', '', $s['start']))->all(); @endphp
                         @foreach($dayShifts as $shift)
-                            @include('driverportal.components.shift-block', ['shift' => $shift])
+                            <div x-data="{ stationName: {{ json_encode($shift['station'] ?? '') }} }" x-show="filterStation === 'All' || filterStation === stationName">
+                                @include('driverportal.components.shift-block', ['shift' => $shift])
+                            </div>
                         @endforeach
                         @if(empty($dayShifts))
                             <div class="h-full flex flex-col items-center justify-center py-12 text-center">
@@ -316,14 +317,6 @@
                     msg.textContent = err.response?.data?.error || '{{ __("portal.confirm_failed") }}';
                     btn.disabled = false;
                 });
-        });
-
-        document.getElementById('filter-station')?.addEventListener('change', function() {
-            var val = this.value;
-            document.querySelectorAll('.shift-card').forEach(function(el) {
-                var name = el.getAttribute('data-station-name') || '';
-                el.style.display = (!val || name === val) ? '' : 'none';
-            });
         });
 
         function getNextMondayYmd() {
