@@ -157,12 +157,13 @@ class ShiftAvailabilityService
     }
 
     /**
-     * Get available free slots for a week. Returns slots where at least one vehicle is free.
-     * Uses 2-hour step for start times to keep the result set manageable.
+     * Get available free slots for a week. Returns continuous time windows per station per day
+     * when at least one vehicle is free. Slots are split only around booked shifts (with downtime).
+     * Only windows >= min_duration_hours are shown.
      *
      * @return array<int, array{id: string, day: string, start: string, end: string, duration: int, station: string, station_id: int, date_iso: string}>
      */
-    public function getAvailableSlotsForWeek(Carbon $weekStart, array $dayNames, int $slotStepMinutes = 120): array
+    public function getAvailableSlotsForWeek(Carbon $weekStart, array $dayNames): array
     {
         $policy = ShiftPolicy::active();
         if (! $policy) {
@@ -173,61 +174,206 @@ class ShiftAvailabilityService
             return [];
         }
         $tz = $policy->timezone ?? 'Europe/Riga';
+        $minDurationHours = (float) ($policy->min_duration_hours ?? 4);
         $allowedDurations = $policy->allowedDurations();
         $slotMinutes = $policy->time_slot_minutes ?? 15;
+        $downtimeMinutes = (int) round($policy->vehicle_downtime_hours * 60);
         $nowInTz = now($tz);
+
+        $weekEnd = $weekStart->copy()->addDays(7)->setTimezone($tz);
+        $vehicles = FleetVehicle::whereIn('home_station_id', $stations->pluck('id'))
+            ->where('status', VehicleStatus::Active)
+            ->get(['id', 'home_station_id']);
+        $vehiclesByStation = $vehicles->groupBy('home_station_id')->map(fn ($v) => $v->pluck('id')->values()->all())->all();
+        $allVehicleIds = array_unique(array_merge(...array_values($vehiclesByStation)));
+        if (empty($allVehicleIds)) {
+            return [];
+        }
+
+        $shifts = Shift::whereIn('vehicle_id', $allVehicleIds)
+            ->where('status', ShiftStatus::Booked)
+            ->where('starts_at', '<', $weekEnd)
+            ->where('ends_at', '>', $weekStart)
+            ->orderBy('vehicle_id')
+            ->orderBy('starts_at')
+            ->get()
+            ->groupBy('vehicle_id');
+
         $slots = [];
         $slotId = 0;
 
         for ($dayIndex = 0; $dayIndex < 7; $dayIndex++) {
             $dayStart = $weekStart->copy()->addDays($dayIndex)->setTimezone($tz)->startOfDay();
+            $dayEnd = $dayStart->copy()->endOfDay();
             $dateIso = $dayStart->format('Y-m-d');
             $dayName = $dayNames[$dayIndex] ?? 'Day' . ($dayIndex + 1);
+            $isToday = $dayStart->isSameDay($nowInTz);
 
             foreach ($stations as $station) {
-                $startMinutes = $dayStart->isSameDay($nowInTz) ? ($nowInTz->hour * 60 + $nowInTz->minute + 1) : 0;
-                $startMinutes = (int) (ceil($startMinutes / $slotMinutes) * $slotMinutes);
-                if ($startMinutes >= 24 * 60) {
+                $stationVehicleIds = $vehiclesByStation[$station->id] ?? [];
+                if (empty($stationVehicleIds)) {
                     continue;
                 }
 
-                for ($minutes = $startMinutes; $minutes + 60 <= 24 * 60; $minutes += $slotStepMinutes) {
-                    $h = (int) floor($minutes / 60);
-                    $m = $minutes % 60;
-                    $startStr = sprintf('%02d:%02d', $h, $m);
-                    $startsAt = $dayStart->copy()->setTime($h, $m, 0);
+                $freeIntervals = $this->computeStationFreeIntervals(
+                    $stationVehicleIds,
+                    $shifts,
+                    $dayStart,
+                    $dayEnd,
+                    $downtimeMinutes,
+                    $slotMinutes,
+                    $isToday ? $nowInTz : null
+                );
 
-                    if ($startsAt->lte($nowInTz)) {
+                foreach ($freeIntervals as [$startMin, $endMin]) {
+                    $durationHours = ($endMin - $startMin) / 60.0;
+                    if ($durationHours < $minDurationHours) {
                         continue;
                     }
-
-                    foreach ($allowedDurations as $durationHours) {
-                        try {
-                            $result = $this->checkAvailability($station->id, $startsAt->copy(), (float) $durationHours);
-                            if ($result['count'] > 0) {
-                                $endsAt = $startsAt->copy()->addHours($durationHours);
-                                $endStr = $endsAt->format('H:i');
-                                $slots[] = [
-                                    'id' => 'as' . (++$slotId),
-                                    'day' => $dayName,
-                                    'start' => $startStr,
-                                    'end' => $endStr,
-                                    'duration' => (int) $durationHours,
-                                    'station' => $station->name,
-                                    'station_id' => $station->id,
-                                    'date_iso' => $dateIso,
-                                ];
-                                break;
-                            }
-                        } catch (ShiftBookingException $e) {
-                            continue;
-                        }
+                    $suggestedDuration = collect($allowedDurations)->filter(fn ($d) => $d <= (int) floor($durationHours))->max() ?? (int) floor($durationHours);
+                    if ($suggestedDuration < $minDurationHours) {
+                        continue;
                     }
+                    $h1 = (int) floor($startMin / 60);
+                    $m1 = $startMin % 60;
+                    $h2 = (int) floor($endMin / 60);
+                    $m2 = $endMin % 60;
+                    $slots[] = [
+                        'id' => 'as' . (++$slotId),
+                        'day' => $dayName,
+                        'start' => sprintf('%02d:%02d', $h1, $m1),
+                        'end' => sprintf('%02d:%02d', $h2, $m2),
+                        'duration' => $suggestedDuration,
+                        'station' => $station->name,
+                        'station_id' => $station->id,
+                        'date_iso' => $dateIso,
+                    ];
                 }
             }
         }
 
         return $slots;
+    }
+
+    /**
+     * Compute free intervals (in minutes from midnight) for a station on a given day.
+     * Union of free intervals across all vehicles. Blocked = shift + downtime.
+     *
+     * @param  array<int>  $vehicleIds
+     * @return array<int, array{0: int, 1: int}>
+     */
+    protected function computeStationFreeIntervals(
+        array $vehicleIds,
+        \Illuminate\Support\Collection $shiftsByVehicle,
+        Carbon $dayStart,
+        Carbon $dayEnd,
+        int $downtimeMinutes,
+        int $slotMinutes,
+        ?Carbon $cutoffNow
+    ): array {
+        $dayStartMinutes = 0;
+        $dayEndMinutes = 24 * 60;
+        $dayStartUtc = $dayStart->copy()->setTimezone('UTC');
+        $dayEndUtc = $dayEnd->copy()->setTimezone('UTC');
+
+        $allFreeIntervals = [];
+
+        foreach ($vehicleIds as $vehicleId) {
+            $vehicleShifts = $shiftsByVehicle->get($vehicleId, collect())
+                ->filter(fn (Shift $s) => $s->starts_at->lt($dayEndUtc) && $s->ends_at->gt($dayStartUtc))
+                ->sortBy('starts_at')
+                ->values();
+
+            $blocked = [];
+            foreach ($vehicleShifts as $shift) {
+                $sStart = $shift->starts_at->copy()->setTimezone($dayStart->timezoneName);
+                $sEnd = $shift->ends_at->copy()->setTimezone($dayStart->timezoneName);
+                $startMin = (int) round(($sStart->timestamp - $dayStart->timestamp) / 60);
+                $endMin = (int) round(($sEnd->timestamp - $dayStart->timestamp) / 60);
+                $blockStart = max(0, $startMin - $downtimeMinutes);
+                $blockEnd = min(24 * 60, $endMin + $downtimeMinutes);
+                if ($blockEnd > $blockStart) {
+                    $blocked[] = [$blockStart, $blockEnd];
+                }
+            }
+
+            $free = $this->gapsFromBlocked($dayStartMinutes, $dayEndMinutes, $blocked);
+            $allFreeIntervals = array_merge($allFreeIntervals, $free);
+        }
+
+        $merged = $this->mergeOverlappingIntervals($allFreeIntervals);
+
+        if ($cutoffNow !== null) {
+            $cutoffMinutes = $cutoffNow->hour * 60 + $cutoffNow->minute;
+            $cutoffMinutes = (int) (ceil(($cutoffMinutes + 1) / $slotMinutes) * $slotMinutes);
+            $merged = array_filter($merged, fn ($iv) => $iv[1] > $cutoffMinutes);
+            $merged = array_map(fn ($iv) => [max($iv[0], $cutoffMinutes), $iv[1]], $merged);
+        }
+
+        $aligned = [];
+        foreach ($merged as [$a, $b]) {
+            $aAligned = (int) (floor($a / $slotMinutes) * $slotMinutes);
+            $bAligned = (int) (ceil($b / $slotMinutes) * $slotMinutes);
+            if ($bAligned > $aAligned) {
+                $aligned[] = [$aAligned, $bAligned];
+            }
+        }
+
+        return array_values($aligned);
+    }
+
+    /**
+     * @param  array<int, array{0: int, 1: int}>  $blocked
+     * @return array<int, array{0: int, 1: int}>
+     */
+    protected function gapsFromBlocked(int $dayStart, int $dayEnd, array $blocked): array
+    {
+        if (empty($blocked)) {
+            return [[$dayStart, $dayEnd]];
+        }
+        usort($blocked, fn ($a, $b) => $a[0] <=> $b[0]);
+        $merged = [];
+        foreach ($blocked as [$a, $b]) {
+            if (empty($merged) || $a > $merged[count($merged) - 1][1]) {
+                $merged[] = [$a, $b];
+            } else {
+                $merged[count($merged) - 1][1] = max($merged[count($merged) - 1][1], $b);
+            }
+        }
+        $gaps = [];
+        $prevEnd = $dayStart;
+        foreach ($merged as [$a, $b]) {
+            if ($a > $prevEnd) {
+                $gaps[] = [$prevEnd, $a];
+            }
+            $prevEnd = max($prevEnd, $b);
+        }
+        if ($prevEnd < $dayEnd) {
+            $gaps[] = [$prevEnd, $dayEnd];
+        }
+        return $gaps;
+    }
+
+    /**
+     * @param  array<int, array{0: int, 1: int}>  $intervals
+     * @return array<int, array{0: int, 1: int}>
+     */
+    protected function mergeOverlappingIntervals(array $intervals): array
+    {
+        if (empty($intervals)) {
+            return [];
+        }
+        usort($intervals, fn ($a, $b) => $a[0] <=> $b[0]);
+        $out = [$intervals[0]];
+        for ($i = 1; $i < count($intervals); $i++) {
+            $last = &$out[count($out) - 1];
+            if ($intervals[$i][0] <= $last[1]) {
+                $last[1] = max($last[1], $intervals[$i][1]);
+            } else {
+                $out[] = $intervals[$i];
+            }
+        }
+        return $out;
     }
 
     /**
