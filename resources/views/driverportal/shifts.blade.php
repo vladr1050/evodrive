@@ -3,11 +3,14 @@
 @section('title', __('portal.shifts'))
 
 @section('content')
+<script>
+    window.__SHIFTS_AVAILABLE_SLOTS__ = @json($availableSlots ?? []);
+</script>
 <div x-data="{
     filterStation: 'All',
     isStationDropdownOpen: false,
     showFreeSlots: false,
-    availableSlots: @json($availableSlots ?? [])
+    availableSlots: window.__SHIFTS_AVAILABLE_SLOTS__ || []
 }" class="animate-fade-in">
     <!-- Header Section (UI 1:1 reference) -->
     <div class="mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
