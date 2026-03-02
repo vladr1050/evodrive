@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\ShiftStatus;
+use Carbon\Carbon;
 use App\Filament\Resources\ShiftResource\Pages;
 use App\Models\Shift;
 use App\Models\ShiftPolicy;
@@ -11,6 +12,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Filters\Indicator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
@@ -95,10 +97,30 @@ class ShiftResource extends Resource
                         Forms\Components\DatePicker::make('starts_from')->label('From'),
                         Forms\Components\DatePicker::make('starts_until')->label('Until'),
                     ])
-                    ->query(fn (Builder $q, array $data) => $q
-                        ->when($data['starts_from'] ?? null, fn ($q, $d) => $q->whereDate('starts_at', '>=', $d))
-                        ->when($data['starts_until'] ?? null, fn ($q, $d) => $q->whereDate('starts_at', '<=', $d))
-                    ),
+                    ->query(function (Builder $query, array $data): Builder {
+                        $tz = ShiftPolicy::active()?->timezone ?: 'Europe/Riga';
+                        if (! empty($data['starts_from'])) {
+                            $from = Carbon::parse($data['starts_from'], $tz)->startOfDay()->utc();
+                            $query->where('starts_at', '>=', $from);
+                        }
+                        if (! empty($data['starts_until'])) {
+                            $until = Carbon::parse($data['starts_until'], $tz)->endOfDay()->utc();
+                            $query->where('starts_at', '<=', $until);
+                        }
+                        return $query;
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if (! empty($data['starts_from'])) {
+                            $indicators[] = Indicator::make('From ' . Carbon::parse($data['starts_from'])->format('d M Y'))
+                                ->removeField('starts_from');
+                        }
+                        if (! empty($data['starts_until'])) {
+                            $indicators[] = Indicator::make('Until ' . Carbon::parse($data['starts_until'])->format('d M Y'))
+                                ->removeField('starts_until');
+                        }
+                        return $indicators;
+                    }),
                 Tables\Filters\SelectFilter::make('station_id')
                     ->label('Station')
                     ->relationship('station', 'name')
