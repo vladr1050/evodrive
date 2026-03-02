@@ -157,6 +157,80 @@ class ShiftAvailabilityService
     }
 
     /**
+     * Get available free slots for a week. Returns slots where at least one vehicle is free.
+     * Uses 2-hour step for start times to keep the result set manageable.
+     *
+     * @return array<int, array{id: string, day: string, start: string, end: string, duration: int, station: string, station_id: int, date_iso: string}>
+     */
+    public function getAvailableSlotsForWeek(Carbon $weekStart, array $dayNames, int $slotStepMinutes = 120): array
+    {
+        $policy = ShiftPolicy::active();
+        if (! $policy) {
+            return [];
+        }
+        $stations = Station::where('is_active', true)->orderBy('name')->get();
+        if ($stations->isEmpty()) {
+            return [];
+        }
+        $tz = $policy->timezone ?? 'Europe/Riga';
+        $allowedDurations = $policy->allowedDurations();
+        $slotMinutes = $policy->time_slot_minutes ?? 15;
+        $nowInTz = now($tz);
+        $slots = [];
+        $slotId = 0;
+
+        for ($dayIndex = 0; $dayIndex < 7; $dayIndex++) {
+            $dayStart = $weekStart->copy()->addDays($dayIndex)->setTimezone($tz)->startOfDay();
+            $dateIso = $dayStart->format('Y-m-d');
+            $dayName = $dayNames[$dayIndex] ?? 'Day' . ($dayIndex + 1);
+
+            foreach ($stations as $station) {
+                $startMinutes = $dayStart->isSameDay($nowInTz) ? ($nowInTz->hour * 60 + $nowInTz->minute + 1) : 0;
+                $startMinutes = (int) (ceil($startMinutes / $slotMinutes) * $slotMinutes);
+                if ($startMinutes >= 24 * 60) {
+                    continue;
+                }
+
+                for ($minutes = $startMinutes; $minutes + 60 <= 24 * 60; $minutes += $slotStepMinutes) {
+                    $h = (int) floor($minutes / 60);
+                    $m = $minutes % 60;
+                    $startStr = sprintf('%02d:%02d', $h, $m);
+                    $startsAt = $dayStart->copy()->setTime($h, $m, 0);
+
+                    if ($startsAt->lte($nowInTz)) {
+                        continue;
+                    }
+
+                    foreach ($allowedDurations as $durationHours) {
+                        try {
+                            $result = $this->checkAvailability($station->id, $startsAt->copy(), (float) $durationHours);
+                            if ($result['count'] > 0) {
+                                $endsAt = $startsAt->copy()->addHours($durationHours);
+                                $endStr = $endsAt->format('H:i');
+                                $slots[] = [
+                                    'id' => 'as' . (++$slotId),
+                                    'day' => $dayName,
+                                    'start' => $startStr,
+                                    'end' => $endStr,
+                                    'duration' => (int) $durationHours,
+                                    'station' => $station->name,
+                                    'station_id' => $station->id,
+                                    'date_iso' => $dateIso,
+                                ];
+                                break;
+                            }
+                        } catch (ShiftBookingException $e) {
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $slots;
+    }
+
+    /**
      * @throws ShiftBookingException
      */
     protected function validatePolicy(ShiftPolicy $policy, Carbon $startsAt, float $durationHours): void

@@ -101,4 +101,11 @@ return [
     'cancel_success' => 'Смена отменена.',
     'cancel_forbidden' => 'Вы не можете отменить эту смену.',
     'cancel_invalid' => 'Эту смену нельзя отменить.',
+
+    // Free slots
+    'all_shifts' => 'Мои смены',
+    'show_free_slots' => 'Свободные слоты',
+    'no_slots_found' => 'Нет свободных слотов',
+    'available' => 'Доступно',
+    'book_now' => 'Забронировать',
 ];

@@ -103,4 +103,11 @@ return [
     'cancel_success' => 'Shift cancelled.',
     'cancel_forbidden' => 'You cannot cancel this shift.',
     'cancel_invalid' => 'This shift cannot be cancelled.',
+
+    // Free slots
+    'all_shifts' => 'My Shifts',
+    'show_free_slots' => 'Free Slots',
+    'no_slots_found' => 'No slots found',
+    'available' => 'Available',
+    'book_now' => 'Book Now',
 ];

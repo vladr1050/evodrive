@@ -158,6 +158,10 @@ class DriverPortalController extends Controller
                 $minTimeToday = sprintf('%02d:%02d', (int) floor($nextSlot / 60), $nextSlot % 60);
             }
         }
+        $dayNames = array_column($weekDates, 'name');
+        $availableSlots = $policy
+            ? app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($startOfWeek, $dayNames)
+            : [];
         return view('driverportal.shifts', [
             'view' => $view,
             'weekDates' => $weekDates,
@@ -168,6 +172,7 @@ class DriverPortalController extends Controller
             'minDate' => $minDate,
             'maxDate' => $maxDate,
             'minTimeToday' => $minTimeToday,
+            'availableSlots' => $availableSlots,
         ]);
     }
 

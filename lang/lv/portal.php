@@ -101,4 +101,11 @@ return [
     'cancel_success' => 'Maiņa atcelta.',
     'cancel_forbidden' => 'Jūs nevarat atcelt šo maiņu.',
     'cancel_invalid' => 'Šo maiņu nevar atcelt.',
+
+    // Free slots
+    'all_shifts' => 'Manas maiņas',
+    'show_free_slots' => 'Brīvie sloti',
+    'no_slots_found' => 'Nav pieejamu slotu',
+    'available' => 'Pieejams',
+    'book_now' => 'Rezervēt',
 ];

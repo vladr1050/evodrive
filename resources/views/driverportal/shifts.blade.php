@@ -3,7 +3,12 @@
 @section('title', __('portal.shifts'))
 
 @section('content')
-<div x-data="{ filterStation: 'All', isStationDropdownOpen: false }" class="animate-fade-in">
+<div x-data="{
+    filterStation: 'All',
+    isStationDropdownOpen: false,
+    showFreeSlots: false,
+    availableSlots: @json($availableSlots ?? [])
+}" class="animate-fade-in">
     <!-- Header Section (UI 1:1 reference) -->
     <div class="mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div>
@@ -78,11 +83,24 @@
         </div>
     @endif
 
+    <!-- Mode toggle: My Shifts / Free Slots -->
+    <div class="mb-6 flex items-center gap-4 bg-white p-2 rounded-3xl border border-slate-100 shadow-sm w-fit">
+        <button type="button" @click="showFreeSlots = false" :class="!showFreeSlots ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            {{ __('portal.all_shifts') }}
+        </button>
+        <button type="button" @click="showFreeSlots = true" :class="showFreeSlots ? 'bg-brand-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+            {{ __('portal.show_free_slots') }}
+        </button>
+    </div>
+
     <!-- Shifts Grid (reference UI 1:1) -->
     <div class="overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0">
         <div class="grid grid-cols-1 md:grid-cols-7 gap-4 min-w-[1000px] md:min-w-0">
             @foreach($weekDates as $dayInfo)
-                <div class="space-y-4">
+                @php $dayShifts = collect($shifts)->where('day', $dayInfo['name'])->sortBy(fn($s) => (int)str_replace(':', '', $s['start']))->all(); @endphp
+                <div class="space-y-4" x-data="{ dayName: '{{ $dayInfo['name'] }}', dayIso: '{{ $dayInfo['iso'] }}', dayHasShifts: {{ json_encode(!empty($dayShifts)) }} }">
                     <div class="flex flex-col items-center py-3 bg-slate-100 rounded-2xl border border-slate-200 relative group">
                         <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-1">{{ $dayInfo['name'] }}</span>
                         <span class="text-sm font-bold text-slate-700">{{ $dayInfo['date'] }} {{ $dayInfo['month'] }}</span>
@@ -91,20 +109,42 @@
                         </button>
                     </div>
                     <div class="space-y-3 min-h-[200px]">
-                        @php $dayShifts = collect($shifts)->where('day', $dayInfo['name'])->sortBy(fn($s) => (int)str_replace(':', '', $s['start']))->all(); @endphp
-                        @foreach($dayShifts as $shift)
-                            <div x-data="{ stationName: {{ json_encode($shift['station'] ?? '') }} }" x-show="filterStation === 'All' || filterStation === stationName">
-                                @include('driverportal.components.shift-block', ['shift' => $shift])
-                            </div>
-                        @endforeach
-                        @if(empty($dayShifts))
-                            <div class="h-full flex flex-col items-center justify-center py-12 text-center">
-                                <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 mb-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        {{-- My Shifts mode --}}
+                        <div x-show="!showFreeSlots" class="space-y-3">
+                            @foreach($dayShifts as $shift)
+                                <div x-data="{ stationName: {{ json_encode($shift['station'] ?? '') }} }" x-show="filterStation === 'All' || filterStation === stationName">
+                                    @include('driverportal.components.shift-block', ['shift' => $shift])
                                 </div>
-                                <span class="text-[10px] font-medium text-slate-300 italic">{{ __('portal.no_shifts_planned') }}</span>
+                            @endforeach
+                        </div>
+                        {{-- Free Slots mode --}}
+                        <div x-show="showFreeSlots" class="space-y-3">
+                            <template x-for="slot in availableSlots.filter(s => s.day === dayName && (filterStation === 'All' || s.station === filterStation))" :key="slot.id">
+                                <div class="relative p-3 rounded-2xl border border-dashed border-brand-300 bg-brand-50/30 transition-all hover:bg-brand-50 hover:border-brand-400 cursor-pointer group/slot"
+                                     @click="openCreateModalFromSlot(slot)">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div class="flex flex-col">
+                                            <span class="text-base font-bold text-brand-700 leading-none" x-text="slot.start"></span>
+                                            <span class="text-[10px] font-bold text-brand-400 mt-1" x-text="slot.end"></span>
+                                        </div>
+                                        <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700">{{ __('portal.available') }}</span>
+                                    </div>
+                                    <div class="mt-2 text-[10px] text-brand-600 font-medium" x-text="slot.station"></div>
+                                    <div class="mt-3 opacity-0 group-hover/slot:opacity-100 transition-opacity">
+                                        <span class="block w-full py-1.5 bg-brand-600 text-white text-[10px] font-bold rounded-lg shadow-sm text-center">{{ __('portal.book_now') }}</span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        {{-- Empty state --}}
+                        <div x-show="(!showFreeSlots && !dayHasShifts) || (showFreeSlots && availableSlots.filter(s => s.day === dayName && (filterStation === 'All' || s.station === filterStation)).length === 0)"
+                             x-transition
+                             class="h-full flex flex-col items-center justify-center py-12 text-center">
+                            <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                             </div>
-                        @endif
+                            <span class="text-[10px] font-medium text-slate-300 italic" x-text="showFreeSlots ? '{{ __("portal.no_slots_found") }}' : '{{ __("portal.no_shifts_planned") }}'"></span>
+                        </div>
                     </div>
                 </div>
             @endforeach
@@ -121,6 +161,10 @@
             <div class="flex items-center gap-2">
                 <div class="w-3 h-3 rounded-full bg-green-500"></div>
                 <span class="text-sm font-medium text-slate-600">{{ __('portal.my_shift') }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded border-2 border-dashed border-brand-400 bg-brand-50"></div>
+                <span class="text-sm font-medium text-slate-600">{{ __('portal.available') }}</span>
             </div>
         </div>
         <div class="flex items-center gap-2 text-slate-400 bg-slate-50 px-4 py-2 rounded-xl">
@@ -263,7 +307,22 @@
             document.getElementById('availability-message').classList.add('hidden');
             document.getElementById('confirm-shift-btn').disabled = true;
         }
+        function openCreateModalFromSlot(slot) {
+            document.getElementById('create-modal').classList.remove('hidden');
+            var dateEl = document.getElementById('create-date');
+            var stationEl = document.getElementById('create-station');
+            var startEl = document.getElementById('create-start');
+            var durationEl = document.getElementById('create-duration');
+            if (dateEl && slot.date_iso) dateEl.value = slot.date_iso;
+            if (stationEl && slot.station_id) stationEl.value = String(slot.station_id);
+            if (startEl && slot.start) startEl.value = slot.start;
+            if (durationEl && slot.duration) durationEl.value = String(slot.duration);
+            updateStartTimeOptions();
+            document.getElementById('availability-message').classList.add('hidden');
+            document.getElementById('confirm-shift-btn').disabled = true;
+        }
         window.openCreateModalForDate = openCreateModalForDate;
+        window.openCreateModalFromSlot = openCreateModalFromSlot;
         window.updateStartTimeOptions = updateStartTimeOptions;
         document.getElementById('create-date')?.addEventListener('change', updateStartTimeOptions);
 
