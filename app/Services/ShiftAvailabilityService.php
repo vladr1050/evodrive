@@ -199,6 +199,30 @@ class ShiftAvailabilityService
             ->get()
             ->groupBy('vehicle_id');
 
+        $dayEndMinutes = 24 * 60;
+        $freeByDay = [];
+        for ($dayIndex = 0; $dayIndex < 7; $dayIndex++) {
+            $dayStart = $weekStart->copy()->addDays($dayIndex)->setTimezone($tz)->startOfDay();
+            $dayEnd = $dayStart->copy()->endOfDay();
+            $isToday = $dayStart->isSameDay($nowInTz);
+            $freeByDay[$dayIndex] = [];
+            foreach ($stations as $station) {
+                $stationVehicleIds = $vehiclesByStation[$station->id] ?? [];
+                if (empty($stationVehicleIds)) {
+                    continue;
+                }
+                $freeByDay[$dayIndex][$station->id] = $this->computeStationFreeIntervals(
+                    $stationVehicleIds,
+                    $shifts,
+                    $dayStart,
+                    $dayEnd,
+                    $downtimeMinutes,
+                    $slotMinutes,
+                    $isToday ? $nowInTz : null
+                );
+            }
+        }
+
         $slots = [];
         $slotId = 0;
 
@@ -210,24 +234,9 @@ class ShiftAvailabilityService
             }
             $dateIso = $dayStart->format('Y-m-d');
             $dayName = $dayNames[$dayIndex] ?? 'Day' . ($dayIndex + 1);
-            $isToday = $dayStart->isSameDay($nowInTz);
 
             foreach ($stations as $station) {
-                $stationVehicleIds = $vehiclesByStation[$station->id] ?? [];
-                if (empty($stationVehicleIds)) {
-                    continue;
-                }
-
-                $freeIntervals = $this->computeStationFreeIntervals(
-                    $stationVehicleIds,
-                    $shifts,
-                    $dayStart,
-                    $dayEnd,
-                    $downtimeMinutes,
-                    $slotMinutes,
-                    $isToday ? $nowInTz : null
-                );
-
+                $freeIntervals = $freeByDay[$dayIndex][$station->id] ?? [];
                 foreach ($freeIntervals as [$startMin, $endMin]) {
                     $durationHours = ($endMin - $startMin) / 60.0;
                     if ($durationHours < $minDurationHours) {
@@ -251,6 +260,55 @@ class ShiftAvailabilityService
                         'station_id' => $station->id,
                         'date_iso' => $dateIso,
                     ];
+                }
+
+                if ($dayIndex < 6) {
+                    $nextIntervals = $freeByDay[$dayIndex + 1][$station->id] ?? [];
+                    $nextDayStart = $weekStart->copy()->addDays($dayIndex + 1)->setTimezone($tz)->startOfDay();
+                    if ($nextDayStart->copy()->endOfDay()->lt($nowInTz)) {
+                        continue;
+                    }
+                    foreach ($freeIntervals as [$startMin, $endMin]) {
+                        if ($endMin < $dayEndMinutes) {
+                            continue;
+                        }
+                        $tailMinutes = $dayEndMinutes - $startMin;
+                        foreach ($nextIntervals as [$nextStart, $nextEnd]) {
+                            if ($nextStart > 0) {
+                                continue;
+                            }
+                            $combinedMinutes = $tailMinutes + $nextEnd;
+                            if ($combinedMinutes < $minDurationHours * 60) {
+                                continue;
+                            }
+                            $maxDuration = (int) floor($combinedMinutes / 60);
+                            $suggestedDuration = collect($allowedDurations)->filter(fn ($d) => $d <= $maxDuration && $d >= (int) $minDurationHours)->max();
+                            if ($suggestedDuration === null || $suggestedDuration < $minDurationHours) {
+                                continue;
+                            }
+                            $totalMin = $suggestedDuration * 60;
+                            if ($totalMin <= $tailMinutes) {
+                                continue;
+                            }
+                            $endMinNext = $totalMin - $tailMinutes;
+                            $h1 = (int) floor($startMin / 60);
+                            $m1 = $startMin % 60;
+                            $h2 = (int) floor($endMinNext / 60);
+                            $m2 = $endMinNext % 60;
+                            $slots[] = [
+                                'id' => 'as' . (++$slotId),
+                                'day' => $dayName,
+                                'start' => sprintf('%02d:%02d', $h1, $m1),
+                                'end' => sprintf('%02d:%02d', $h2, $m2),
+                                'duration' => $suggestedDuration,
+                                'station' => $station->name,
+                                'station_id' => $station->id,
+                                'date_iso' => $dateIso,
+                                'end_date_iso' => $nextDayStart->format('Y-m-d'),
+                            ];
+                            break;
+                        }
+                    }
                 }
             }
         }

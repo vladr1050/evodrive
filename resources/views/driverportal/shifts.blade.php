@@ -128,7 +128,7 @@
                                     <div class="flex justify-between items-start mb-2">
                                         <div class="flex flex-col">
                                             <span class="text-base font-bold text-brand-700 leading-none" x-text="slot.start"></span>
-                                            <span class="text-[10px] font-bold text-brand-400 mt-1" x-text="slot.end"></span>
+                                            <span class="text-[10px] font-bold text-brand-400 mt-1" x-text="slot.end_date_iso ? slot.end + ' (+1)' : slot.end"></span>
                                         </div>
                                         <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700">{{ __('portal.available') }}</span>
                                     </div>
