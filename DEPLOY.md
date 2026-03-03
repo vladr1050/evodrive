@@ -96,7 +96,7 @@ cd /var/www/evodrive
 cp deploy/env.production.example .env
 ```
 
-Отредактируй `.env`: задай `APP_KEY` (сгенерируй: `docker compose run --rm app php artisan key:generate --show` и вставь), `DB_PASSWORD`, при необходимости `APP_URL` и почту.
+Отредактируй `.env`: задай `APP_KEY` (сгенерируй: `docker compose run --rm app php artisan key:generate --show` и вставь), `DB_PASSWORD`, при необходимости `APP_URL` и почту. Для уведомлений в Telegram при отмене смен добавь `TELEGRAM_BOT_TOKEN` и `TELEGRAM_SHIFTS_CHAT_ID` (см. `deploy/env.production.example`); воркер очереди уже есть в Docker и обрабатывает отложенные задачи.
 
 ```bash
 # Сгенерировать APP_KEY и подставить в .env вручную
