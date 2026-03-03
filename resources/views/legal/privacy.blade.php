@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('ui.legal_privacy_title') . ' — EvoDrive.lv')
+@section('title', __('ui.legal_privacy_title') . ' — Evo.drive')
 
 @section('content')
 <div class="max-w-3xl mx-auto px-4 py-20">

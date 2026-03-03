@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', __('ui.home_hero_title') . ' ' . __('ui.home_hero_repeat') . ' — EvoDrive.lv')
+@section('title', __('ui.home_hero_title') . ' ' . __('ui.home_hero_repeat') . ' — Evo.drive')
 
 @section('content')
 <div class="flex flex-col min-h-screen pt-20">

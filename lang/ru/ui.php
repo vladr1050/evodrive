@@ -26,7 +26,7 @@ return [
     'home_trust_3_desc' => 'Только EV и гибриды',
     'home_trust_4' => 'Поддержка 24/7',
     'home_trust_4_desc' => 'Помощь круглосуточно',
-    'google_hero_h1' => 'Работайте в автопарке EvoDrive',
+    'google_hero_h1' => 'Работайте в автопарке Evo.drive',
     'google_hero_sub' => 'Зарабатывайте больше без личного риска.',
     'apply_2_min' => 'Подать заявку за 2 минуты',
     'rent_instead' => 'Арендовать авто вместо этого',

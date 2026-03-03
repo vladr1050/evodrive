@@ -26,7 +26,7 @@ return [
     'home_trust_3_desc' => 'EV & Hybrid only',
     'home_trust_4' => 'Full Support',
     'home_trust_4_desc' => '24/7 assistance',
-    'google_hero_h1' => 'Work with EvoDrive Fleet',
+    'google_hero_h1' => 'Work with Evo.drive Fleet',
     'google_hero_sub' => 'Earn more with zero personal risk.',
     'apply_2_min' => 'Apply in 2 Minutes',
     'rent_instead' => 'Rent a Car Instead',

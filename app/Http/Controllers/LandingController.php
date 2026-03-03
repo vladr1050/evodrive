@@ -55,7 +55,7 @@ class LandingController extends Controller
             'car' => $car,
             'locale' => $locale,
             'metaDescription' => $metaDesc,
-            'ogTitle' => $carTitle . ' — ' . __('ui.rent_now') . ' — EvoDrive.lv',
+            'ogTitle' => $carTitle . ' — ' . __('ui.rent_now') . ' — Evo.drive',
             'ogDescription' => $metaDesc,
             'ogImage' => $car['image'] ?? null,
         ]);
@@ -71,7 +71,7 @@ class LandingController extends Controller
             'categories' => $categories,
             'siteSettings' => SiteSetting::first(),
             'metaDescription' => __('ui.faq_hero_sub'),
-            'ogTitle' => __('ui.faq_title') . ' — EvoDrive.lv',
+            'ogTitle' => __('ui.faq_title') . ' — Evo.drive',
         ]);
     }
 }

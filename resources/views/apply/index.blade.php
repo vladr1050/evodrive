@@ -35,7 +35,7 @@
                     </button>
                     <a href="{{ url('/' . app()->getLocale() . '/g') }}" id="logo-btn" class="block p-2 -ml-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-full transition-all active:scale-90">
                         <div class="w-6 h-6 bg-black rounded-[22%] flex items-center justify-center overflow-hidden shrink-0">
-                            <img src="{{ asset('images/logo.png') }}" alt="EvoDrive" class="w-full h-full object-contain">
+                            <img src="{{ asset('images/logo.png') }}" alt="Evo.drive" class="w-full h-full object-contain">
                         </div>
                     </a>
                 </div>

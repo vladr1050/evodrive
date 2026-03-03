@@ -2,7 +2,7 @@
 
 return [
     'organization' => [
-        'name' => env('SCHEMA_ORG_NAME', 'EvoDrive'),
+        'name' => env('SCHEMA_ORG_NAME', 'Evo.drive'),
         'url' => env('APP_URL', 'https://evodrive.lv'),
     ],
     'job_location' => [

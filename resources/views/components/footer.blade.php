@@ -8,7 +8,7 @@
             <div class="col-span-1 md:col-span-2 space-y-4">
                 <div class="flex items-center gap-2">
                     <x-logo class="h-6 w-auto"/>
-                    <span class="text-xl font-bold tracking-tight text-slate-900">EvoDrive<span class="text-brand-600">.lv</span></span>
+                    <span class="text-xl font-bold tracking-tight text-slate-900">Evo.</span><span class="text-xl font-bold tracking-tight text-brand-600">drive</span>
                 </div>
                 <p class="text-slate-400 text-sm max-w-sm font-medium leading-relaxed">
                     {{ __('ui.footer_tagline') }}
@@ -32,7 +32,7 @@
             </div>
         </div>
         <div class="mt-16 pt-8 border-t border-slate-50 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">&copy; {{ date('Y') }} EvoDrive Latvia. {{ __('ui.footer_rights') }}</p>
+            <p class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">&copy; {{ date('Y') }} Evo.drive Latvia. {{ __('ui.footer_rights') }}</p>
             <div class="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{{ __('ui.footer_tagline2') }}</div>
         </div>
     </div>

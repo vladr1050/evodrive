@@ -4,7 +4,7 @@
 @endphp
 @extends('layouts.app')
 
-@section('title', __('ui.error_404_title') . ' — EvoDrive.lv')
+@section('title', __('ui.error_404_title') . ' — Evo.drive')
 
 @section('content')
 <div class="min-h-[60vh] flex flex-col items-center justify-center px-4 py-20">

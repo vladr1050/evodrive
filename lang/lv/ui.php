@@ -26,7 +26,7 @@ return [
     'home_trust_3_desc' => 'Tikai EV un hibrīdi',
     'home_trust_4' => 'Atbalsts 24/7',
     'home_trust_4_desc' => 'Palīdzība visa laika',
-    'google_hero_h1' => 'Strādājiet ar EvoDrive floti',
+    'google_hero_h1' => 'Strādājiet ar Evo.drive floti',
     'google_hero_sub' => 'Nopelniet vairāk bez personīgā riska.',
     'apply_2_min' => 'Pieteikties 2 minūtēs',
     'rent_instead' => 'Īrēt auto tā vietā',

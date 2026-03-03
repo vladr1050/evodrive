@@ -7,7 +7,7 @@
         'description' => \Illuminate\Support\Str::limit(strip_tags($car['description'] ?? ''), 500),
         'brand' => [
             '@type' => 'Brand',
-            'name' => $car['make'] ?? 'EvoDrive',
+            'name' => $car['make'] ?? 'Evo.drive',
         ],
         'offers' => [
             '@type' => 'Offer',

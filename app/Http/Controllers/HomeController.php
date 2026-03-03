@@ -13,7 +13,7 @@ class HomeController extends Controller
         return view('home', [
             'siteSettings' => SiteSetting::first(),
             'metaDescription' => __('ui.home_hero_sub'),
-            'ogTitle' => __('ui.home_hero_title') . ' ' . __('ui.home_hero_repeat') . ' — EvoDrive.lv',
+            'ogTitle' => __('ui.home_hero_title') . ' ' . __('ui.home_hero_repeat') . ' — Evo.drive',
             'ogDescription' => __('ui.home_hero_sub'),
         ]);
     }

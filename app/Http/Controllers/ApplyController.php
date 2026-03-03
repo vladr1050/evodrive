@@ -28,8 +28,8 @@ class ApplyController extends Controller
         return view('apply.index', [
             'sessionData' => $sessionData,
             'source' => $this->resolveSource($request),
-            'metaDescription' => __('apply.step_phone_title') . ' — EvoDrive.lv. ' . __('ui.home_hero_sub'),
-            'ogTitle' => __('apply.personal_info') . ' — EvoDrive.lv',
+            'metaDescription' => __('apply.step_phone_title') . ' — Evo.drive. ' . __('ui.home_hero_sub'),
+            'ogTitle' => __('apply.personal_info') . ' — Evo.drive',
             'ogDescription' => __('ui.home_hero_sub'),
         ]);
     }
@@ -90,7 +90,7 @@ class ApplyController extends Controller
         return view('apply.thanks', [
             'phone' => $phone,
             'metaDescription' => __('apply.done') . ' — ' . __('ui.home_hero_sub'),
-            'ogTitle' => __('apply.done') . ' — EvoDrive.lv',
+            'ogTitle' => __('apply.done') . ' — Evo.drive',
             'ogDescription' => __('ui.home_hero_sub'),
         ]);
     }

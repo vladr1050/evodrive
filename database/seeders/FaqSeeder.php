@@ -17,8 +17,8 @@ class FaqSeeder extends Seeder
                 'title' => ['en' => 'General', 'ru' => 'Общее', 'lv' => 'Vispārīgi'],
                 'items' => [
                     [
-                        'question' => ['en' => 'What is EvoDrive.lv?'],
-                        'answer' => ['en' => 'EvoDrive is Riga\'s leading mobility infrastructure platform. We provide professional drivers with everything they need to succeed: from premium Tesla fleet employment to taxi-licensed vehicle rentals for independent work.'],
+                        'question' => ['en' => 'What is Evo.drive?'],
+                        'answer' => ['en' => 'Evo.drive is Riga\'s leading mobility infrastructure platform. We provide professional drivers with everything they need to succeed: from premium Tesla fleet employment to taxi-licensed vehicle rentals for independent work.'],
                     ],
                     [
                         'question' => ['en' => 'Where are you located?'],

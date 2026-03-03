@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', $page?->getTranslated('meta_title') ?? __('ui.emp_hero_h1_1') . ' ' . __('ui.emp_hero_h1_2') . ' — EvoDrive.lv')
+@section('title', $page?->getTranslated('meta_title') ?? __('ui.emp_hero_h1_1') . ' ' . __('ui.emp_hero_h1_2') . ' — Evo.drive')
 
 @push('scripts')
     @if($page && $page->key === 'google_landing')

@@ -4,7 +4,7 @@
     @include('components.product-schema', ['car' => $car])
 @endpush
 
-@section('title', $car['make'] . ' ' . $car['model'] . ' — ' . __('ui.rent_now') . ' — EvoDrive.lv')
+@section('title', $car['make'] . ' ' . $car['model'] . ' — ' . __('ui.rent_now') . ' — Evo.drive')
 
 @section('content')
 <div class="bg-white min-h-screen pb-20">

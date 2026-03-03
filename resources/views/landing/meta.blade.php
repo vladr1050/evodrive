@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', $page?->getTranslated('meta_title') ?? __('ui.rent_hero_h1_1') . ' ' . __('ui.rent_hero_h1_2') . ' — EvoDrive.lv')
+@section('title', $page?->getTranslated('meta_title') ?? __('ui.rent_hero_h1_1') . ' ' . __('ui.rent_hero_h1_2') . ' — Evo.drive')
 
 @section('content')
 <div class="bg-white min-h-screen pb-20">

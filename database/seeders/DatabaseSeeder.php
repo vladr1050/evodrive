@@ -27,16 +27,16 @@ class DatabaseSeeder extends Seeder
         $pages = [
             [
                 'key' => 'google_landing',
-                'title' => ['en' => 'Work with EvoDrive Fleet', 'ru' => 'Работайте в автопарке EvoDrive', 'lv' => 'Strādājiet ar EvoDrive floti'],
+                'title' => ['en' => 'Work with Evo.drive Fleet', 'ru' => 'Работайте в автопарке Evo.drive', 'lv' => 'Strādājiet ar Evo.drive floti'],
                 'slug' => ['en' => 'g', 'ru' => 'g', 'lv' => 'g'],
-                'meta_title' => ['en' => 'Work with EvoDrive Fleet | Taxi Jobs Riga', 'ru' => 'Работа в EvoDrive | Такси Рига', 'lv' => 'Darbs EvoDrive | Taksometrs Rīga'],
+                'meta_title' => ['en' => 'Work with Evo.drive Fleet | Taxi Jobs Riga', 'ru' => 'Работа в Evo.drive | Такси Рига', 'lv' => 'Darbs Evo.drive | Taksometrs Rīga'],
                 'meta_description' => ['en' => 'Earn more with zero personal risk. Apply in 2 minutes.', 'ru' => 'Зарабатывайте больше без личного риска. Заявка за 2 минуты.', 'lv' => 'Nopelniet vairāk bez personīgā riska. Pieteikties 2 minūtēs.'],
                 'is_active' => true,
                 'sections' => [
                     ['key' => 'hero', 'sort_order' => 1, 'content' => [
-                        'en' => ['h1' => 'Work with EvoDrive Fleet', 'subtitle' => 'Earn more with zero personal risk.', 'cta_primary' => 'Apply in 2 Minutes', 'cta_secondary' => 'Rent a Car Instead'],
-                        'ru' => ['h1' => 'Работайте в автопарке EvoDrive', 'subtitle' => 'Зарабатывайте больше без личного риска.', 'cta_primary' => 'Подать заявку за 2 минуты', 'cta_secondary' => 'Арендовать авто вместо'],
-                        'lv' => ['h1' => 'Strādājiet ar EvoDrive floti', 'subtitle' => 'Nopelniet vairāk bez personīgā riska.', 'cta_primary' => 'Pieteikties 2 minūtēs', 'cta_secondary' => 'Īrēt auto tā vietā'],
+                        'en' => ['h1' => 'Work with Evo.drive Fleet', 'subtitle' => 'Earn more with zero personal risk.', 'cta_primary' => 'Apply in 2 Minutes', 'cta_secondary' => 'Rent a Car Instead'],
+                        'ru' => ['h1' => 'Работайте в автопарке Evo.drive', 'subtitle' => 'Зарабатывайте больше без личного риска.', 'cta_primary' => 'Подать заявку за 2 минуты', 'cta_secondary' => 'Арендовать авто вместо'],
+                        'lv' => ['h1' => 'Strādājiet ar Evo.drive floti', 'subtitle' => 'Nopelniet vairāk bez personīgā riska.', 'cta_primary' => 'Pieteikties 2 minūtēs', 'cta_secondary' => 'Īrēt auto tā vietā'],
                     ]],
                     ['key' => 'benefits', 'sort_order' => 2, 'content' => [
                         'en' => ['items' => ['7–10 EUR/h bruto', 'Weekly payments', 'Tesla fleet', 'Maintenance included']],
@@ -59,7 +59,7 @@ class DatabaseSeeder extends Seeder
                 'key' => 'meta_landing',
                 'title' => ['en' => 'Your Career Starts Here', 'ru' => 'Ваша карьера начинается здесь', 'lv' => 'Tava karjera sākas šeit'],
                 'slug' => ['en' => 'm', 'ru' => 'm', 'lv' => 'm'],
-                'meta_title' => ['en' => 'Your Career Starts Here | EvoDrive Taxi', 'ru' => 'Карьера в такси | EvoDrive', 'lv' => 'Karjera taksometrā | EvoDrive'],
+                'meta_title' => ['en' => 'Your Career Starts Here | Evo.drive Taxi', 'ru' => 'Карьера в такси | Evo.drive', 'lv' => 'Karjera taksometrā | Evo.drive'],
                 'meta_description' => ['en' => 'Join the best taxi fleet in Latvia. Zero debt. Zero maintenance.', 'ru' => 'Присоединяйтесь к лучшему таксопарку Латвии.', 'lv' => 'Pievienojies labākajam taksometru parkam Latvijā.'],
                 'is_active' => true,
                 'sections' => [
@@ -74,7 +74,7 @@ class DatabaseSeeder extends Seeder
                 'key' => 'privacy',
                 'title' => ['en' => 'Privacy Policy', 'ru' => 'Политика конфиденциальности', 'lv' => 'Privātuma politika'],
                 'slug' => ['en' => 'privacy', 'ru' => 'privacy', 'lv' => 'privacy'],
-                'meta_title' => ['en' => 'Privacy Policy | EvoDrive.lv', 'ru' => 'Политика конфиденциальности | EvoDrive.lv', 'lv' => 'Privātuma politika | EvoDrive.lv'],
+                'meta_title' => ['en' => 'Privacy Policy | Evo.drive', 'ru' => 'Политика конфиденциальности | Evo.drive', 'lv' => 'Privātuma politika | Evo.drive'],
                 'is_active' => true,
                 'sections' => [],
             ],
@@ -82,7 +82,7 @@ class DatabaseSeeder extends Seeder
                 'key' => 'terms',
                 'title' => ['en' => 'Terms of Service', 'ru' => 'Условия использования', 'lv' => 'Lietošanas noteikumi'],
                 'slug' => ['en' => 'terms', 'ru' => 'terms', 'lv' => 'terms'],
-                'meta_title' => ['en' => 'Terms of Service | EvoDrive.lv', 'ru' => 'Условия использования | EvoDrive.lv', 'lv' => 'Lietošanas noteikumi | EvoDrive.lv'],
+                'meta_title' => ['en' => 'Terms of Service | Evo.drive', 'ru' => 'Условия использования | Evo.drive', 'lv' => 'Lietošanas noteikumi | Evo.drive'],
                 'is_active' => true,
                 'sections' => [],
             ],

@@ -20,8 +20,8 @@
     <meta name="twitter:description" content="{{ $page->getTranslated('og_description') ?? $page->getTranslated('meta_description') }}">
 @else
     @php
-        $metaDesc = $metaDescription ?? 'EvoDrive.lv — Drive. Earn. Repeat. Start working in taxi in Latvia this week.';
-        $ogTitleVal = $ogTitle ?? 'EvoDrive.lv — Drive. Earn. Repeat.';
+        $metaDesc = $metaDescription ?? 'Evo.drive — Drive. Earn. Repeat. Start working in taxi in Latvia this week.';
+        $ogTitleVal = $ogTitle ?? 'Evo.drive — Drive. Earn. Repeat.';
         $ogDescVal = $ogDescription ?? 'Start working in taxi in Latvia this week. Choose your path.';
     @endphp
     <meta name="description" content="{{ $metaDesc }}">

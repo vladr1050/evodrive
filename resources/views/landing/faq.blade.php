@@ -4,7 +4,7 @@
     @include('components.faq-page-schema', ['categories' => $categories])
 @endpush
 
-@section('title', __('ui.faq_title') . ' — EvoDrive.lv')
+@section('title', __('ui.faq_title') . ' — Evo.drive')
 
 @section('content')
 @php
