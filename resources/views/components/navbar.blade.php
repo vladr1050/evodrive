@@ -20,7 +20,7 @@
         <div class="flex justify-between h-16">
             <a href="{{ route('home', ['locale' => $locale]) }}" class="flex items-center gap-2 group">
                 <x-logo class="h-8 w-auto group-hover:scale-105 transition-transform"/>
-                <span class="text-xl font-bold tracking-tight text-slate-900">Evo.</span><span class="text-xl font-bold tracking-tight text-brand-600 -ml-px">drive</span>
+                <span class="inline-flex items-baseline"><span class="text-xl font-bold tracking-tight text-slate-900">Evo.</span><span class="text-xl font-bold tracking-tight text-brand-600 -ml-px">drive</span></span>
             </a>
 
             <div class="hidden md:flex items-center space-x-8">
