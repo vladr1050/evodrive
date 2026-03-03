@@ -205,6 +205,9 @@ class ShiftAvailabilityService
         for ($dayIndex = 0; $dayIndex < 7; $dayIndex++) {
             $dayStart = $weekStart->copy()->addDays($dayIndex)->setTimezone($tz)->startOfDay();
             $dayEnd = $dayStart->copy()->endOfDay();
+            if ($dayEnd->lt($nowInTz)) {
+                continue;
+            }
             $dateIso = $dayStart->format('Y-m-d');
             $dayName = $dayNames[$dayIndex] ?? 'Day' . ($dayIndex + 1);
             $isToday = $dayStart->isSameDay($nowInTz);
