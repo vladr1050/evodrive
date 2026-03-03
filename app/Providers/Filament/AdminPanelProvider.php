@@ -26,6 +26,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->brandName('Evo.drive')
             ->login()
             ->colors([
                 'primary' => \Filament\Support\Colors\Color::Blue,
