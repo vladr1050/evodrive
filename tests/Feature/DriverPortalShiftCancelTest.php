@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\ShiftStatus;
+use App\Jobs\SendShiftCancellationTelegramNotificationJob;
 use App\Models\Driver;
 use App\Models\FleetVehicle;
 use App\Models\Shift;
@@ -10,6 +11,7 @@ use App\Models\ShiftPolicy;
 use App\Models\Station;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class DriverPortalShiftCancelTest extends TestCase
@@ -64,6 +66,42 @@ class DriverPortalShiftCancelTest extends TestCase
         $this->assertSame(ShiftStatus::Cancelled, $shift->status);
         $this->assertNotNull($shift->cancelled_at);
         $this->assertSame('cancelled_by_driver', $shift->cancel_reason);
+        $this->assertSame((int) $this->driver1->id, (int) $shift->cancelled_by_driver_id);
+    }
+
+    public function test_cancelling_shift_schedules_delayed_telegram_notification_job(): void
+    {
+        Queue::fake();
+
+        $startsAt = Carbon::tomorrow()->setTime(8, 0);
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver1->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => $startsAt,
+            'ends_at' => $startsAt->copy()->addHours(4),
+            'status' => ShiftStatus::Booked,
+        ]);
+
+        $this->actingAs($this->driver1, 'driver');
+        $this->get(route('driverportal.shifts', ['locale' => 'en']));
+        $this->postJson(route('driverportal.shifts.cancel', [
+                'locale' => 'en',
+                'shift' => $shift->id,
+            ]), ['_token' => csrf_token()])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        Queue::assertPushed(SendShiftCancellationTelegramNotificationJob::class, function (SendShiftCancellationTelegramNotificationJob $job) {
+            if ($job->delay === null) {
+                return false;
+            }
+            // Delay may be DateTimeInterface (e.g. Carbon) or seconds
+            if ($job->delay instanceof \DateTimeInterface) {
+                return $job->delay->getTimestamp() > time();
+            }
+            return (int) $job->delay >= 60;
+        });
     }
 
     public function test_driver_cannot_cancel_other_drivers_shift(): void

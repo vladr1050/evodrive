@@ -21,6 +21,8 @@ class Shift extends Model
         'confirmed_at',
         'cancelled_at',
         'cancel_reason',
+        'cancelled_by_driver_id',
+        'cancellation_notified_at',
     ];
 
     protected function casts(): array
@@ -31,6 +33,7 @@ class Shift extends Model
             'status' => ShiftStatus::class,
             'confirmed_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'cancellation_notified_at' => 'datetime',
         ];
     }
 
@@ -47,6 +50,12 @@ class Shift extends Model
     public function station(): BelongsTo
     {
         return $this->belongsTo(Station::class);
+    }
+
+    /** Driver who cancelled this shift (when status is Cancelled). */
+    public function cancelledByDriver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class, 'cancelled_by_driver_id');
     }
 
     public function durationHours(): float

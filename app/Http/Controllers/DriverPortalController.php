@@ -9,6 +9,7 @@ use App\Models\ShiftPolicy;
 use App\Models\Station;
 use App\Services\ShiftAvailabilityService;
 use App\Services\ShiftBookingService;
+use App\Services\ShiftCancellationService;
 use App\Services\ShiftCopyService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -352,11 +353,7 @@ class DriverPortalController extends Controller
                 'reason_code' => 'SHIFT_IN_PAST',
             ], 422);
         }
-        $shift->update([
-            'status' => ShiftStatus::Cancelled,
-            'cancelled_at' => now(),
-            'cancel_reason' => 'cancelled_by_driver',
-        ]);
+        app(ShiftCancellationService::class)->cancelShift($shift, $driver, 'cancelled_by_driver');
         return response()->json(['success' => true]);
     }
 
