@@ -78,30 +78,27 @@ class SendShiftCancellationTelegramNotificationJob implements ShouldQueue
         $sent = $notifier->sendToShiftsChat($text);
         if ($sent) {
             $shift->update(['cancellation_notified_at' => now()]);
+            Log::channel('stack')->info('SendShiftCancellationTelegramNotificationJob: notification sent', ['shift_id' => $shift->id]);
         }
     }
 
     /**
      * Check if a replacement booked shift exists: same driver, same station,
-     * overlapping the cancelled window or within tolerance minutes.
+     * and the other shift starts within tolerance minutes of the cancelled shift's start
+     * (driver rebooked the same slot, not just has another shift that day).
      */
     protected function replacementShiftExists(Shift $cancelled): bool
     {
         $toleranceMinutes = config('telegram.replacement_tolerance_minutes', 15);
-        $windowStart = $cancelled->starts_at->copy()->subMinutes($toleranceMinutes);
-        $windowEnd = $cancelled->ends_at->copy()->addMinutes($toleranceMinutes);
+        $startMin = $cancelled->starts_at->copy()->subMinutes($toleranceMinutes);
+        $startMax = $cancelled->starts_at->copy()->addMinutes($toleranceMinutes);
 
         return Shift::query()
             ->where('id', '!=', $cancelled->id)
             ->where('driver_id', $cancelled->driver_id)
             ->where('station_id', $cancelled->station_id)
             ->where('status', ShiftStatus::Booked)
-            ->where(function ($q) use ($windowStart, $windowEnd) {
-                $q->where(function ($q) use ($windowStart, $windowEnd) {
-                    $q->where('starts_at', '<', $windowEnd)
-                        ->where('ends_at', '>', $windowStart);
-                });
-            })
+            ->whereBetween('starts_at', [$startMin, $startMax])
             ->exists();
     }
 
