@@ -129,13 +129,18 @@ class DriverPortalController extends Controller
                 $endsAtInTz = $s->ends_at->copy()->setTimezone($tz);
                 $isMine = (int) $s->driver_id === (int) $driverId;
                 $cancellable = $isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz);
+                $vehicle = $s->vehicle;
+                $vehicleLabel = $vehicle?->label ?? '-';
+                $isTesla = $vehicle && (stripos((string) $vehicle->brand, 'Tesla') !== false || stripos((string) $vehicle->model, 'Tesla') !== false);
+                $vehicleRegNumber = ($isTesla && !empty($vehicle->registration_number)) ? $vehicle->registration_number : null;
                 return [
                     'id' => (string) $s->id,
                     'day' => $days[$startsAtInTz->dayOfWeek === 0 ? 6 : $startsAtInTz->dayOfWeek - 1],
                     'start' => $startsAtInTz->format('H:i'),
                     'end' => $endsAtInTz->format('H:i'),
                     'duration' => (int) $s->durationHours(),
-                    'vehicle' => $s->vehicle?->label ?? '-',
+                    'vehicle' => $vehicleLabel,
+                    'vehicle_reg_number' => $vehicleRegNumber,
                     'station' => $s->station?->name ?? '-',
                     'station_address' => $s->station?->address ?: null,
                     'status' => $s->status->value,
