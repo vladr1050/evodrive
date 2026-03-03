@@ -70,8 +70,8 @@
             <div class="flex flex-col h-full min-h-0">
                 {{-- Sidebar Logo --}}
                 <div class="p-8">
-                    <a href="{{ url($locale) }}" class="text-2xl font-bold tracking-tight">
-                        <span class="text-slate-900">Evo.</span><span class="text-brand-600">drive</span>
+                    <a href="{{ url($locale) }}" class="text-2xl font-bold tracking-tight inline-flex items-baseline">
+                        <span class="text-white">Evo.</span><span class="text-brand-600 -ml-px">drive</span>
                     </a>
                 </div>
 

@@ -8,7 +8,7 @@
             <div class="col-span-1 md:col-span-2 space-y-4">
                 <div class="flex items-center gap-2">
                     <x-logo class="h-6 w-auto"/>
-                    <span class="text-xl font-bold tracking-tight text-slate-900">Evo.</span><span class="text-xl font-bold tracking-tight text-brand-600">drive</span>
+                    <span class="text-xl font-bold tracking-tight text-slate-900">Evo.</span><span class="text-xl font-bold tracking-tight text-brand-600 -ml-px">drive</span>
                 </div>
                 <p class="text-slate-400 text-sm max-w-sm font-medium leading-relaxed">
                     {{ __('ui.footer_tagline') }}
