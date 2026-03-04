@@ -58,9 +58,11 @@ class ShiftResource extends Resource
                     ->label('Driver')
                     ->formatStateUsing(fn (Shift $r) => $r->driver ? $r->driver->name . ' (' . $r->driver->email . ')' : '-')
                     ->searchable(query: function (Builder $q, string $search) {
+                        if ($q->getModel() === null) {
+                            return;
+                        }
                         $search = trim((string) $search);
                         if ($search === '') {
-                            $q->whereRaw('1 = 1');
                             return;
                         }
                         $variants = Latvian::searchVariants($search);
@@ -77,9 +79,11 @@ class ShiftResource extends Resource
                     ->label('Vehicle')
                     ->formatStateUsing(fn (Shift $r) => $r->vehicle ? $r->vehicle->registration_number . ' – ' . trim(($r->vehicle->brand ?? '') . ' ' . ($r->vehicle->model ?? '')) : '-')
                     ->searchable(query: function (Builder $q, string $search) {
+                        if ($q->getModel() === null) {
+                            return;
+                        }
                         $search = trim((string) $search);
                         if ($search === '') {
-                            $q->whereRaw('1 = 1');
                             return;
                         }
                         $variants = Latvian::searchVariants($search);
@@ -94,9 +98,11 @@ class ShiftResource extends Resource
                 Tables\Columns\TextColumn::make('station.name')
                     ->label('Station')
                     ->searchable(query: function (Builder $q, string $search) {
+                        if ($q->getModel() === null) {
+                            return;
+                        }
                         $search = trim((string) $search);
                         if ($search === '') {
-                            $q->whereRaw('1 = 1');
                             return;
                         }
                         $variants = Latvian::searchVariants($search);
