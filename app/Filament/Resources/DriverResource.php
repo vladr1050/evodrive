@@ -49,6 +49,13 @@ class DriverResource extends Resource
                         Forms\Components\TextInput::make('phone')
                             ->tel()
                             ->maxLength(50),
+                        Forms\Components\TextInput::make('telegram_id')
+                            ->label('Telegram ID')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxLength(20)
+                            ->placeholder('ID пользователя в Telegram для бота')
+                            ->helperText('Числовой ID из @userinfobot или при получении контакта в боте'),
                         Forms\Components\TextInput::make('license_number')
                             ->required()
                             ->maxLength(50),
@@ -110,6 +117,11 @@ class DriverResource extends Resource
                 Tables\Columns\TextColumn::make('email')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('telegram_id')
+                    ->label('Telegram ID')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('license_number')
                     ->searchable()
                     ->toggleable(),

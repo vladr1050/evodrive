@@ -28,6 +28,7 @@ class Driver extends Authenticatable
         'email',
         'password',
         'phone',
+        'telegram_id',
         'atd_number',
         'license_number',
         'locale',
