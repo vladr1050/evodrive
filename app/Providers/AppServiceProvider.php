@@ -2,9 +2,12 @@
 
 namespace App\Providers;
 
+use App\Contracts\SmsProviderInterface;
 use App\Events\ShiftCancelled;
 use App\Listeners\SendShiftCancellationTelegramNotification;
+use App\Services\CarControlService;
 use App\Services\DatabaseTranslationLoader;
+use App\Services\NessSmsProvider;
 use App\Services\TelegramNotifier;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
@@ -22,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->bind(TelegramNotifier::class, fn () => TelegramNotifier::fromConfig());
+        $this->app->bind(SmsProviderInterface::class, fn () => NessSmsProvider::fromConfig());
+        $this->app->singleton(CarControlService::class);
     }
 
     /**

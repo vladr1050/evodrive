@@ -73,8 +73,10 @@ class FleetVehicleResource extends Resource
                             ->label('IMEI')
                             ->maxLength(20),
                         Forms\Components\TextInput::make('sim')
-                            ->label('SIM')
-                            ->maxLength(50),
+                            ->label('SIM (phone for SMS car control)')
+                            ->tel()
+                            ->maxLength(50)
+                            ->placeholder('37120000000'),
                     ])
                     ->columns(2),
             ]);

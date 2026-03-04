@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+        $middleware->validateCsrfTokens(except: [
+            'telegram/*',
+        ]);
         $middleware->redirectGuestsTo(function (\Illuminate\Http\Request $request) {
             if (str_contains($request->path(), 'driverportal')) {
                 return route('driverportal.login', ['locale' => $request->route('locale') ?? app()->getLocale()]);

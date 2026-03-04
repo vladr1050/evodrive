@@ -4,6 +4,7 @@ use App\Http\Controllers\ApplyController;
 use App\Http\Controllers\DriverPortalController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\TelegramCarControlWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -82,3 +83,6 @@ Route::get('/', function () {
     return redirect('/en')
         ->header('Cache-Control', 'no-cache, no-store, must-revalidate');
 });
+
+// Telegram webhook for car control (no locale, no CSRF)
+Route::post('telegram/car-control-webhook', [TelegramCarControlWebhookController::class, 'handle'])->name('telegram.car_control.webhook');
