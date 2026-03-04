@@ -91,8 +91,15 @@ class FleetVehicleResource extends Resource
                     ->label('Brand / Model')
                     ->formatStateUsing(fn (FleetVehicle $r) => trim(($r->brand ?? '') . ' ' . ($r->model ?? '')))
                     ->searchable(query: function (Builder $q, string $search) {
-                        $q->where(function ($q) use ($search) {
-                            $q->where('brand', 'like', "%{$search}%")->orWhere('model', 'like', "%{$search}%");
+                        if ($q->getModel() === null) {
+                            return;
+                        }
+                        $search = trim($search);
+                        if ($search === '') {
+                            return;
+                        }
+                        $q->where(function (Builder $sub) use ($search) {
+                            $sub->where('brand', 'like', "%{$search}%")->orWhere('model', 'like', "%{$search}%");
                         });
                     }),
                 Tables\Columns\TextColumn::make('homeStation.name')

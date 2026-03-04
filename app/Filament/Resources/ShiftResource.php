@@ -58,60 +58,63 @@ class ShiftResource extends Resource
                     ->label('Driver')
                     ->formatStateUsing(fn (Shift $r) => $r->driver ? $r->driver->name . ' (' . $r->driver->email . ')' : '-')
                     ->searchable(query: function (Builder $q, string $search) {
-                        if ($q->getModel() === null) {
-                            return;
-                        }
                         $search = trim((string) $search);
                         if ($search === '') {
                             return;
                         }
-                        $variants = Latvian::searchVariants($search);
-                        $q->whereHas('driver', function (Builder $sub) use ($variants) {
-                            foreach (['first_name', 'last_name', 'email'] as $col) {
-                                foreach ($variants as $v) {
-                                    $sub->orWhere($col, 'like', '%' . $v . '%');
+                        try {
+                            $variants = Latvian::searchVariants($search);
+                            $q->whereHas('driver', function (Builder $sub) use ($variants) {
+                                foreach (['first_name', 'last_name', 'email'] as $col) {
+                                    foreach ($variants as $v) {
+                                        $sub->orWhere($col, 'like', '%' . $v . '%');
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        } catch (\Throwable) {
+                            // Summary/aggregate context may pass builder without model
+                        }
                     })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('vehicle.registration_number')
                     ->label('Vehicle')
                     ->formatStateUsing(fn (Shift $r) => $r->vehicle ? $r->vehicle->registration_number . ' – ' . trim(($r->vehicle->brand ?? '') . ' ' . ($r->vehicle->model ?? '')) : '-')
                     ->searchable(query: function (Builder $q, string $search) {
-                        if ($q->getModel() === null) {
-                            return;
-                        }
                         $search = trim((string) $search);
                         if ($search === '') {
                             return;
                         }
-                        $variants = Latvian::searchVariants($search);
-                        $q->whereHas('vehicle', function (Builder $sub) use ($variants) {
-                            foreach (['registration_number', 'brand', 'model'] as $col) {
-                                foreach ($variants as $v) {
-                                    $sub->orWhere($col, 'like', '%' . $v . '%');
+                        try {
+                            $variants = Latvian::searchVariants($search);
+                            $q->whereHas('vehicle', function (Builder $sub) use ($variants) {
+                                foreach (['registration_number', 'brand', 'model'] as $col) {
+                                    foreach ($variants as $v) {
+                                        $sub->orWhere($col, 'like', '%' . $v . '%');
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        } catch (\Throwable) {
+                            // Summary/aggregate context may pass builder without model
+                        }
                     }),
                 Tables\Columns\TextColumn::make('station.name')
                     ->label('Station')
                     ->searchable(query: function (Builder $q, string $search) {
-                        if ($q->getModel() === null) {
-                            return;
-                        }
                         $search = trim((string) $search);
                         if ($search === '') {
                             return;
                         }
-                        $variants = Latvian::searchVariants($search);
-                        $q->whereHas('station', function (Builder $sub) use ($variants) {
-                            foreach ($variants as $v) {
-                                $sub->orWhere('name', 'like', '%' . $v . '%')
-                                    ->orWhere('address', 'like', '%' . $v . '%');
-                            }
-                        });
+                        try {
+                            $variants = Latvian::searchVariants($search);
+                            $q->whereHas('station', function (Builder $sub) use ($variants) {
+                                foreach ($variants as $v) {
+                                    $sub->orWhere('name', 'like', '%' . $v . '%')
+                                        ->orWhere('address', 'like', '%' . $v . '%');
+                                }
+                            });
+                        } catch (\Throwable) {
+                            // Summary/aggregate context may pass builder without model
+                        }
                     })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
