@@ -168,8 +168,9 @@ class ShiftResource extends Resource
                             if ($variants !== []) {
                                 $query->where(function (Builder $q) use ($variants) {
                                     foreach ($variants as $v) {
-                                        $q->orWhere('name', 'like', '%' . $v . '%')
-                                            ->orWhere('address', 'like', '%' . $v . '%');
+                                        $pattern = '%' . $v . '%';
+                                        $q->orWhereRaw('LOWER(name) LIKE LOWER(?)', [$pattern])
+                                            ->orWhereRaw('LOWER(address) LIKE LOWER(?)', [$pattern]);
                                     }
                                 });
                             }
