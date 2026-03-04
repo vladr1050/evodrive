@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\ShiftStatus;
+use App\Helpers\Latvian;
 use Carbon\Carbon;
 use App\Filament\Resources\ShiftResource\Pages;
 use App\Models\Shift;
@@ -55,21 +56,55 @@ class ShiftResource extends Resource
                     ->label('Driver')
                     ->formatStateUsing(fn (Shift $r) => $r->driver ? $r->driver->name . ' (' . $r->driver->email . ')' : '-')
                     ->searchable(query: function (Builder $q, string $search) {
-                        $q->whereHas('driver', fn ($q) => $q->where('first_name', 'like', "%{$search}%")
-                            ->orWhere('last_name', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%"));
+                        $search = trim((string) $search);
+                        if ($search === '') {
+                            $q->whereRaw('1 = 1');
+                            return;
+                        }
+                        $variants = Latvian::searchVariants($search);
+                        $q->whereHas('driver', function (Builder $sub) use ($variants) {
+                            foreach (['first_name', 'last_name', 'email'] as $col) {
+                                foreach ($variants as $v) {
+                                    $sub->orWhere($col, 'like', '%' . $v . '%');
+                                }
+                            }
+                        });
                     })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('vehicle.registration_number')
                     ->label('Vehicle')
                     ->formatStateUsing(fn (Shift $r) => $r->vehicle ? $r->vehicle->registration_number . ' – ' . trim(($r->vehicle->brand ?? '') . ' ' . ($r->vehicle->model ?? '')) : '-')
                     ->searchable(query: function (Builder $q, string $search) {
-                        $q->whereHas('vehicle', fn ($q) => $q->where('registration_number', 'like', "%{$search}%")
-                            ->orWhere('brand', 'like', "%{$search}%")
-                            ->orWhere('model', 'like', "%{$search}%"));
+                        $search = trim((string) $search);
+                        if ($search === '') {
+                            $q->whereRaw('1 = 1');
+                            return;
+                        }
+                        $variants = Latvian::searchVariants($search);
+                        $q->whereHas('vehicle', function (Builder $sub) use ($variants) {
+                            foreach (['registration_number', 'brand', 'model'] as $col) {
+                                foreach ($variants as $v) {
+                                    $sub->orWhere($col, 'like', '%' . $v . '%');
+                                }
+                            }
+                        });
                     }),
                 Tables\Columns\TextColumn::make('station.name')
                     ->label('Station')
+                    ->searchable(query: function (Builder $q, string $search) {
+                        $search = trim((string) $search);
+                        if ($search === '') {
+                            $q->whereRaw('1 = 1');
+                            return;
+                        }
+                        $variants = Latvian::searchVariants($search);
+                        $q->whereHas('station', function (Builder $sub) use ($variants) {
+                            foreach ($variants as $v) {
+                                $sub->orWhere('name', 'like', '%' . $v . '%')
+                                    ->orWhere('address', 'like', '%' . $v . '%');
+                            }
+                        });
+                    })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
