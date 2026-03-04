@@ -133,6 +133,13 @@
                                         <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700">{{ __('portal.available') }}</span>
                                     </div>
                                     <div class="mt-2 text-[10px] text-brand-600 font-medium" x-text="slot.station"></div>
+                                    <template x-if="slot.vehicles && slot.vehicles.length">
+                                        <div class="mt-1.5 text-[10px] text-slate-500 font-medium">
+                                            <template x-for="(v, i) in slot.vehicles" :key="i">
+                                                <div x-text="v.number ? (v.model + ' — ' + v.number) : v.model"></div>
+                                            </template>
+                                        </div>
+                                    </template>
                                     <div class="mt-3 opacity-0 group-hover/slot:opacity-100 transition-opacity">
                                         <span class="block w-full py-1.5 bg-brand-600 text-white text-[10px] font-bold rounded-lg shadow-sm text-center">{{ __('portal.book_now') }}</span>
                                     </div>

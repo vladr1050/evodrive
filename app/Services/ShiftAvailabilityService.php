@@ -183,8 +183,9 @@ class ShiftAvailabilityService
         $weekEnd = $weekStart->copy()->addDays(7)->setTimezone($tz);
         $vehicles = FleetVehicle::whereIn('home_station_id', $stations->pluck('id'))
             ->where('status', VehicleStatus::Active)
-            ->get(['id', 'home_station_id']);
+            ->get(['id', 'home_station_id', 'brand', 'model', 'registration_number', 'label']);
         $vehiclesByStation = $vehicles->groupBy('home_station_id')->map(fn ($v) => $v->pluck('id')->values()->all())->all();
+        $vehiclesById = $vehicles->keyBy('id');
         $allVehicleIds = array_unique(array_merge(...array_values($vehiclesByStation)));
         if (empty($allVehicleIds)) {
             return [];
@@ -250,15 +251,32 @@ class ShiftAvailabilityService
                     $m1 = $startMin % 60;
                     $h2 = (int) floor($endMin / 60);
                     $m2 = $endMin % 60;
+                    $slotStart = sprintf('%02d:%02d', $h1, $m1);
+                    $slotEnd = sprintf('%02d:%02d', $h2, $m2);
+                    $slotStartsAt = Carbon::parse($dateIso . ' ' . $slotStart, $tz);
+                    $slotEndsAt = Carbon::parse($dateIso . ' ' . $slotEnd, $tz);
+                    if ($slotEndsAt->lte($slotStartsAt)) {
+                        $slotEndsAt->addDay();
+                    }
+                    $availableVehicleIds = $this->availableVehicleIdsForSlot(
+                        $station->id,
+                        $vehiclesByStation[$station->id] ?? [],
+                        $shifts,
+                        $slotStartsAt,
+                        $slotEndsAt,
+                        $policy
+                    );
+                    $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
                     $slots[] = [
                         'id' => 'as' . (++$slotId),
                         'day' => $dayName,
-                        'start' => sprintf('%02d:%02d', $h1, $m1),
-                        'end' => sprintf('%02d:%02d', $h2, $m2),
+                        'start' => $slotStart,
+                        'end' => $slotEnd,
                         'duration' => $suggestedDuration,
                         'station' => $station->name,
                         'station_id' => $station->id,
                         'date_iso' => $dateIso,
+                        'vehicles' => $vehiclesDisplay,
                     ];
                 }
 
@@ -295,16 +313,30 @@ class ShiftAvailabilityService
                             $m1 = $startMin % 60;
                             $h2 = (int) floor($endMinNext / 60);
                             $m2 = $endMinNext % 60;
+                            $slotStart = sprintf('%02d:%02d', $h1, $m1);
+                            $slotEnd = sprintf('%02d:%02d', $h2, $m2);
+                            $slotStartsAt = Carbon::parse($dateIso . ' ' . $slotStart, $tz);
+                            $slotEndsAt = Carbon::parse($nextDayStart->format('Y-m-d') . ' ' . $slotEnd, $tz);
+                            $availableVehicleIds = $this->availableVehicleIdsForSlot(
+                                $station->id,
+                                $vehiclesByStation[$station->id] ?? [],
+                                $shifts,
+                                $slotStartsAt,
+                                $slotEndsAt,
+                                $policy
+                            );
+                            $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
                             $slots[] = [
                                 'id' => 'as' . (++$slotId),
                                 'day' => $dayName,
-                                'start' => sprintf('%02d:%02d', $h1, $m1),
-                                'end' => sprintf('%02d:%02d', $h2, $m2),
+                                'start' => $slotStart,
+                                'end' => $slotEnd,
                                 'duration' => $suggestedDuration,
                                 'station' => $station->name,
                                 'station_id' => $station->id,
                                 'date_iso' => $dateIso,
                                 'end_date_iso' => $nextDayStart->format('Y-m-d'),
+                                'vehicles' => $vehiclesDisplay,
                             ];
                             break;
                         }
@@ -314,6 +346,55 @@ class ShiftAvailabilityService
         }
 
         return $slots;
+    }
+
+    /**
+     * Which vehicle IDs at a station are available for the given time window.
+     *
+     * @param  array<int>  $stationVehicleIds
+     * @return array<int>
+     */
+    protected function availableVehicleIdsForSlot(
+        int $stationId,
+        array $stationVehicleIds,
+        \Illuminate\Support\Collection $shiftsByVehicle,
+        Carbon $startsAt,
+        Carbon $endsAt,
+        ShiftPolicy $policy
+    ): array {
+        $durationHours = $startsAt->diffInMinutes($endsAt) / 60.0;
+        $availableIds = [];
+        foreach ($stationVehicleIds as $vehicleId) {
+            $shifts = $shiftsByVehicle->get($vehicleId, collect());
+            if ($this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy)) {
+                $availableIds[] = $vehicleId;
+            }
+        }
+        return $availableIds;
+    }
+
+    /**
+     * Format vehicle list for display in free slot: model + registration number.
+     *
+     * @param  array<int>  $vehicleIds
+     * @param  \Illuminate\Support\Collection<int, FleetVehicle>  $vehiclesById
+     * @return array<int, array{model: string, number: string|null}>
+     */
+    protected function formatVehiclesForSlot(array $vehicleIds, \Illuminate\Support\Collection $vehiclesById): array
+    {
+        $out = [];
+        foreach ($vehicleIds as $id) {
+            $v = $vehiclesById->get($id);
+            if (! $v) {
+                continue;
+            }
+            $model = trim(($v->brand ?? '') . ' ' . ($v->model ?? '')) ?: ($v->label ?? '—');
+            $out[] = [
+                'model' => $model,
+                'number' => $v->registration_number ?: null,
+            ];
+        }
+        return $out;
     }
 
     /**
