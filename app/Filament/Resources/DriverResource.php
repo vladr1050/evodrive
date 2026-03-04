@@ -95,8 +95,12 @@ class DriverResource extends Resource
                     ->label('Name')
                     ->formatStateUsing(fn (Driver $r) => $r->name)
                     ->searchable(query: function (Builder $q, string $search) {
-                        $q->where(function ($q) use ($search) {
-                            $q->where('first_name', 'like', "%{$search}%")
+                        $search = trim($search);
+                        if ($search === '' || $q->getModel() === null) {
+                            return;
+                        }
+                        $q->where(function (Builder $sub) use ($search) {
+                            $sub->where('first_name', 'like', "%{$search}%")
                                 ->orWhere('last_name', 'like', "%{$search}%");
                         });
                     })
