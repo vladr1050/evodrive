@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use App\Filament\Resources\ShiftResource\Pages;
 use App\Models\Shift;
 use App\Models\ShiftPolicy;
+use App\Models\Station;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -159,7 +160,22 @@ class ShiftResource extends Resource
                 Tables\Filters\SelectFilter::make('station_id')
                     ->label('Station')
                     ->relationship('station', 'name')
-                    ->searchable(),
+                    ->searchable()
+                    ->getSearchResultsUsing(function (?string $search): array {
+                        $query = Station::query()->where('is_active', true);
+                        if (filled($search)) {
+                            $variants = Latvian::searchVariants(trim($search));
+                            if ($variants !== []) {
+                                $query->where(function (Builder $q) use ($variants) {
+                                    foreach ($variants as $v) {
+                                        $q->orWhere('name', 'like', '%' . $v . '%')
+                                            ->orWhere('address', 'like', '%' . $v . '%');
+                                    }
+                                });
+                            }
+                        }
+                        return $query->orderBy('name')->limit(100)->pluck('name', 'id')->toArray();
+                    }),
                 Tables\Filters\SelectFilter::make('vehicle_id')
                     ->label('Vehicle')
                     ->relationship('vehicle', 'registration_number')
