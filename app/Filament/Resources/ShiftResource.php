@@ -17,6 +17,7 @@ use Filament\Tables\Table;
 use Filament\Tables\Filters\Indicator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class ShiftResource extends Resource
 {
@@ -164,16 +165,11 @@ class ShiftResource extends Resource
                     ->getSearchResultsUsing(function (?string $search): array {
                         $query = Station::query()->where('is_active', true);
                         if (filled($search)) {
-                            $variants = Latvian::searchVariants(trim($search));
-                            if ($variants !== []) {
-                                $query->where(function (Builder $q) use ($variants) {
-                                    foreach ($variants as $v) {
-                                        $pattern = '%' . $v . '%';
-                                        $q->orWhereRaw('LOWER(name) LIKE LOWER(?)', [$pattern])
-                                            ->orWhereRaw('LOWER(address) LIKE LOWER(?)', [$pattern]);
-                                    }
-                                });
-                            }
+                            $driver = DB::connection()->getDriverName();
+                            $pattern = '%' . mb_strtolower(Latvian::normalize(trim($search))) . '%';
+                            $nameExpr = Latvian::sqlNormalizedColumn($driver, 'name');
+                            $addrExpr = Latvian::sqlNormalizedColumn($driver, 'address');
+                            $query->whereRaw("({$nameExpr} LIKE ?) OR ({$addrExpr} LIKE ?)", [$pattern, $pattern]);
                         }
                         return $query->orderBy('name')->limit(100)->pluck('name', 'id')->toArray();
                     }),

@@ -46,4 +46,21 @@ class Latvian
 
         return array_values($variants);
     }
+
+    /**
+     * SQL expression that normalizes a column to ASCII (Latvian → Latin) and lowercase,
+     * for use in LIKE search. So "Pūces" and "puces" both match.
+     * Supports: pgsql (translate), sqlite/mysql (REPLACE chain).
+     */
+    public static function sqlNormalizedColumn(string $driver, string $column): string
+    {
+        if ($driver === 'pgsql') {
+            return "translate(LOWER(COALESCE({$column}, '')), 'āčēģīķļņšūž', 'acegiklnsuz')";
+        }
+        $lower = "LOWER(COALESCE({$column}, ''))";
+        foreach (['ū'=>'u','ā'=>'a','č'=>'c','ē'=>'e','ģ'=>'g','ī'=>'i','ķ'=>'k','ļ'=>'l','ņ'=>'n','š'=>'s','ž'=>'z'] as $from => $to) {
+            $lower = "REPLACE({$lower}, '{$from}', '{$to}')";
+        }
+        return $lower;
+    }
 }
