@@ -145,12 +145,12 @@ class TelegramCarControlWebhookController extends Controller
         if (! ($context['allowed'] ?? false)) {
             $reason = $context['reason'] ?? 'no_shift';
             $messages = [
-                'too_early' => 'До смены больше 45 минут.',
-                'too_late' => 'Смена завершена, окно управления закрыто.',
-                'no_shift' => 'Смена не найдена.',
-                'car_not_configured' => 'Машина не настроена (нет SIM / номера).',
+                'too_early' => 'More than 45 minutes until shift start.',
+                'too_late' => 'Shift ended, control window closed.',
+                'no_shift' => 'No shift found.',
+                'car_not_configured' => 'Vehicle not configured (no SIM / number).',
             ];
-            $text = $messages[$reason] ?? 'Нет активной смены.';
+            $text = $messages[$reason] ?? 'No active shift.';
             $keyboard = ['inline_keyboard' => [[['text' => 'My next shift', 'callback_data' => 'my_next_shift']]]];
             $this->telegram->sendToChat($chatId, $text, $keyboard);
             return;

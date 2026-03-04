@@ -174,7 +174,10 @@ class CarControlService
                     'error' => $result['error'] ?? null,
                 ]);
 
-                return ['ok' => false, 'message' => 'SMS failed: ' . ($result['error'] ?? 'Unknown error'), 'command' => $command];
+                $userMessage = ($result['error'] ?? '') === 'SMS provider not configured'
+                    ? 'Car control is temporarily unavailable. Please contact support.'
+                    : 'SMS failed: ' . ($result['error'] ?? 'Unknown error');
+                return ['ok' => false, 'message' => $userMessage, 'command' => $command];
             }
         }
 
@@ -205,11 +208,11 @@ class CarControlService
     private function reasonToMessage(string $reason): string
     {
         return match ($reason) {
-            'too_early' => 'До смены больше 45 минут.',
-            'too_late' => 'Смена завершена, окно управления закрыто.',
-            'no_shift' => 'Смена не найдена.',
-            'car_not_configured' => 'Машина не настроена (нет SIM / номера).',
-            default => 'Нет активной смены.',
+            'too_early' => 'More than 45 minutes until shift start.',
+            'too_late' => 'Shift ended, control window closed.',
+            'no_shift' => 'No shift found.',
+            'car_not_configured' => 'Vehicle not configured (no SIM / number).',
+            default => 'No active shift.',
         };
     }
 
