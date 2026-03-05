@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\DriverUtilizationApiController;
 use App\Http\Controllers\Admin\UtilizationApiController;
 use App\Http\Controllers\ApplyController;
 use App\Http\Controllers\DriverPortalController;
@@ -93,4 +94,10 @@ Route::middleware(['auth'])->prefix('api/admin/utilization')->group(function () 
     Route::get('daily', [UtilizationApiController::class, 'daily'])->name('api.admin.utilization.daily');
     Route::get('daily/{vehicleId}/{date}', [UtilizationApiController::class, 'dailyIntervals'])->name('api.admin.utilization.daily_intervals');
     Route::get('sources', [UtilizationApiController::class, 'sources'])->name('api.admin.utilization.sources');
+});
+
+// Admin driver utilization API (JSON, auth required)
+Route::middleware(['auth'])->prefix('api/admin/driver-utilization')->group(function () {
+    Route::get('/', [DriverUtilizationApiController::class, 'daily'])->name('api.admin.driver_utilization.daily');
+    Route::get('{driverId}/{date}', [DriverUtilizationApiController::class, 'dayBreakdown'])->name('api.admin.driver_utilization.day_breakdown');
 });
