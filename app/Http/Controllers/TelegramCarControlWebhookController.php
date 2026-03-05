@@ -49,9 +49,22 @@ class TelegramCarControlWebhookController extends Controller
 
     private function handleMessage(array $message): void
     {
-        $chatId = (string) ($message['chat']['id'] ?? '');
+        $chat = $message['chat'] ?? [];
+        $chatId = (string) ($chat['id'] ?? '');
+        $chatType = (string) ($chat['type'] ?? '');
         $text = trim((string) ($message['text'] ?? ''));
         if ($chatId === '' || $text === '') {
+            return;
+        }
+
+        // Car control only in private chats. In groups we don't respond.
+        if ($chatType !== 'private') {
+            return;
+        }
+
+        $trigger = mb_strtolower($text);
+        $carTriggers = ['car', 'car control', 'авто', 'машина', '/car'];
+        if (! in_array($trigger, $carTriggers, true)) {
             return;
         }
 
@@ -61,21 +74,22 @@ class TelegramCarControlWebhookController extends Controller
             return;
         }
 
-        $trigger = mb_strtolower($text);
-        if (! in_array($trigger, ['car', 'car control', 'авто', 'машина', '/car'], true)) {
-            return;
-        }
-
         $this->sendCarControlCard($driver->id, $chatId);
     }
 
     private function handleCallbackQuery(array $callback): void
     {
-        $chatId = (string) ($callback['message']['chat']['id'] ?? '');
-        $messageId = (int) ($callback['message']['message_id'] ?? 0);
+        $chat = $callback['message']['chat'] ?? [];
+        $chatId = (string) ($chat['id'] ?? '');
+        $chatType = (string) ($chat['type'] ?? '');
         $data = (string) ($callback['data'] ?? '');
         $callbackId = (string) ($callback['id'] ?? '');
         if ($chatId === '' || $data === '') {
+            return;
+        }
+
+        if ($chatType !== 'private') {
+            $this->telegram->answerCallbackQuery($callbackId);
             return;
         }
 
