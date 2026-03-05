@@ -4,11 +4,11 @@
     </p>
 
     @if (empty($rows))
-        <x-filament-panels::section>
+        <x-filament::section>
             <p class="text-gray-500 dark:text-gray-400">No shift data yet.</p>
-        </x-filament-panels::section>
+        </x-filament::section>
     @else
-        <x-filament-panels::section>
+        <x-filament::section>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
                     <thead class="text-xs uppercase bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
@@ -29,6 +29,6 @@
                     </tbody>
                 </table>
             </div>
-        </x-filament-panels::section>
+        </x-filament::section>
     @endif
 </x-filament-panels::page>
