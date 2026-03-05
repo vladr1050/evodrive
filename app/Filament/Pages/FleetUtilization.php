@@ -18,7 +18,7 @@ class FleetUtilization extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar-square';
 
-    protected static ?string $navigationGroup = 'Fleet Management';
+    protected static ?string $navigationGroup = 'Statistics';
 
     protected static ?string $navigationLabel = 'Utilization';
 

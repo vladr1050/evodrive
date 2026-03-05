@@ -16,6 +16,8 @@ class VehicleUtilizationStats extends Page
 
     protected static ?int $navigationSort = 50;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string $view = 'filament.pages.vehicle-utilization-stats';
 
     protected static ?string $title = 'Vehicle utilization';
