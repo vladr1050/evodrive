@@ -64,6 +64,7 @@ class User extends Authenticatable implements FilamentUser
             'faq_categories' => 'FAQ categories',
             'site_settings' => 'Site settings',
             'fleet_management' => 'Fleet Management (Driver Portal)',
+            'statistics' => 'Statistics',
         ];
     }
 

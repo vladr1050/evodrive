@@ -117,7 +117,7 @@ class UtilizationApiController extends Controller
     private function authorizeFleetManagement(): void
     {
         $user = auth()->user();
-        if (! $user || ! $user->canAccessResource('fleet_management')) {
+        if (! $user || ! $user->canAccessResource('statistics')) {
             abort(403, 'Access denied.');
         }
     }
