@@ -1,0 +1,12 @@
+# Minimal workflow to verify Actions are triggered. Remove after debugging.
+name: Ping
+
+on:
+  push:
+    branches: [main, develop]
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Actions are working - commit ${{ github.sha }}"
