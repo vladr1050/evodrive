@@ -420,6 +420,8 @@ class ShiftAvailabilityService
 
         $allFreeIntervals = [];
 
+        $nextDayStart = $dayStart->copy()->addDay();
+
         foreach ($vehicleIds as $vehicleId) {
             $vehicleShifts = $shiftsByVehicle->get($vehicleId, collect())
                 ->filter(fn (Shift $s) => $s->starts_at->lt($dayEndUtc) && $s->ends_at->gt($dayStartUtc))
@@ -437,6 +439,15 @@ class ShiftAvailabilityService
                 if ($blockEnd > $blockStart) {
                     $blocked[] = [$blockStart, $blockEnd];
                 }
+            }
+
+            // Block end of day when a shift starts at 00:00 next day (downtime before that shift)
+            $hasShiftStartingNextDay = $shiftsByVehicle->get($vehicleId, collect())
+                ->contains(fn (Shift $s) => $s->starts_at->copy()->setTimezone($dayStart->timezoneName)->gte($nextDayStart)
+                    && $s->starts_at->copy()->setTimezone($dayStart->timezoneName)->lt($nextDayStart->copy()->addDay()));
+            if ($hasShiftStartingNextDay && $downtimeMinutes > 0) {
+                $blockStart = max(0, $dayEndMinutes - $downtimeMinutes);
+                $blocked[] = [$blockStart, $dayEndMinutes];
             }
 
             $free = $this->gapsFromBlocked($dayStartMinutes, $dayEndMinutes, $blocked);
