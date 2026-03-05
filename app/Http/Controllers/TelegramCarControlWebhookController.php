@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CarCommand;
 use App\Models\Driver;
+use App\Models\ShiftPolicy;
 use App\Services\CarControlService;
 use App\Services\TelegramNotifier;
 use Carbon\Carbon;
@@ -159,9 +160,9 @@ class TelegramCarControlWebhookController extends Controller
         $shift = $context['shift'];
         $vehicle = $context['vehicle'];
         $now = now();
-        $tz = config('app.timezone', 'Europe/Riga');
-        $start = $shift->starts_at->timezone($tz)->format('d.m H:i');
-        $end = $shift->ends_at->timezone($tz)->format('d.m H:i');
+        $tz = ShiftPolicy::active()?->timezone ?? config('app.timezone', 'Europe/Riga');
+        $start = $shift->starts_at->copy()->setTimezone($tz)->format('d.m H:i');
+        $end = $shift->ends_at->copy()->setTimezone($tz)->format('d.m H:i');
         $label = trim(($vehicle->brand ?? '') . ' ' . ($vehicle->model ?? ''));
         $plate = $vehicle->registration_number ?? '—';
         $phoneMask = $this->maskPhone($vehicle->sim);
@@ -206,9 +207,9 @@ class TelegramCarControlWebhookController extends Controller
             return;
         }
 
-        $tz = config('app.timezone', 'Europe/Riga');
-        $start = $next->starts_at->timezone($tz)->format('d.m.Y H:i');
-        $end = $next->ends_at->timezone($tz)->format('H:i');
+        $tz = ShiftPolicy::active()?->timezone ?? config('app.timezone', 'Europe/Riga');
+        $start = $next->starts_at->copy()->setTimezone($tz)->format('d.m.Y H:i');
+        $end = $next->ends_at->copy()->setTimezone($tz)->format('H:i');
         $v = $next->vehicle;
         $label = $v ? trim(($v->brand ?? '') . ' ' . ($v->model ?? '')) . ', ' . ($v->registration_number ?? '') : '—';
         $st = $next->station ? $next->station->name : '—';
