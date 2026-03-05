@@ -101,6 +101,9 @@ class FleetVehicleResource extends Resource
                             return;
                         }
                         $q->where(function (Builder $sub) use ($search) {
+                            if ($sub->getModel() === null) {
+                                return;
+                            }
                             $sub->where('brand', 'like', "%{$search}%")->orWhere('model', 'like', "%{$search}%");
                         });
                     }),

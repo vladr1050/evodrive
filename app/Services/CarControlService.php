@@ -174,9 +174,12 @@ class CarControlService
                     'error' => $result['error'] ?? null,
                 ]);
 
-                $userMessage = ($result['error'] ?? '') === 'SMS provider not configured'
-                    ? 'Car control is temporarily unavailable. Please contact support.'
-                    : 'SMS failed: ' . ($result['error'] ?? 'Unknown error');
+                $err = $result['error'] ?? '';
+                $userMessage = match (true) {
+                    $err === 'SMS provider not configured' => 'Car control is temporarily unavailable. Please contact support.',
+                    $err === 'InvalidSender' => 'SMS sender ID is not set up for this account. Please contact support.',
+                    default => 'SMS failed: ' . ($err ?: 'Unknown error'),
+                };
                 return ['ok' => false, 'message' => $userMessage, 'command' => $command];
             }
         }
