@@ -9,14 +9,14 @@ class TelegramSmsTestSendCommand extends Command
 {
     protected $signature = 'telegram:sms-test-send
                             {to : Phone number (e.g. 37120000000)}
-                            {--text= : SMS text (default: EvoDrive test)}';
+                            {text? : SMS text (optional, default: EvoDrive test)}';
 
     protected $description = 'Send one test SMS via NESS to verify provider is working';
 
     public function handle(SmsProviderInterface $sms): int
     {
         $to = $this->argument('to');
-        $text = $this->option('text') ?? 'EvoDrive test';
+        $text = $this->argument('text') ?? 'EvoDrive test';
 
         $this->info("Sending to {$to}: \"{$text}\"");
 
