@@ -5,32 +5,44 @@
 @section('content')
 <script>
     window.__SHIFTS_AVAILABLE_SLOTS__ = @json($availableSlots ?? []);
+    window.__SHIFTS_PAGE_INIT__ = @json([
+        'initialFilterStation' => $initialFilterStation ?? 'All',
+        'stations' => $stations->map(fn($s) => ['id' => $s->id, 'name' => $s->name])->values()->all(),
+        'shiftsBaseUrl' => $shiftsBaseUrl ?? '',
+        'currentView' => $view ?? 'current',
+    ]);
+    document.addEventListener('alpine:init', function() {
+        Alpine.data('shiftsPage', function() {
+            const init = window.__SHIFTS_PAGE_INIT__ || {};
+            return {
+                filterStation: init.initialFilterStation || 'All',
+                isStationDropdownOpen: false,
+                showFreeSlots: false,
+                availableSlots: window.__SHIFTS_AVAILABLE_SLOTS__ || [],
+                stations: init.stations || [],
+                shiftsBaseUrl: init.shiftsBaseUrl || '',
+                currentView: init.currentView || 'current',
+                weekUrl(view) {
+                    const params = new URLSearchParams();
+                    params.set('view', view);
+                    if (this.filterStation !== 'All') {
+                        const st = this.stations.find(s => s.name === this.filterStation);
+                        if (st) params.set('station_id', st.id);
+                    }
+                    return this.shiftsBaseUrl + '?' + params.toString();
+                },
+                applyStationFilter(name) {
+                    this.filterStation = name;
+                    this.isStationDropdownOpen = false;
+                    if (typeof history !== 'undefined' && history.replaceState) {
+                        history.replaceState(null, '', this.weekUrl(this.currentView));
+                    }
+                }
+            };
+        });
+    });
 </script>
-<div x-data="{
-    filterStation: @json($initialFilterStation ?? 'All'),
-    isStationDropdownOpen: false,
-    showFreeSlots: false,
-    availableSlots: window.__SHIFTS_AVAILABLE_SLOTS__ || [],
-    stations: @json($stations->map(fn($s) => ['id' => $s->id, 'name' => $s->name])),
-    shiftsBaseUrl: @json($shiftsBaseUrl ?? ''),
-    currentView: @json($view ?? 'current'),
-    weekUrl(view) {
-        const params = new URLSearchParams();
-        params.set('view', view);
-        if (this.filterStation !== 'All') {
-            const st = this.stations.find(s => s.name === this.filterStation);
-            if (st) params.set('station_id', st.id);
-        }
-        return this.shiftsBaseUrl + '?' + params.toString();
-    },
-    applyStationFilter(name) {
-        this.filterStation = name;
-        this.isStationDropdownOpen = false;
-        if (typeof history !== 'undefined' && history.replaceState) {
-            history.replaceState(null, '', this.weekUrl(this.currentView));
-        }
-    }
-}" class="animate-fade-in">
+<div x-data="shiftsPage()" class="animate-fade-in">
     <!-- Header Section (UI 1:1 reference) -->
     <div class="mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div>
