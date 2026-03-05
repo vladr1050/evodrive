@@ -13,9 +13,20 @@ on:
 
 jobs:
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     steps:
+      - name: Deploy summary (commit info)
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "## Deployed commit" >> $GITHUB_STEP_SUMMARY
+            echo "- **SHA:** \`${{ github.event.workflow_run.head_sha }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Branch:** ${{ github.event.workflow_run.head_branch }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Message:** ${{ github.event.workflow_run.display_title }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Manual deploy" >> $GITHUB_STEP_SUMMARY
+            echo "Deploy triggered manually. Server will pull latest \`main\`." >> $GITHUB_STEP_SUMMARY
+          fi
       - name: Check deploy secrets
         run: |
           if [ -z "${{ secrets.DEPLOY_HOST }}" ]; then echo "::error::Add secret DEPLOY_HOST (e.g. 89.167.74.32) in Settings → Secrets → Actions"; exit 1; fi
