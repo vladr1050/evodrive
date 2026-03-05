@@ -98,6 +98,7 @@ class DriverPortalController extends Controller
     {
         $driver = Auth::guard('driver')->user();
         $view = $request->get('view', 'current');
+        $stationId = $request->get('station_id');
         $days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         $policyForTz = ShiftPolicy::active();
         $tz = $policyForTz?->timezone ?: 'Europe/Riga';
@@ -151,6 +152,12 @@ class DriverPortalController extends Controller
             ->all();
         $policy = $policyForTz;
         $stations = Station::where('is_active', true)->orderBy('name')->get(['id', 'name', 'address']);
+        $selectedStationId = null;
+        $initialFilterStation = 'All';
+        if ($stationId && $stations->contains('id', (int) $stationId)) {
+            $selectedStationId = (int) $stationId;
+            $initialFilterStation = $stations->firstWhere('id', $selectedStationId)->name;
+        }
         $allowedDurations = $policy ? $policy->allowedDurations() : [4, 6, 8, 10, 12];
         $timeSlotMinutes = $policy->time_slot_minutes ?? 15;
         $planningWindowDays = $policy->planning_window_days ?? 14;
@@ -179,6 +186,8 @@ class DriverPortalController extends Controller
             'maxDate' => $maxDate,
             'minTimeToday' => $minTimeToday,
             'availableSlots' => $availableSlots,
+            'initialFilterStation' => $initialFilterStation,
+            'shiftsBaseUrl' => route('driverportal.shifts', ['locale' => $request->route('locale', app()->getLocale())]),
         ]);
     }
 

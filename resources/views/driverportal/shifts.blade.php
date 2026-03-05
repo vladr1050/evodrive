@@ -7,10 +7,29 @@
     window.__SHIFTS_AVAILABLE_SLOTS__ = @json($availableSlots ?? []);
 </script>
 <div x-data="{
-    filterStation: 'All',
+    filterStation: @json($initialFilterStation ?? 'All'),
     isStationDropdownOpen: false,
     showFreeSlots: false,
-    availableSlots: window.__SHIFTS_AVAILABLE_SLOTS__ || []
+    availableSlots: window.__SHIFTS_AVAILABLE_SLOTS__ || [],
+    stations: @json($stations->map(fn($s) => ['id' => $s->id, 'name' => $s->name])),
+    shiftsBaseUrl: @json($shiftsBaseUrl ?? ''),
+    currentView: @json($view ?? 'current'),
+    weekUrl(view) {
+        const params = new URLSearchParams();
+        params.set('view', view);
+        if (this.filterStation !== 'All') {
+            const st = this.stations.find(s => s.name === this.filterStation);
+            if (st) params.set('station_id', st.id);
+        }
+        return this.shiftsBaseUrl + '?' + params.toString();
+    },
+    applyStationFilter(name) {
+        this.filterStation = name;
+        this.isStationDropdownOpen = false;
+        if (typeof history !== 'undefined' && history.replaceState) {
+            history.replaceState(null, '', this.weekUrl(this.currentView));
+        }
+    }
 }" class="animate-fade-in">
     <!-- Header Section (UI 1:1 reference) -->
     <div class="mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
@@ -21,8 +40,8 @@
 
         <div class="flex flex-wrap items-center gap-4">
             <div class="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
-                <a href="{{ route('driverportal.shifts', ['locale' => app()->getLocale(), 'view' => 'current']) }}" class="px-4 py-2 rounded-xl text-sm font-bold transition-all {{ $view === 'current' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900' }}">{{ __('portal.current_week') }}</a>
-                <a href="{{ route('driverportal.shifts', ['locale' => app()->getLocale(), 'view' => 'next']) }}" class="px-4 py-2 rounded-xl text-sm font-bold transition-all {{ $view === 'next' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900' }}">{{ __('portal.next_week') }}</a>
+                <a :href="weekUrl('current')" class="px-4 py-2 rounded-xl text-sm font-bold transition-all {{ $view === 'current' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900' }}">{{ __('portal.current_week') }}</a>
+                <a :href="weekUrl('next')" class="px-4 py-2 rounded-xl text-sm font-bold transition-all {{ $view === 'next' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900' }}">{{ __('portal.next_week') }}</a>
             </div>
 
             <!-- Custom Station Dropdown (reference 1:1) -->
@@ -48,12 +67,12 @@
                     x-transition:enter-start="opacity-0 transform -translate-y-2"
                     x-transition:enter-end="opacity-100 transform translate-y-0"
                 >
-                    <button type="button" @click="filterStation = 'All'; isStationDropdownOpen = false" class="w-full px-5 py-3 text-left text-sm font-bold transition-colors flex items-center justify-between" :class="filterStation === 'All' ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                    <button type="button" @click="applyStationFilter('All')" class="w-full px-5 py-3 text-left text-sm font-bold transition-colors flex items-center justify-between" :class="filterStation === 'All' ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
                         <span>{{ __('portal.all_stations') }}</span>
                         <svg x-show="filterStation === 'All'" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     </button>
                     @foreach($stations as $s)
-                    <button type="button" @click="filterStation = '{{ addslashes($s->name) }}'; isStationDropdownOpen = false" class="w-full px-5 py-3 text-left text-sm font-bold transition-colors flex items-center justify-between gap-2" :class="filterStation === '{{ addslashes($s->name) }}' ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                    <button type="button" @click="applyStationFilter('{{ addslashes($s->name) }}')" class="w-full px-5 py-3 text-left text-sm font-bold transition-colors flex items-center justify-between gap-2" :class="filterStation === '{{ addslashes($s->name) }}' ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
                         <div class="min-w-0 flex-1 text-left">
                             <span class="block">{{ $s->name }}</span>
                             @if(!empty($s->address))
