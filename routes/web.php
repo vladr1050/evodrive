@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\UtilizationApiController;
 use App\Http\Controllers\ApplyController;
 use App\Http\Controllers\DriverPortalController;
 use App\Http\Controllers\HomeController;
@@ -86,3 +87,10 @@ Route::get('/', function () {
 
 // Telegram webhook for car control (no locale, no CSRF)
 Route::post('telegram/car-control-webhook', [TelegramCarControlWebhookController::class, 'handle'])->name('telegram.car_control.webhook');
+
+// Admin utilization API (JSON, auth required)
+Route::middleware(['auth'])->prefix('api/admin/utilization')->group(function () {
+    Route::get('daily', [UtilizationApiController::class, 'daily'])->name('api.admin.utilization.daily');
+    Route::get('daily/{vehicleId}/{date}', [UtilizationApiController::class, 'dailyIntervals'])->name('api.admin.utilization.daily_intervals');
+    Route::get('sources', [UtilizationApiController::class, 'sources'])->name('api.admin.utilization.sources');
+});
