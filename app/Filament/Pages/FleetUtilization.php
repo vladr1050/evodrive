@@ -60,7 +60,8 @@ class FleetUtilization extends Page
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->canAccessResource('statistics') ?? false;
+        $user = auth()->user();
+        return $user === null || $user->canAccessResource('statistics');
     }
 
     protected function getViewData(): array

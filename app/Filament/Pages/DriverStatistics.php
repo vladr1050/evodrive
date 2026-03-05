@@ -64,7 +64,8 @@ class DriverStatistics extends Page
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->canAccessResource('fleet_management') ?? false;
+        $user = auth()->user();
+        return $user === null || $user->canAccessResource('fleet_management');
     }
 
     protected function getViewData(): array
