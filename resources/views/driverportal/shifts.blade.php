@@ -5,12 +5,7 @@
 @section('content')
 <script>
     window.__SHIFTS_AVAILABLE_SLOTS__ = @json($availableSlots ?? []);
-    window.__SHIFTS_PAGE_INIT__ = @json([
-        'initialFilterStation' => $initialFilterStation ?? 'All',
-        'stations' => $stations->map(fn($s) => ['id' => $s->id, 'name' => $s->name])->values()->all(),
-        'shiftsBaseUrl' => $shiftsBaseUrl ?? '',
-        'currentView' => $view ?? 'current',
-    ]);
+    window.__SHIFTS_PAGE_INIT__ = @json($shiftsPageInit ?? []);
     document.addEventListener('alpine:init', function() {
         Alpine.data('shiftsPage', function() {
             const init = window.__SHIFTS_PAGE_INIT__ || {};

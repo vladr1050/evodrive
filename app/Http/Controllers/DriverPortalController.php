@@ -175,6 +175,13 @@ class DriverPortalController extends Controller
         $availableSlots = $policy
             ? app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($startOfWeek, $dayNames)
             : [];
+        $shiftsBaseUrl = route('driverportal.shifts', ['locale' => $request->route('locale', app()->getLocale())]);
+        $shiftsPageInit = [
+            'initialFilterStation' => $initialFilterStation,
+            'stations' => $stations->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()->all(),
+            'shiftsBaseUrl' => $shiftsBaseUrl,
+            'currentView' => $view,
+        ];
         return view('driverportal.shifts', [
             'view' => $view,
             'weekDates' => $weekDates,
@@ -187,7 +194,8 @@ class DriverPortalController extends Controller
             'minTimeToday' => $minTimeToday,
             'availableSlots' => $availableSlots,
             'initialFilterStation' => $initialFilterStation,
-            'shiftsBaseUrl' => route('driverportal.shifts', ['locale' => $request->route('locale', app()->getLocale())]),
+            'shiftsBaseUrl' => $shiftsBaseUrl,
+            'shiftsPageInit' => $shiftsPageInit,
         ]);
     }
 
