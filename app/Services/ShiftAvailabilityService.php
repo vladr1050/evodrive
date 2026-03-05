@@ -450,6 +450,16 @@ class ShiftAvailabilityService
                 $blocked[] = [$blockStart, $dayEndMinutes];
             }
 
+            // Block start of day when a shift ends at 00:00 today (downtime after that shift)
+            $hasShiftEndingAtMidnight = $shiftsByVehicle->get($vehicleId, collect())
+                ->contains(function (Shift $s) use ($dayStart) {
+                    $endLocal = $s->ends_at->copy()->setTimezone($dayStart->timezoneName);
+                    return $endLocal->isStartOfDay() && $endLocal->isSameDay($dayStart);
+                });
+            if ($hasShiftEndingAtMidnight && $downtimeMinutes > 0) {
+                $blocked[] = [0, min($downtimeMinutes, $dayEndMinutes)];
+            }
+
             $free = $this->gapsFromBlocked($dayStartMinutes, $dayEndMinutes, $blocked);
             $allFreeIntervals = array_merge($allFreeIntervals, $free);
         }
