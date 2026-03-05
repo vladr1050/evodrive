@@ -19,7 +19,7 @@ class DriverStatistics extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $navigationGroup = 'Fleet Management';
+    protected static ?string $navigationGroup = 'Statistics';
 
     protected static ?string $navigationLabel = 'Driver Statistics';
 
