@@ -9,6 +9,7 @@ on:
     types:
       - completed
     branches: [main]
+  workflow_dispatch: {}   # Ручной запуск: Actions → Deploy → Run workflow
 
 jobs:
   deploy:
