@@ -75,6 +75,7 @@ return [
     'check_failed' => 'Neizdevās pārbaudīt pieejamību.',
     'confirm_failed' => 'Neizdevās rezervēt maiņu.',
     'shift_start_must_be_future' => 'Maiņas sākumam jābūt nākotnē.',
+    'shift_date_outside_planning_window' => 'Šī datums ir ārpus atļautā rezervēšanas perioda. Maiņas var rezervēt tikai nākamajās dienās.',
     'copied' => 'Maiņas nokopētas.',
 
     'copy_modal_title' => 'Kopēt iepriekšējo nedēļu',

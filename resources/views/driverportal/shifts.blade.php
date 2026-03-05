@@ -184,7 +184,7 @@
     </div>
 
     <!-- Create Shift Modal (reference UI 1:1) -->
-    <div id="create-modal" data-testid="shift-create-modal" data-min-date="{{ $minDate }}" data-min-time-today="{{ $minTimeToday ?? '' }}" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" role="dialog" aria-modal="true" onclick="if(event.target===this)this.classList.add('hidden')">
+    <div id="create-modal" data-testid="shift-create-modal" data-min-date="{{ $minDate }}" data-max-date="{{ $maxDate }}" data-min-time-today="{{ $minTimeToday ?? '' }}" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" role="dialog" aria-modal="true" onclick="if(event.target===this)this.classList.add('hidden')">
         <div class="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative">
             <button type="button" data-testid="shift-create-modal-close" onclick="document.getElementById('create-modal').classList.add('hidden')" class="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-900 transition-colors" aria-label="Close">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
@@ -346,12 +346,32 @@
             };
         }
 
+        function isDateInPlanningWindow() {
+            var modal = document.getElementById('create-modal');
+            var dateEl = document.getElementById('create-date');
+            var minDate = modal?.dataset.minDate || '';
+            var maxDate = modal?.dataset.maxDate || '';
+            var value = dateEl?.value || '';
+            return value >= minDate && value <= maxDate;
+        }
+
+        function showDateRangeError() {
+            var msg = document.getElementById('availability-message');
+            msg.classList.remove('hidden', 'bg-green-50', 'text-green-700');
+            msg.classList.add('bg-red-50', 'text-red-600');
+            msg.textContent = '{{ __("portal.shift_date_outside_planning_window") }}';
+        }
+
         document.getElementById('check-availability-btn')?.addEventListener('click', function() {
             var msg = document.getElementById('availability-message');
             msg.classList.remove('hidden', 'bg-green-50', 'text-green-700', 'bg-red-50', 'text-red-600');
             msg.textContent = '';
             var btn = document.getElementById('confirm-shift-btn');
             btn.disabled = true;
+            if (!isDateInPlanningWindow()) {
+                showDateRangeError();
+                return;
+            }
             axios.post(checkUrl, getPayload())
                 .then(function(res) {
                     if (res.data.available && res.data.count > 0) {
@@ -372,6 +392,12 @@
         document.getElementById('confirm-shift-btn')?.addEventListener('click', function() {
             var btn = this;
             var msg = document.getElementById('availability-message');
+            if (!isDateInPlanningWindow()) {
+                msg.classList.remove('hidden', 'bg-green-50', 'text-green-700');
+                msg.classList.add('bg-red-50', 'text-red-600');
+                msg.textContent = '{{ __("portal.shift_date_outside_planning_window") }}';
+                return;
+            }
             btn.disabled = true;
             axios.post(confirmUrl, getPayload())
                 .then(function(res) {

@@ -75,6 +75,7 @@ return [
     'check_failed' => 'Could not check availability.',
     'confirm_failed' => 'Could not book shift.',
     'shift_start_must_be_future' => 'Shift must start in the future.',
+    'shift_date_outside_planning_window' => 'This date is outside the allowed booking window. You can only book shifts within the next few days.',
     'copied' => 'Shifts copied.',
 
     // Copy previous week modal

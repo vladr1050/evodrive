@@ -232,9 +232,21 @@ class DriverPortalController extends Controller
         ]);
         $driver = Auth::guard('driver')->user();
         try {
-            $tz = ShiftPolicy::active()?->timezone ?: 'Europe/Riga';
+            $policy = ShiftPolicy::active();
+            $tz = $policy?->timezone ?: 'Europe/Riga';
+            $nowInTz = now($tz);
+            $planningWindowDays = $policy?->planning_window_days ?? 14;
+            $maxDate = $nowInTz->copy()->addDays($planningWindowDays)->format('Y-m-d');
+            $requestDate = $request->input('date');
+            if ($requestDate > $maxDate) {
+                return response()->json([
+                    'success' => false,
+                    'error' => __('portal.shift_date_outside_planning_window'),
+                    'reason_code' => 'DATE_OUTSIDE_PLANNING_WINDOW',
+                ], 422);
+            }
             $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
-            if ($startsAt->lte(now($tz))) {
+            if ($startsAt->lte($nowInTz)) {
                 return response()->json([
                     'success' => false,
                     'error' => __('portal.shift_start_must_be_future'),
