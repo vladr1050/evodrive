@@ -84,6 +84,7 @@ class TelegramCarControlWebhookController extends Controller
         $chatType = (string) ($chat['type'] ?? '');
         $data = (string) ($callback['data'] ?? '');
         $callbackId = (string) ($callback['id'] ?? '');
+        $messageId = (int) ($callback['message']['message_id'] ?? 0);
         if ($chatId === '' || $data === '') {
             return;
         }
