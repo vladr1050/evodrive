@@ -259,37 +259,51 @@ class ShiftAvailabilityService
                     if ($suggestedDuration < $minDurationHours) {
                         continue;
                     }
-                    $h1 = (int) floor($startMin / 60);
-                    $m1 = $startMin % 60;
-                    $h2 = (int) floor($endMin / 60);
-                    $m2 = $endMin % 60;
-                    $slotStart = sprintf('%02d:%02d', $h1, $m1);
-                    $slotEnd = sprintf('%02d:%02d', $h2, $m2);
-                    $slotStartsAt = Carbon::parse($dateIso . ' ' . $slotStart, $tz);
-                    $slotEndsAt = Carbon::parse($dateIso . ' ' . $slotEnd, $tz);
-                    if ($slotEndsAt->lte($slotStartsAt)) {
-                        $slotEndsAt->addDay();
+                    $durationMin = $suggestedDuration * 60;
+                    $maxStartMin = $endMin - $durationMin;
+                    $startMinAligned = (int) (floor($startMin / $slotMinutes) * $slotMinutes);
+                    $slotAdded = false;
+                    for ($startMinTry = $startMinAligned; $startMinTry <= $maxStartMin && ! $slotAdded; $startMinTry += $slotMinutes) {
+                        $endMinTry = $startMinTry + $durationMin;
+                        $h1 = (int) floor($startMinTry / 60);
+                        $m1 = $startMinTry % 60;
+                        $h2 = (int) floor($endMinTry / 60);
+                        $m2 = $endMinTry % 60;
+                        $slotStart = sprintf('%02d:%02d', $h1, $m1);
+                        $slotEnd = sprintf('%02d:%02d', $h2, $m2);
+                        $slotStartsAt = Carbon::parse($dateIso . ' ' . $slotStart, $tz);
+                        $slotEndsAt = Carbon::parse($dateIso . ' ' . $slotEnd, $tz);
+                        if ($slotEndsAt->lte($slotStartsAt)) {
+                            $slotEndsAt->addDay();
+                        }
+                        if ($slotStartsAt->lte($nowInTz)) {
+                            continue;
+                        }
+                        $availableVehicleIds = $this->availableVehicleIdsForSlot(
+                            $station->id,
+                            $vehiclesByStation[$station->id] ?? [],
+                            $shifts,
+                            $slotStartsAt,
+                            $slotEndsAt,
+                            $policy
+                        );
+                        if (empty($availableVehicleIds)) {
+                            continue;
+                        }
+                        $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
+                        $slots[] = [
+                            'id' => 'as' . (++$slotId),
+                            'day' => $dayName,
+                            'start' => $slotStart,
+                            'end' => $slotEnd,
+                            'duration' => $suggestedDuration,
+                            'station' => $station->name,
+                            'station_id' => $station->id,
+                            'date_iso' => $dateIso,
+                            'vehicles' => $vehiclesDisplay,
+                        ];
+                        $slotAdded = true;
                     }
-                    $availableVehicleIds = $this->availableVehicleIdsForSlot(
-                        $station->id,
-                        $vehiclesByStation[$station->id] ?? [],
-                        $shifts,
-                        $slotStartsAt,
-                        $slotEndsAt,
-                        $policy
-                    );
-                    $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
-                    $slots[] = [
-                        'id' => 'as' . (++$slotId),
-                        'day' => $dayName,
-                        'start' => $slotStart,
-                        'end' => $slotEnd,
-                        'duration' => $suggestedDuration,
-                        'station' => $station->name,
-                        'station_id' => $station->id,
-                        'date_iso' => $dateIso,
-                        'vehicles' => $vehiclesDisplay,
-                    ];
                 }
 
                 if ($dayIndex < 6) {
