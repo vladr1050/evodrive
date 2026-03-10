@@ -255,15 +255,8 @@ class ShiftAvailabilityService
                     if ($durationHours < $minDurationHours) {
                         continue;
                     }
-                    $floorHours = (int) floor($durationHours);
-                    $suggestedDuration = collect($allowedDurations)->filter(fn ($d) => $d <= $floorHours)->max() ?? $floorHours;
-                    if ($suggestedDuration < $minDurationHours) {
-                        if ($floorHours >= 4 && $durationHours >= $minDurationHours - 1) {
-                            $suggestedDuration = $floorHours;
-                        } else {
-                            continue;
-                        }
-                    }
+                    // Display full interval (ignore Allowed durations); booking will still enforce policy
+                    $suggestedDuration = (int) floor($durationHours);
                     $durationMin = $suggestedDuration * 60;
                     $maxStartMin = $endMin - $durationMin;
                     $startMinAligned = (int) (floor($startMin / $slotMinutes) * $slotMinutes);
@@ -332,9 +325,8 @@ class ShiftAvailabilityService
                                 if ($combinedMinutes < $minDurationHours * 60) {
                                     continue;
                                 }
-                                $maxDuration = (int) floor($combinedMinutes / 60);
-                                $suggestedDuration = collect($allowedDurations)->filter(fn ($d) => $d <= $maxDuration && $d >= (int) $minDurationHours)->max();
-                                if ($suggestedDuration === null || $suggestedDuration < $minDurationHours) {
+                                $suggestedDuration = (int) floor($combinedMinutes / 60);
+                                if ($suggestedDuration < $minDurationHours) {
                                     continue;
                                 }
                                 $totalMin = $suggestedDuration * 60;
@@ -399,9 +391,8 @@ class ShiftAvailabilityService
                             if ($combinedMinutes < $minDurationHours * 60) {
                                 continue;
                             }
-                            $maxDuration = (int) floor($combinedMinutes / 60);
-                            $suggestedDuration = collect($allowedDurations)->filter(fn ($d) => $d <= $maxDuration && $d >= (int) $minDurationHours)->max();
-                            if ($suggestedDuration === null || $suggestedDuration < $minDurationHours) {
+                            $suggestedDuration = (int) floor($combinedMinutes / 60);
+                            if ($suggestedDuration < $minDurationHours) {
                                 continue;
                             }
                             $totalMin = $suggestedDuration * 60;
