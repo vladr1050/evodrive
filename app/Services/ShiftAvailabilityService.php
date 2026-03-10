@@ -255,9 +255,14 @@ class ShiftAvailabilityService
                     if ($durationHours < $minDurationHours) {
                         continue;
                     }
-                    $suggestedDuration = collect($allowedDurations)->filter(fn ($d) => $d <= (int) floor($durationHours))->max() ?? (int) floor($durationHours);
+                    $floorHours = (int) floor($durationHours);
+                    $suggestedDuration = collect($allowedDurations)->filter(fn ($d) => $d <= $floorHours)->max() ?? $floorHours;
                     if ($suggestedDuration < $minDurationHours) {
-                        continue;
+                        if ($floorHours >= 4 && $durationHours >= $minDurationHours - 1) {
+                            $suggestedDuration = $floorHours;
+                        } else {
+                            continue;
+                        }
                     }
                     $durationMin = $suggestedDuration * 60;
                     $maxStartMin = $endMin - $durationMin;
@@ -447,6 +452,132 @@ class ShiftAvailabilityService
         }
 
         return $slots;
+    }
+
+    /**
+     * Debug: return free intervals per day/station and policy so we can see why slots are missing.
+     * Use from artisan only (e.g. php artisan slots:debug "Ignitis Jaunmoku").
+     *
+     * @return array{policy: array, now: string, week_start: string, days: array<int, array{date: string, name: string, skipped: bool, stations: array<int, array{station_name: string, intervals: array}>, slots_count: int}>}
+     */
+    public function getFreeSlotsDebug(Carbon $weekStart, array $dayNames, ?int $filterStationId = null): array
+    {
+        $policy = ShiftPolicy::active();
+        if (! $policy) {
+            return ['policy' => null, 'now' => '', 'week_start' => $weekStart->toIso8601String(), 'days' => []];
+        }
+        $tz = $policy->timezone ?? 'Europe/Riga';
+        $nowInTz = now($tz);
+        $minDurationHours = (float) ($policy->min_duration_hours ?? 4);
+        $allowedDurations = $policy->allowedDurations();
+        $slotMinutes = $policy->time_slot_minutes ?? 15;
+        $downtimeMinutes = (int) round($policy->vehicle_downtime_hours * 60);
+
+        $stations = Station::where('is_active', true)->orderBy('name')->get();
+        if ($filterStationId) {
+            $stations = $stations->where('id', $filterStationId)->values();
+        }
+        if ($stations->isEmpty()) {
+            return [
+                'policy' => [
+                    'min_duration_hours' => $minDurationHours,
+                    'allowed_durations' => $allowedDurations,
+                    'time_slot_minutes' => $slotMinutes,
+                    'vehicle_downtime_hours' => $policy->vehicle_downtime_hours,
+                    'timezone' => $tz,
+                ],
+                'now' => $nowInTz->toIso8601String(),
+                'week_start' => $weekStart->toIso8601String(),
+                'days' => [],
+            ];
+        }
+
+        $vehicles = FleetVehicle::whereIn('home_station_id', $stations->pluck('id'))
+            ->where('status', VehicleStatus::Active)
+            ->get(['id', 'home_station_id']);
+        $vehiclesByStation = $vehicles->groupBy('home_station_id')->map(fn ($v) => $v->pluck('id')->values()->all())->all();
+        $allVehicleIds = array_unique(array_merge(...array_values($vehiclesByStation)));
+        $shifts = [];
+        if (! empty($allVehicleIds)) {
+            $weekEnd = $weekStart->copy()->addDays(7)->setTimezone($tz);
+            $shifts = Shift::whereIn('vehicle_id', $allVehicleIds)
+                ->where('status', ShiftStatus::Booked)
+                ->where('starts_at', '<', $weekEnd)
+                ->where('ends_at', '>', $weekStart)
+                ->orderBy('vehicle_id')
+                ->orderBy('starts_at')
+                ->get()
+                ->groupBy('vehicle_id');
+        }
+
+        $freeByDay = [];
+        for ($dayIndex = 0; $dayIndex < 7; $dayIndex++) {
+            $dayStart = $weekStart->copy()->addDays($dayIndex)->setTimezone($tz)->startOfDay();
+            $dayEnd = $dayStart->copy()->endOfDay();
+            $isToday = $dayStart->isSameDay($nowInTz);
+            $freeByDay[$dayIndex] = [];
+            foreach ($stations as $station) {
+                $stationVehicleIds = $vehiclesByStation[$station->id] ?? [];
+                if (empty($stationVehicleIds)) {
+                    continue;
+                }
+                $freeByDay[$dayIndex][$station->id] = $this->computeStationFreeIntervals(
+                    $stationVehicleIds,
+                    $shifts,
+                    $dayStart,
+                    $dayEnd,
+                    $downtimeMinutes,
+                    $slotMinutes,
+                    $isToday ? $nowInTz : null
+                );
+            }
+        }
+
+        $slots = $this->getAvailableSlotsForWeek($weekStart, $dayNames);
+        $slotsByDayStation = [];
+        foreach ($slots as $s) {
+            $key = $s['day'] . '|' . ($s['station_id'] ?? 0);
+            $slotsByDayStation[$key] = ($slotsByDayStation[$key] ?? 0) + 1;
+        }
+
+        $days = [];
+        for ($dayIndex = 0; $dayIndex < 7; $dayIndex++) {
+            $dayStart = $weekStart->copy()->addDays($dayIndex)->setTimezone($tz)->startOfDay();
+            $dayEnd = $dayStart->copy()->endOfDay();
+            $skipped = $dayEnd->lt($nowInTz);
+            $dateIso = $dayStart->format('Y-m-d');
+            $dayName = $dayNames[$dayIndex] ?? 'Day' . ($dayIndex + 1);
+            $stationsDebug = [];
+            foreach ($stations as $station) {
+                $intervals = $freeByDay[$dayIndex][$station->id] ?? [];
+                $stationsDebug[$station->id] = [
+                    'station_name' => $station->name,
+                    'intervals' => array_map(fn ($iv) => [sprintf('%02d:%02d', (int) floor($iv[0] / 60), $iv[0] % 60), sprintf('%02d:%02d', (int) floor($iv[1] / 60), $iv[1] % 60)], $intervals),
+                ];
+                $key = $dayName . '|' . $station->id;
+                $stationsDebug[$station->id]['slots_count'] = $slotsByDayStation[$key] ?? 0;
+            }
+            $days[] = [
+                'date' => $dateIso,
+                'name' => $dayName,
+                'skipped' => $skipped,
+                'stations' => $stationsDebug,
+                'slots_count' => array_sum(array_column($stationsDebug, 'slots_count')),
+            ];
+        }
+
+        return [
+            'policy' => [
+                'min_duration_hours' => $minDurationHours,
+                'allowed_durations' => $allowedDurations,
+                'time_slot_minutes' => $slotMinutes,
+                'vehicle_downtime_hours' => $policy->vehicle_downtime_hours,
+                'timezone' => $tz,
+            ],
+            'now' => $nowInTz->toIso8601String(),
+            'week_start' => $weekStart->toIso8601String(),
+            'days' => $days,
+        ];
     }
 
     /**
