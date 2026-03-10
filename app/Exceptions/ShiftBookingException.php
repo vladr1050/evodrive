@@ -54,4 +54,9 @@ class ShiftBookingException extends Exception
     {
         return new self('Station does not match vehicle home station.', 'STATION_MISMATCH');
     }
+
+    public static function shiftNotEditable(): self
+    {
+        return new self('This shift cannot be edited (not enough gap before or after on this vehicle).', 'NOT_EDITABLE');
+    }
 }

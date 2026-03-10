@@ -95,6 +95,9 @@ return [
     'copy_reason_STATION_MISMATCH' => 'Stacija nav pieejama',
     'copy_reason_OUTSIDE_PLANNING_WINDOW' => 'Ārpus rezervēšanas perioda',
 
+    'edit_shift' => 'Rediģēt',
+    'edit_shift_save' => 'Saglabāt',
+
     'cancel_shift' => 'Atcelt',
     'cancel_shift_confirm_title' => 'Atcelt šo maiņu?',
     'cancel_shift_confirm_btn' => 'Jā, atcel maiņu',

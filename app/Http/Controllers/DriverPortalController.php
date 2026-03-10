@@ -11,6 +11,7 @@ use App\Services\ShiftAvailabilityService;
 use App\Services\ShiftBookingService;
 use App\Services\ShiftCancellationService;
 use App\Services\ShiftCopyService;
+use App\Services\ShiftEditService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -119,17 +120,19 @@ class DriverPortalController extends Controller
         $weekStart = $startOfWeek->copy();
         $weekEnd = $startOfWeek->copy()->addDays(6)->endOfDay();
         $driverId = $driver->id;
+        $editService = app(ShiftEditService::class);
         $shifts = Shift::whereIn('status', [\App\Enums\ShiftStatus::Booked, \App\Enums\ShiftStatus::Completed])
             ->where('starts_at', '>=', $weekStart)
             ->where('ends_at', '<=', $weekEnd)
             ->with(['vehicle', 'station'])
             ->orderBy('starts_at')
             ->get()
-            ->map(function (Shift $s) use ($days, $tz, $nowInTz, $driverId) {
+            ->map(function (Shift $s) use ($days, $tz, $nowInTz, $driverId, $editService) {
                 $startsAtInTz = $s->starts_at->copy()->setTimezone($tz);
                 $endsAtInTz = $s->ends_at->copy()->setTimezone($tz);
                 $isMine = (int) $s->driver_id === (int) $driverId;
                 $cancellable = $isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz);
+                $editable = $isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz) && $editService->canEditShift($s);
                 $vehicle = $s->vehicle;
                 $vehicleLabel = $vehicle?->label ?? '-';
                 $isTesla = $vehicle && (stripos((string) $vehicle->brand, 'Tesla') !== false || stripos((string) $vehicle->model, 'Tesla') !== false);
@@ -139,6 +142,7 @@ class DriverPortalController extends Controller
                     'day' => $days[$startsAtInTz->dayOfWeek === 0 ? 6 : $startsAtInTz->dayOfWeek - 1],
                     'start' => $startsAtInTz->format('H:i'),
                     'end' => $endsAtInTz->format('H:i'),
+                    'date_iso' => $startsAtInTz->format('Y-m-d'),
                     'duration' => (int) $s->durationHours(),
                     'vehicle' => $vehicleLabel,
                     'vehicle_reg_number' => $vehicleRegNumber,
@@ -147,6 +151,7 @@ class DriverPortalController extends Controller
                     'status' => $s->status->value,
                     'is_mine' => $isMine,
                     'cancellable' => $cancellable,
+                    'editable' => $editable,
                 ];
             })
             ->all();
@@ -360,6 +365,59 @@ class DriverPortalController extends Controller
             return response()->json($result);
         }
         return response()->json($result, 422);
+    }
+
+    public function updateShift(Request $request, string $locale, Shift $shift): JsonResponse
+    {
+        $request->validate([
+            'date' => 'required|date_format:Y-m-d',
+            'start_time' => 'required|date_format:H:i',
+            'duration_hours' => 'required|numeric|min:1',
+        ]);
+        $driver = Auth::guard('driver')->user();
+        if ((int) $shift->driver_id !== (int) $driver->id) {
+            return response()->json(['success' => false, 'reason_code' => 'FORBIDDEN'], 403);
+        }
+        try {
+            $policy = ShiftPolicy::active();
+            $tz = $policy?->timezone ?: 'Europe/Riga';
+            $nowInTz = now($tz);
+            $planningWindowDays = $policy?->planning_window_days ?? 14;
+            $maxDate = $nowInTz->copy()->addDays($planningWindowDays)->format('Y-m-d');
+            if ($request->input('date') > $maxDate) {
+                return response()->json([
+                    'success' => false,
+                    'error' => __('portal.shift_date_outside_planning_window'),
+                    'reason_code' => 'DATE_OUTSIDE_PLANNING_WINDOW',
+                ], 422);
+            }
+            $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
+            if ($startsAt->lte($nowInTz)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => __('portal.shift_start_must_be_future'),
+                    'reason_code' => 'SHIFT_IN_PAST',
+                ], 422);
+            }
+            $durationHours = (float) $request->input('duration_hours');
+            $updated = app(ShiftEditService::class)->updateShift($shift, $startsAt, $durationHours);
+            return response()->json([
+                'success' => true,
+                'shift' => [
+                    'id' => $updated->id,
+                    'starts_at' => $updated->starts_at->toIso8601String(),
+                    'ends_at' => $updated->ends_at->toIso8601String(),
+                    'vehicle' => $updated->vehicle ? ['id' => $updated->vehicle->id, 'label' => $updated->vehicle->label] : null,
+                    'station' => $updated->station ? ['id' => $updated->station->id, 'name' => $updated->station->name] : null,
+                ],
+            ]);
+        } catch (ShiftBookingException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'reason_code' => $e->reasonCode,
+            ], 422);
+        }
     }
 
     public function cancelShift(Request $request, string $locale, Shift $shift): JsonResponse

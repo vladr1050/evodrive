@@ -88,6 +88,18 @@ class ShiftAvailabilityService
     }
 
     /**
+     * Like vehicleAvailableFor but excludes one shift (e.g. the one being edited).
+     */
+    public function vehicleAvailableForExcludingShift(int $vehicleId, int $excludeShiftId, Carbon $startsAt, Carbon $endsAt, ShiftPolicy $policy): bool
+    {
+        $shiftsByVehicle = $this->fetchRelevantShiftsForVehicles([$vehicleId], $startsAt, $endsAt, $policy);
+        $shifts = $shiftsByVehicle->get($vehicleId, collect())
+            ->reject(fn (Shift $s) => (int) $s->id === $excludeShiftId);
+
+        return $this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy);
+    }
+
+    /**
      * Evaluate availability for a slot given a collection of relevant shifts (no DB queries).
      */
     protected function vehicleAvailableForWithShifts(Collection $shifts, Carbon $startsAt, Carbon $endsAt, ShiftPolicy $policy): bool

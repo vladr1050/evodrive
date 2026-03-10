@@ -306,6 +306,43 @@
         </div>
     </div>
 
+    {{-- Edit shift modal --}}
+    <div id="edit-shift-modal" data-testid="shift-edit-modal" data-min-date="{{ $minDate }}" data-max-date="{{ $maxDate }}" data-min-time-today="{{ $minTimeToday ?? '' }}" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" role="dialog" aria-modal="true" onclick="if(event.target===this)document.getElementById('edit-shift-modal').classList.add('hidden')">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative" onclick="event.stopPropagation()">
+            <button type="button" data-testid="shift-edit-modal-close" onclick="document.getElementById('edit-shift-modal').classList.add('hidden')" class="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-900 transition-colors" aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+            </button>
+            <h3 class="text-2xl font-bold text-slate-900 mb-6">{{ __('portal.edit_shift') }}</h3>
+            <div class="space-y-6">
+                <div>
+                    <label for="edit-shift-date" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">{{ __('portal.date') }}</label>
+                    <input id="edit-shift-date" data-testid="shift-edit-date" type="date" min="{{ $minDate }}" max="{{ $maxDate }}" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all font-bold text-slate-700">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="edit-shift-start" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">{{ __('portal.start_time') }}</label>
+                        <select id="edit-shift-start" data-testid="shift-edit-start" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all font-bold text-slate-700">
+                            @for($h = 0; $h < 24; $h++) @for($m = 0; $m < 60; $m += $timeSlotMinutes)
+                                <option value="{{ sprintf('%02d:%02d', $h, $m) }}">{{ sprintf('%02d:%02d', $h, $m) }}</option>
+                            @endfor @endfor
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edit-shift-duration" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">{{ __('portal.duration') }}</label>
+                        <select id="edit-shift-duration" data-testid="shift-edit-duration" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all font-bold text-slate-700">
+                            @foreach($allowedDurations as $d)<option value="{{ $d }}">{{ $d }}h</option>@endforeach
+                        </select>
+                    </div>
+                </div>
+                <div id="edit-shift-error" class="hidden p-4 rounded-xl text-sm font-medium bg-red-50 text-red-600"></div>
+                <div class="flex gap-3">
+                    <button type="button" id="edit-shift-modal-cancel" class="flex-1 bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200 transition-all">{{ __('portal.cancel_shift_cancel_btn') }}</button>
+                    <button type="button" id="edit-shift-save-btn" data-testid="shift-edit-save" class="flex-1 bg-brand-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-brand-600/20 hover:bg-brand-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">{{ __('portal.edit_shift_save') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
     (function() {
         const locale = '{{ app()->getLocale() }}';
@@ -314,6 +351,9 @@
         const previewCopyUrl = '{{ route("driverportal.shifts.copy-previous-week-preview", ["locale" => app()->getLocale()]) }}';
         const confirmCopyUrl = '{{ route("driverportal.shifts.copy-previous-week-confirm", ["locale" => app()->getLocale()]) }}';
         const csrf = '{{ csrf_token() }}';
+        const minDate = '{{ $minDate }}';
+        const maxDate = '{{ $maxDate }}';
+        const minTimeToday = '{{ $minTimeToday ?? '' }}';
         const stationNames = @json($stations->pluck('name', 'id'));
         const stationAddresses = @json($stations->pluck('address', 'id'));
         const reasonLabels = @json($copyReasonLabels);
@@ -510,6 +550,80 @@
         function closeCopyModal() {
             document.getElementById('copy-modal').classList.add('hidden');
         }
+
+        function updateEditStartTimeOptions() {
+            var modal = document.getElementById('edit-shift-modal');
+            var dateEl = document.getElementById('edit-shift-date');
+            var startEl = document.getElementById('edit-shift-start');
+            if (!dateEl || !startEl || !minDate || !minTimeToday) return;
+            var isToday = dateEl.value === minDate;
+            var firstValid = null;
+            for (var i = 0; i < startEl.options.length; i++) {
+                var opt = startEl.options[i];
+                var disabled = isToday && opt.value < minTimeToday;
+                opt.disabled = disabled;
+                if (!disabled && firstValid === null) firstValid = opt.value;
+            }
+            if (isToday && firstValid && startEl.value < minTimeToday) startEl.value = firstValid;
+        }
+        document.getElementById('edit-shift-date')?.addEventListener('change', updateEditStartTimeOptions);
+
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.shifts-grid-edit-btn');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+            var url = btn.getAttribute('data-edit-url');
+            var date = btn.getAttribute('data-edit-date') || minDate;
+            var start = btn.getAttribute('data-edit-start') || '08:00';
+            var duration = btn.getAttribute('data-edit-duration') || '8';
+            if (!url) return;
+            document.getElementById('edit-shift-modal').classList.remove('hidden');
+            document.getElementById('edit-shift-date').value = date;
+            document.getElementById('edit-shift-date').min = minDate;
+            document.getElementById('edit-shift-date').max = maxDate;
+            document.getElementById('edit-shift-start').value = start;
+            document.getElementById('edit-shift-duration').value = String(duration);
+            updateEditStartTimeOptions();
+            document.getElementById('edit-shift-error').classList.add('hidden');
+            document.getElementById('edit-shift-save-btn').dataset.editUrl = url;
+        });
+        document.getElementById('edit-shift-modal-cancel')?.addEventListener('click', function() {
+            document.getElementById('edit-shift-modal').classList.add('hidden');
+        });
+        document.getElementById('edit-shift-save-btn')?.addEventListener('click', function() {
+            var url = this.dataset.editUrl;
+            if (!url) return;
+            var dateEl = document.getElementById('edit-shift-date');
+            var startEl = document.getElementById('edit-shift-start');
+            var durationEl = document.getElementById('edit-shift-duration');
+            var errEl = document.getElementById('edit-shift-error');
+            var payload = {
+                date: dateEl.value,
+                start_time: startEl.value,
+                duration_hours: parseInt(durationEl.value, 10),
+                _token: csrf
+            };
+            if (dateEl.value < minDate || dateEl.value > maxDate) {
+                errEl.textContent = '{{ __("portal.shift_date_outside_planning_window") }}';
+                errEl.classList.remove('hidden');
+                return;
+            }
+            this.disabled = true;
+            errEl.classList.add('hidden');
+            axios.post(url, payload)
+                .then(function(res) {
+                    if (res.data.success) {
+                        document.getElementById('edit-shift-modal').classList.add('hidden');
+                        window.location.reload();
+                    }
+                })
+                .catch(function(err) {
+                    errEl.textContent = (err.response?.data?.error) || '{{ __("portal.confirm_failed") }}';
+                    errEl.classList.remove('hidden');
+                    document.getElementById('edit-shift-save-btn').disabled = false;
+                });
+        });
 
         document.getElementById('copy-prev-week')?.addEventListener('click', openCopyModal);
         document.getElementById('copy-modal-close')?.addEventListener('click', closeCopyModal);

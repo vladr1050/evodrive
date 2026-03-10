@@ -96,6 +96,10 @@ return [
     'copy_reason_STATION_MISMATCH' => 'Station not available',
     'copy_reason_OUTSIDE_PLANNING_WINDOW' => 'Outside booking window',
 
+    // Edit shift
+    'edit_shift' => 'Edit',
+    'edit_shift_save' => 'Save changes',
+
     // Cancel shift
     'cancel_shift' => 'Cancel',
     'cancel_shift_confirm_title' => 'Cancel this shift?',

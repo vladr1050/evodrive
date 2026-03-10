@@ -3,6 +3,7 @@
     $isMine = (bool) ($shift['is_mine'] ?? false);
     $isMyShift = $isMine && (($shift['status'] ?? '') === 'booked');
     $cancellable = (bool) ($shift['cancellable'] ?? false);
+    $editable = (bool) ($shift['editable'] ?? false);
 @endphp
 <div class="shift-card relative p-3 rounded-2xl border transition-all hover:scale-[1.02] {{ $isMyShift ? 'bg-green-50 border-green-200 shadow-sm' : 'bg-slate-200/50 border-slate-300/50 opacity-80' }}" data-shift-id="{{ $shift['id'] ?? '' }}" data-station-name="{{ $shift['station'] ?? '' }}">
     <div class="flex justify-between items-start mb-2">
@@ -11,6 +12,11 @@
             <span class="text-[10px] font-bold text-slate-400 mt-1">{{ $shift['end'] }}</span>
         </div>
         <div class="flex items-center gap-2">
+            @if($editable)
+                <button type="button" class="shifts-grid-edit-btn p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600 rounded-lg transition-all" data-testid="shift-edit-btn" data-shift-id="{{ $shift['id'] }}" data-edit-url="{{ route('driverportal.shifts.update', ['locale' => app()->getLocale(), 'shift' => $shift['id']]) }}" data-edit-date="{{ $shift['date_iso'] ?? '' }}" data-edit-start="{{ $shift['start'] ?? '' }}" data-edit-duration="{{ $shift['duration'] ?? 0 }}" title="{{ __('portal.edit_shift') }}">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </button>
+            @endif
             @if($cancellable)
                 <button type="button" class="shifts-grid-cancel-btn p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all" data-testid="shift-cancel-btn" data-shift-id="{{ $shift['id'] }}" data-cancel-url="{{ route('driverportal.shifts.cancel', ['locale' => app()->getLocale(), 'shift' => $shift['id']]) }}" title="{{ __('portal.cancel_shift') }}">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

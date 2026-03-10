@@ -95,6 +95,9 @@ return [
     'copy_reason_STATION_MISMATCH' => 'Станция недоступна',
     'copy_reason_OUTSIDE_PLANNING_WINDOW' => 'Вне окна бронирования',
 
+    'edit_shift' => 'Изменить',
+    'edit_shift_save' => 'Сохранить',
+
     'cancel_shift' => 'Отменить',
     'cancel_shift_confirm_title' => 'Отменить эту смену?',
     'cancel_shift_confirm_btn' => 'Да, отменить смену',
