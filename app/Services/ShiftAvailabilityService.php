@@ -337,6 +337,9 @@ class ShiftAvailabilityService
                                 $slotEndsAt,
                                 $policy
                             );
+                            if (empty($availableVehicleIds)) {
+                                continue;
+                            }
                             $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
                             $slots[] = [
                                 'id' => 'as' . (++$slotId),

@@ -291,4 +291,47 @@ class ShiftBookingTest extends TestCase
             ->count();
         $this->assertSame(1, $shiftCount, 'Exactly one shift must exist for this station/time');
     }
+
+    /** Overnight free slot: gap between shift ending 19:00 day1 and shift starting 06:00 day2 should appear as one bookable slot (e.g. 20:00–04:00). */
+    public function test_overnight_free_slot_appears_between_two_shifts(): void
+    {
+        $this->policy->update([
+            'vehicle_downtime_hours' => 1,
+            'min_duration_hours' => 6,
+            'allowed_durations_json' => [6, 8, 10, 12],
+            'time_slot_minutes' => 15,
+            'timezone' => 'Europe/Riga',
+        ]);
+        $this->policy->refresh();
+
+        $tz = 'Europe/Riga';
+        $weekStart = Carbon::parse('2030-01-06 00:00:00', $tz);
+        $day1 = $weekStart->copy()->addDay()->startOfDay();
+        $day2 = $weekStart->copy()->addDays(2)->startOfDay();
+
+        Shift::factory()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'driver_id' => $this->driver1->id,
+            'starts_at' => $day1->copy()->setTime(7, 0),
+            'ends_at' => $day1->copy()->setTime(19, 0),
+            'status' => ShiftStatus::Booked,
+        ]);
+        Shift::factory()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'driver_id' => $this->driver1->id,
+            'starts_at' => $day2->copy()->setTime(6, 0),
+            'ends_at' => $day2->copy()->setTime(18, 0),
+            'status' => ShiftStatus::Booked,
+        ]);
+
+        $dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        $slots = app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($weekStart, $dayNames);
+
+        $overnightSlots = collect($slots)->filter(fn ($s) => isset($s['end_date_iso']) && ! empty($s['vehicles'] ?? []));
+        $this->assertTrue($overnightSlots->isNotEmpty(), 'At least one overnight slot (with vehicles) should appear. Slots: ' . json_encode($slots));
+        $overnight = $overnightSlots->first();
+        $this->assertGreaterThanOrEqual(6, $overnight['duration']);
+    }
 }
