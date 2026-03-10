@@ -673,11 +673,11 @@ class ShiftAvailabilityService
                 }
             }
 
-            // Block end of day when a shift starts at 00:00 next day (downtime before that shift)
-            $hasShiftStartingNextDay = $shiftsByVehicle->get($vehicleId, collect())
-                ->contains(fn (Shift $s) => $s->starts_at->copy()->setTimezone($dayStart->timezoneName)->gte($nextDayStart)
-                    && $s->starts_at->copy()->setTimezone($dayStart->timezoneName)->lt($nextDayStart->copy()->addDay()));
-            if ($hasShiftStartingNextDay && $downtimeMinutes > 0) {
+            // Block end of day only when a shift starts at 00:00 (midnight) next day — downtime before that shift. Do not block when the next shift starts later (e.g. 10:00), so overnight slots can use 23:00–24:00.
+            $nextDayStartLocal = $nextDayStart->copy()->setTimezone($dayStart->timezoneName);
+            $hasShiftStartingAtMidnightNextDay = $shiftsByVehicle->get($vehicleId, collect())
+                ->contains(fn (Shift $s) => $s->starts_at->copy()->setTimezone($dayStart->timezoneName)->equalTo($nextDayStartLocal));
+            if ($hasShiftStartingAtMidnightNextDay && $downtimeMinutes > 0) {
                 $blockStart = max(0, $dayEndMinutes - $downtimeMinutes);
                 $blocked[] = [$blockStart, $dayEndMinutes];
             }
