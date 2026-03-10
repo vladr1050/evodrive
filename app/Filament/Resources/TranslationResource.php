@@ -80,8 +80,7 @@ class TranslationResource extends Resource
             ->defaultSort('group')
             ->filters([
                 Tables\Filters\SelectFilter::make('group')
-                    ->options(['ui' => 'UI', 'apply' => 'Apply'])
-                    ->default('ui'),
+                    ->options(['ui' => 'UI', 'apply' => 'Apply (apply flow)']),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
