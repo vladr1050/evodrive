@@ -262,8 +262,10 @@ class ShiftAvailabilityService
                     $durationMin = $suggestedDuration * 60;
                     $maxStartMin = $endMin - $durationMin;
                     $startMinAligned = (int) (floor($startMin / $slotMinutes) * $slotMinutes);
+                    // Use a step that won't skip over valid starts when alignment pushed start earlier (e.g. slotMinutes=480 → 19:00 free but aligned to 16:00)
+                    $stepMin = $slotMinutes <= 60 ? $slotMinutes : 60;
                     $slotAdded = false;
-                    for ($startMinTry = $startMinAligned; $startMinTry <= $maxStartMin && ! $slotAdded; $startMinTry += $slotMinutes) {
+                    for ($startMinTry = $startMinAligned; $startMinTry <= $maxStartMin && ! $slotAdded; $startMinTry += $stepMin) {
                         $endMinTry = $startMinTry + $durationMin;
                         $h1 = (int) floor($startMinTry / 60);
                         $m1 = $startMinTry % 60;
