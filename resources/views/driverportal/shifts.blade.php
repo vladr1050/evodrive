@@ -16,7 +16,8 @@
                 availableSlots: window.__SHIFTS_AVAILABLE_SLOTS__ || [],
                 stations: init.stations || [],
                 shiftsBaseUrl: init.shiftsBaseUrl || '',
-                currentView: init.currentView || 'current',
+                currentView: init.currentView || '0',
+                weekOptions: init.weekOptions || [],
                 weekUrl(view) {
                     const params = new URLSearchParams();
                     params.set('view', view);
@@ -46,9 +47,13 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-4">
-            <div class="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
-                <a :href="weekUrl('current')" class="px-4 py-2 rounded-xl text-sm font-bold transition-all {{ $view === 'current' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900' }}">{{ __('portal.current_week') }}</a>
-                <a :href="weekUrl('next')" class="px-4 py-2 rounded-xl text-sm font-bold transition-all {{ $view === 'next' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900' }}">{{ __('portal.next_week') }}</a>
+            @php
+                $shiftsBaseUrl = route('driverportal.shifts', ['locale' => request()->route('locale', app()->getLocale())]);
+            @endphp
+            <div class="flex flex-wrap items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+                @foreach($weekOptions ?? [] as $opt)
+                <a href="{{ $shiftsBaseUrl }}?view={{ $opt['index'] }}{{ request('station_id') ? '&station_id=' . request('station_id') : '' }}" class="px-4 py-2 rounded-xl text-sm font-bold transition-all {{ (string)$view === (string)$opt['index'] ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900' }}">{{ $opt['label'] }}</a>
+                @endforeach
             </div>
 
             <!-- Custom Station Dropdown (reference 1:1) -->

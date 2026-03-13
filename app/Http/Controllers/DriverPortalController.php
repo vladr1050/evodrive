@@ -98,15 +98,23 @@ class DriverPortalController extends Controller
     public function shifts(Request $request): View
     {
         $driver = Auth::guard('driver')->user();
-        $view = $request->get('view', 'current');
-        $stationId = $request->get('station_id');
-        $days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         $policyForTz = ShiftPolicy::active();
+        $planningWindowDays = $policyForTz?->planning_window_days ?? 14;
         $tz = $policyForTz?->timezone ?: 'Europe/Riga';
         $nowInTz = now($tz);
-        $dayOfWeek = $nowInTz->dayOfWeek;
+        $todayStart = $nowInTz->copy()->startOfDay();
+        $dayOfWeek = $todayStart->dayOfWeek;
         $diffToMonday = $dayOfWeek === 0 ? -6 : 1 - $dayOfWeek;
-        $startOfWeek = $nowInTz->copy()->addDays($diffToMonday + ($view === 'next' ? 7 : 0))->startOfDay();
+        $firstWeekMonday = $todayStart->copy()->addDays($diffToMonday);
+        $lastDayInWindow = $todayStart->copy()->addDays($planningWindowDays - 1);
+        $lastWeekMonday = $lastDayInWindow->copy()->subDays($lastDayInWindow->dayOfWeek === 0 ? 6 : $lastDayInWindow->dayOfWeek - 1)->startOfDay();
+        $totalWeeks = (int) max(1, 1 + (int) ($firstWeekMonday->diffInDays($lastWeekMonday) / 7));
+        $viewParam = $request->get('view', '0');
+        $weekIndex = is_numeric($viewParam) ? (int) $viewParam : 0;
+        $weekIndex = max(0, min($weekIndex, $totalWeeks - 1));
+        $stationId = $request->get('station_id');
+        $days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        $startOfWeek = $firstWeekMonday->copy()->addDays($weekIndex * 7)->startOfDay();
         $weekDates = [];
         for ($i = 0; $i < 7; $i++) {
             $d = $startOfWeek->copy()->addDays($i);
@@ -165,9 +173,8 @@ class DriverPortalController extends Controller
         }
         $allowedDurations = $policy ? $policy->allowedDurations() : [4, 6, 8, 10, 12];
         $timeSlotMinutes = $policy->time_slot_minutes ?? 15;
-        $planningWindowDays = $policy->planning_window_days ?? 14;
-        $minDate = $nowInTz->format('Y-m-d');
-        $maxDate = $nowInTz->copy()->addDays($planningWindowDays)->format('Y-m-d');
+        $minDate = $todayStart->format('Y-m-d');
+        $maxDate = $todayStart->copy()->addDays(max(0, $planningWindowDays - 1))->format('Y-m-d');
         $minTimeToday = null;
         if ($timeSlotMinutes > 0) {
             $minutes = $nowInTz->hour * 60 + $nowInTz->minute;
@@ -181,14 +188,23 @@ class DriverPortalController extends Controller
             ? app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($startOfWeek, $dayNames)
             : [];
         $shiftsBaseUrl = route('driverportal.shifts', ['locale' => $request->route('locale', app()->getLocale())]);
+        $weekOptions = [];
+        for ($w = 0; $w < $totalWeeks; $w++) {
+            $mon = $firstWeekMonday->copy()->addDays($w * 7)->startOfDay();
+            $sun = $mon->copy()->addDays(6);
+            $label = $w === 0 ? __('portal.current_week') : ($w === 1 ? __('portal.next_week') : $mon->format('d') . '–' . $sun->format('d') . ' ' . $sun->translatedFormat('M'));
+            $weekOptions[] = ['index' => $w, 'label' => $label];
+        }
         $shiftsPageInit = [
             'initialFilterStation' => $initialFilterStation,
             'stations' => $stations->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()->all(),
             'shiftsBaseUrl' => $shiftsBaseUrl,
-            'currentView' => $view,
+            'currentView' => (string) $weekIndex,
+            'weekOptions' => $weekOptions,
         ];
         return view('driverportal.shifts', [
-            'view' => $view,
+            'view' => (string) $weekIndex,
+            'weekOptions' => $weekOptions,
             'weekDates' => $weekDates,
             'shifts' => $shifts,
             'stations' => $stations,
@@ -258,7 +274,7 @@ class DriverPortalController extends Controller
             $tz = $policy?->timezone ?: 'Europe/Riga';
             $nowInTz = now($tz);
             $planningWindowDays = $policy?->planning_window_days ?? 14;
-            $maxDate = $nowInTz->copy()->addDays($planningWindowDays)->format('Y-m-d');
+            $maxDate = $nowInTz->copy()->addDays(max(0, $planningWindowDays - 1))->format('Y-m-d');
             $requestDate = $request->input('date');
             if ($requestDate > $maxDate) {
                 return response()->json([
@@ -383,7 +399,7 @@ class DriverPortalController extends Controller
             $tz = $policy?->timezone ?: 'Europe/Riga';
             $nowInTz = now($tz);
             $planningWindowDays = $policy?->planning_window_days ?? 14;
-            $maxDate = $nowInTz->copy()->addDays($planningWindowDays)->format('Y-m-d');
+            $maxDate = $nowInTz->copy()->addDays(max(0, $planningWindowDays - 1))->format('Y-m-d');
             if ($request->input('date') > $maxDate) {
                 return response()->json([
                     'success' => false,
