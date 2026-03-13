@@ -187,6 +187,12 @@ class DriverPortalController extends Controller
         $availableSlots = $policy
             ? app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($startOfWeek, $dayNames)
             : [];
+        if (! empty($availableSlots)) {
+            $availableSlots = array_values(array_filter($availableSlots, function ($slot) use ($minDate, $maxDate) {
+                $date = $slot['date_iso'] ?? null;
+                return $date && $date >= $minDate && $date <= $maxDate;
+            }));
+        }
         $shiftsBaseUrl = route('driverportal.shifts', ['locale' => $request->route('locale', app()->getLocale())]);
         $weekOptions = [];
         for ($w = 0; $w < $totalWeeks; $w++) {

@@ -43,6 +43,17 @@ class TelegramNotifier
         $response = Http::timeout(10)->post($url, $payload);
 
         if (! $response->successful()) {
+            $json = $response->json();
+            $params = $json['parameters'] ?? [];
+            $migrateToChatId = $params['migrate_to_chat_id'] ?? null;
+            if ($response->status() === 400 && $migrateToChatId !== null) {
+                Log::channel('stack')->warning('TelegramNotifier: group upgraded to supergroup, retrying with migrate_to_chat_id. Update TELEGRAM_SHIFTS_CHAT_ID to ' . $migrateToChatId . ' in .env');
+                $payload['chat_id'] = $migrateToChatId;
+                $retry = Http::timeout(10)->post($url, $payload);
+                if ($retry->successful() && ($retry->json()['ok'] ?? false)) {
+                    return true;
+                }
+            }
             Log::channel('stack')->error('TelegramNotifier: sendMessage failed', [
                 'status' => $response->status(),
                 'body' => $response->body(),

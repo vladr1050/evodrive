@@ -42,22 +42,13 @@ class ShiftPolicyResource extends Resource
                 Forms\Components\Section::make('Durations & timing')
                     ->description('Allowed shift lengths and minimum duration.')
                     ->schema([
-                        Forms\Components\Repeater::make('allowed_durations_json')
+                        Forms\Components\Select::make('allowed_durations_json')
                             ->label('Allowed durations (hours)')
-                            ->schema([
-                                Forms\Components\TextInput::make('hours')
-                                    ->label('Hours')
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->maxValue(24)
-                                    ->required()
-                                    ->integer(),
-                            ])
-                            ->defaultItems(0)
-                            ->addActionLabel('Add duration')
-                            ->reorderable(false)
+                            ->options(array_combine($h = range(1, 24), $h))
+                            ->multiple()
+                            ->searchable()
                             ->required()
-                            ->helperText('Add each allowed shift length in hours (e.g. 4, 6, 8). Integers only.'),
+                            ->helperText('Select one or more allowed shift lengths in hours.'),
                         Forms\Components\TextInput::make('min_duration_hours')
                             ->numeric()
                             ->minValue(1)
