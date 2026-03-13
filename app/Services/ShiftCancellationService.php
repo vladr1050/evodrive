@@ -7,6 +7,7 @@ use App\Events\ShiftCancelled;
 use App\Jobs\SendShiftCancellationTelegramNotificationJob;
 use App\Models\Driver;
 use App\Models\Shift;
+use App\Models\ShiftEvent;
 use Illuminate\Support\Facades\Event;
 
 /**
@@ -28,6 +29,7 @@ class ShiftCancellationService
             'cancel_reason' => $reason ?? 'cancelled_by_driver',
         ]);
 
+        ShiftEvent::logCancelled($shift->fresh(), 'driver', (int) $driver->id);
         Event::dispatch(new ShiftCancelled($shift->fresh(), $driver));
     }
 }

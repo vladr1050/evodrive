@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ShiftStatus;
 use App\Exceptions\ShiftBookingException;
 use App\Models\Shift;
+use App\Models\ShiftEvent;
 use App\Models\ShiftPolicy;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -99,6 +100,8 @@ class ShiftEditService
                 'starts_at' => $newStartsAtUtc,
                 'ends_at' => $newEndsAtUtc,
             ]);
+
+            ShiftEvent::logEdited($shift->fresh(), 'driver', (int) $shift->driver_id);
 
             return $shift->fresh(['vehicle', 'station']);
         });

@@ -7,6 +7,7 @@ use App\Helpers\Latvian;
 use Carbon\Carbon;
 use App\Filament\Resources\ShiftResource\Pages;
 use App\Models\Shift;
+use App\Models\ShiftEvent;
 use App\Models\ShiftPolicy;
 use App\Models\Station;
 use Filament\Forms;
@@ -209,6 +210,7 @@ class ShiftResource extends Resource
                             'status' => ShiftStatus::Cancelled,
                             'cancelled_at' => now(),
                         ]);
+                        ShiftEvent::logCancelled($record->fresh(), 'admin', (int) auth()->id());
                         \Filament\Notifications\Notification::make()
                             ->title('Shift cancelled')
                             ->success()

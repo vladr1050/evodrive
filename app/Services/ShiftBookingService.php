@@ -6,6 +6,7 @@ use App\Enums\ShiftStatus;
 use App\Exceptions\ShiftBookingException;
 use App\Models\FleetVehicle;
 use App\Models\Shift;
+use App\Models\ShiftEvent;
 use App\Models\ShiftPolicy;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +52,8 @@ class ShiftBookingService
                 'ends_at' => $endsAtUtc,
                 'status' => ShiftStatus::Booked,
             ]);
+
+            ShiftEvent::logCreated($shift, 'driver', $driverId);
 
             return $shift->load('vehicle', 'station');
         });

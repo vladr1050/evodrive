@@ -61,4 +61,9 @@ class Driver extends Authenticatable
     {
         return $this->hasMany(Shift::class);
     }
+
+    public function shiftEvents(): HasMany
+    {
+        return $this->hasMany(ShiftEvent::class)->orderByDesc('created_at');
+    }
 }

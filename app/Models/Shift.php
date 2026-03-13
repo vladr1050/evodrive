@@ -6,6 +6,7 @@ use App\Enums\ShiftStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Shift extends Model
 {
@@ -61,5 +62,10 @@ class Shift extends Model
     public function durationHours(): float
     {
         return $this->starts_at->diffInMinutes($this->ends_at) / 60;
+    }
+
+    public function shiftEvents(): HasMany
+    {
+        return $this->hasMany(ShiftEvent::class)->orderByDesc('created_at');
     }
 }

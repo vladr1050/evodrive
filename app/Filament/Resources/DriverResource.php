@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\DriverStatus;
 use App\Filament\Resources\DriverResource\Pages;
+use App\Filament\Resources\DriverResource\RelationManagers\ShiftEventsRelationManager;
 use App\Models\Driver;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -188,6 +189,13 @@ class DriverResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            ShiftEventsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
