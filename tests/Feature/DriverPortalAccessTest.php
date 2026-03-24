@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\DriverStatus;
 use App\Models\Driver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -36,6 +37,33 @@ class DriverPortalAccessTest extends TestCase
             ->get('/en/driverportal/dashboard');
 
         $response->assertStatus(200);
+    }
+
+    public function test_suspended_driver_cannot_log_in(): void
+    {
+        $driver = Driver::factory()->create([
+            'status' => DriverStatus::Suspended,
+        ]);
+
+        $response = $this->post('/en/driverportal', [
+            'email' => $driver->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect('/en/driverportal');
+        $response->assertSessionHas('driverportal.error');
+        $this->assertGuest('driver');
+    }
+
+    public function test_suspended_driver_session_is_rejected_on_portal_routes(): void
+    {
+        $driver = Driver::factory()->create(['status' => DriverStatus::Suspended]);
+
+        $response = $this->actingAs($driver, 'driver')
+            ->get('/en/driverportal/dashboard');
+
+        $response->assertRedirect('/en/driverportal');
+        $this->assertGuest('driver');
     }
 
     public function test_authenticated_driver_sees_shifts(): void

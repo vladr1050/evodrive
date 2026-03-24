@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+        $middleware->alias([
+            'driver.portal' => \App\Http\Middleware\EnsureDriverPortalAccess::class,
+        ]);
         $middleware->validateCsrfTokens(except: [
             'telegram/*',
         ]);

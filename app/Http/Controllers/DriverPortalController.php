@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DriverStatus;
 use App\Enums\ShiftStatus;
 use App\Exceptions\ShiftBookingException;
 use App\Models\Shift;
@@ -34,6 +35,13 @@ class DriverPortalController extends Controller
         ]);
         $locale = $request->route('locale', 'en');
         if (Auth::guard('driver')->attempt($request->only('email', 'password'), $request->boolean('remember'))) {
+            $driver = Auth::guard('driver')->user();
+            if ($driver->status !== DriverStatus::Active) {
+                Auth::guard('driver')->logout();
+                return redirect()->route('driverportal.login', ['locale' => $locale])
+                    ->withInput($request->only('email'))
+                    ->with('driverportal.error', __('portal.portal_access_denied'));
+            }
             $request->session()->regenerate();
             return redirect()->intended(route('driverportal.dashboard', ['locale' => $locale]));
         }

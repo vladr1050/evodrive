@@ -14,6 +14,7 @@ return [
     'password' => 'Password',
     'remember_me' => 'Remember me',
     'forgot_password' => 'Forgot password?',
+    'portal_access_denied' => 'Your account cannot access the driver portal. Contact support if you think this is a mistake.',
     'welcome_back' => 'Welcome back, :name',
     'next_shift' => 'Next Shift',
     'until_start' => 'until start',

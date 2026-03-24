@@ -38,7 +38,7 @@ Route::prefix('{locale}')
         // Driver Portal (Fleet)
         Route::get('driverportal', [DriverPortalController::class, 'login'])->name('driverportal.login');
         Route::post('driverportal', [DriverPortalController::class, 'loginSubmit'])->name('driverportal.login.submit');
-        Route::middleware('auth:driver')->group(function () {
+        Route::middleware(['auth:driver', 'driver.portal'])->group(function () {
             Route::get('driverportal/dashboard', [DriverPortalController::class, 'dashboard'])->name('driverportal.dashboard');
             Route::get('driverportal/shifts', [DriverPortalController::class, 'shifts'])->name('driverportal.shifts');
             Route::post('driverportal/shifts/check-availability', [DriverPortalController::class, 'checkAvailability'])->name('driverportal.shifts.check-availability');

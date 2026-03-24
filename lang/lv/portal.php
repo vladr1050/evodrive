@@ -14,6 +14,7 @@ return [
     'password' => 'Parole',
     'remember_me' => 'Atcerēties mani',
     'forgot_password' => 'Aizmirsi paroli?',
+    'portal_access_denied' => 'Jūsu kontam nav piekļuves vadītāja portālam. Sazinieties ar atbalstu, ja uzskatāt, ka tā ir kļūda.',
     'welcome_back' => 'Laipni atgriezti, :name',
     'next_shift' => 'Nākamā maiņa',
     'until_start' => 'līdz sākumam',
