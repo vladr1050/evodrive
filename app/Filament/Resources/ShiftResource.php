@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\ShiftStatus;
+use App\Events\ShiftCancelled;
 use App\Helpers\Latvian;
 use Carbon\Carbon;
 use App\Filament\Resources\ShiftResource\Pages;
@@ -19,6 +20,7 @@ use Filament\Tables\Filters\Indicator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 class ShiftResource extends Resource
 {
@@ -210,7 +212,11 @@ class ShiftResource extends Resource
                             'status' => ShiftStatus::Cancelled,
                             'cancelled_at' => now(),
                         ]);
-                        ShiftEvent::logCancelled($record->fresh(), 'admin', (int) auth()->id());
+                        $shift = $record->fresh(['driver']);
+                        ShiftEvent::logCancelled($shift, 'admin', (int) auth()->id());
+                        if ($shift->driver) {
+                            Event::dispatch(new ShiftCancelled($shift, $shift->driver));
+                        }
                         \Filament\Notifications\Notification::make()
                             ->title('Shift cancelled')
                             ->success()

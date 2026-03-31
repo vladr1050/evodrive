@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\ShiftStatus;
+use App\Events\ShiftCancelled;
 use App\Jobs\SendShiftCancellationTelegramNotificationJob;
 use App\Models\Driver;
 use App\Models\FleetVehicle;
@@ -12,7 +13,9 @@ use App\Models\Station;
 use App\Services\TelegramNotifier;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class ShiftCancellationTelegramNotificationTest extends TestCase
@@ -152,5 +155,39 @@ class ShiftCancellationTelegramNotificationTest extends TestCase
         $fourth->refresh();
         $this->assertNull($fourth->cancellation_notified_at);
         Http::assertNothingSent();
+    }
+
+    public function test_shift_cancelled_event_after_admin_style_cancel_schedules_delayed_telegram_job(): void
+    {
+        Queue::fake();
+
+        $startsAt = Carbon::tomorrow()->setTime(11, 0);
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => $startsAt,
+            'ends_at' => $startsAt->copy()->addHours(4),
+            'status' => ShiftStatus::Booked,
+        ]);
+
+        $shift->update([
+            'status' => ShiftStatus::Cancelled,
+            'cancelled_at' => now(),
+        ]);
+
+        $fresh = $shift->fresh(['driver']);
+        Event::dispatch(new ShiftCancelled($fresh, $fresh->driver));
+
+        Queue::assertPushed(SendShiftCancellationTelegramNotificationJob::class, function (SendShiftCancellationTelegramNotificationJob $job) {
+            if ($job->delay === null) {
+                return false;
+            }
+            if ($job->delay instanceof \DateTimeInterface) {
+                return $job->delay->getTimestamp() > time();
+            }
+
+            return (int) $job->delay >= 60;
+        });
     }
 }
