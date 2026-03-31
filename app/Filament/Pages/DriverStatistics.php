@@ -2,8 +2,10 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\ShiftStatus;
 use App\Models\Driver;
 use App\Models\FleetVehicle;
+use App\Models\Shift;
 use App\Models\ShiftPolicy;
 use App\Models\Station;
 use App\Services\Utilization\DateRange;
@@ -35,6 +37,8 @@ class DriverStatistics extends Page
 
     /** @var array<int> */
     public array $driverIds = [];
+
+    public bool $selectAllDrivers = false;
 
     /** @var array<int> */
     public array $stationIds = [];
@@ -71,9 +75,14 @@ class DriverStatistics extends Page
     protected function getViewData(): array
     {
         $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
+        $driversSelect = Driver::orderBy('name')->get(['id', 'name']);
+        $effectiveDriverIds = $this->selectAllDrivers
+            ? $driversSelect->pluck('id')->map(fn ($id) => (int) $id)->all()
+            : ($this->driverIds ?: null);
+
         $range = new DateRange($this->dateFrom, $this->dateTo);
         $filters = new DriverUtilizationFilters(
-            $this->driverIds ?: null,
+            $effectiveDriverIds,
             $this->stationIds ?: null,
             $this->vehicleIds ?: null,
             $this->statusMode,
@@ -88,6 +97,8 @@ class DriverStatistics extends Page
         $kpis = $this->computeKpis($rows, $drivers->count(), count($dateKeys));
         $stationBreakdown = $this->computeStationBreakdown($rows);
         $vehicleBreakdown = $this->computeVehicleBreakdown($rows);
+        $driverTotals = $this->computeDriverTotals($rows);
+        $totalsSummary = $this->computeTotalsSummary($rows, $range, $effectiveDriverIds, $tz);
 
         $breakdownDetail = [];
         $breakdownDriverName = null;
@@ -105,7 +116,9 @@ class DriverStatistics extends Page
             'kpis' => $kpis,
             'stationBreakdown' => $stationBreakdown,
             'vehicleBreakdown' => $vehicleBreakdown,
-            'driversSelect' => Driver::orderBy('name')->get(['id', 'name']),
+            'driverTotals' => $driverTotals,
+            'totalsSummary' => $totalsSummary,
+            'driversSelect' => $driversSelect,
             'stationsSelect' => Station::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'vehiclesSelect' => FleetVehicle::orderBy('registration_number')->get(['id', 'brand', 'model', 'registration_number']),
             'breakdownDetail' => $breakdownDetail,
@@ -240,6 +253,108 @@ class DriverStatistics extends Page
         usort($out, fn ($a, $b) => $b->worked_hours <=> $a->worked_hours);
 
         return $out;
+    }
+
+    protected function computeDriverTotals(Collection $rows): array
+    {
+        $byDriver = [];
+        foreach ($rows as $r) {
+            $driverId = (int) $r->driver_id;
+            if (! isset($byDriver[$driverId])) {
+                $byDriver[$driverId] = [
+                    'driver_id' => $driverId,
+                    'driver_name' => $r->driver_name,
+                    'worked_minutes' => 0,
+                    'booked_minutes' => 0,
+                    'total_minutes' => 0,
+                ];
+            }
+            $byDriver[$driverId]['worked_minutes'] += (int) $r->worked_minutes;
+            $byDriver[$driverId]['booked_minutes'] += (int) $r->planned_minutes;
+            $byDriver[$driverId]['total_minutes'] += (int) $r->total_minutes;
+        }
+
+        $out = array_values(array_map(function (array $row): object {
+            return (object) [
+                'driver_id' => $row['driver_id'],
+                'driver_name' => $row['driver_name'],
+                'worked_hours' => round($row['worked_minutes'] / 60, 1),
+                'booked_hours' => round($row['booked_minutes'] / 60, 1),
+                'total_hours' => round($row['total_minutes'] / 60, 1),
+            ];
+        }, $byDriver));
+
+        usort($out, fn ($a, $b) => $b->total_hours <=> $a->total_hours);
+
+        return $out;
+    }
+
+    protected function computeTotalsSummary(Collection $rows, DateRange $range, ?array $driverIds, string $tz): object
+    {
+        $workedHours = round($rows->sum(fn ($r) => $r->worked_minutes) / 60, 1);
+        $bookedHours = round($rows->sum(fn ($r) => $r->planned_minutes) / 60, 1);
+        $combinedHours = round($rows->sum(fn ($r) => $r->total_minutes) / 60, 1);
+        $cancelledHours = $this->computeCancelledHours($range, $driverIds, $tz);
+
+        $selectedByStatus = match ($this->statusMode) {
+            DriverUtilizationFilters::STATUS_MODE_COMPLETED => $workedHours,
+            DriverUtilizationFilters::STATUS_MODE_BOOKED => $bookedHours,
+            default => $combinedHours,
+        };
+
+        return (object) [
+            'selected_hours' => $selectedByStatus,
+            'worked_hours' => $workedHours,
+            'booked_hours' => $bookedHours,
+            'cancelled_hours' => $cancelledHours,
+        ];
+    }
+
+    protected function computeCancelledHours(DateRange $range, ?array $driverIds, string $tz): float
+    {
+        $from = Carbon::parse($range->dateFrom, $tz)->startOfDay()->setTimezone('UTC');
+        $to = Carbon::parse($range->dateTo, $tz)->endOfDay()->setTimezone('UTC');
+
+        $query = Shift::query()
+            ->where('status', ShiftStatus::Cancelled)
+            ->where('starts_at', '<', $to)
+            ->where('ends_at', '>', $from);
+
+        if ($driverIds !== null && $driverIds !== []) {
+            $query->whereIn('driver_id', $driverIds);
+        }
+        if ($this->stationIds !== []) {
+            $query->whereIn('station_id', $this->stationIds);
+        }
+        if ($this->vehicleIds !== []) {
+            $query->whereIn('vehicle_id', $this->vehicleIds);
+        }
+
+        $minutes = 0;
+        foreach ($query->get(['starts_at', 'ends_at']) as $shift) {
+            $start = $shift->starts_at->copy()->max($from);
+            $end = $shift->ends_at->copy()->min($to);
+            if ($start->lt($end)) {
+                $minutes += $start->diffInMinutes($end);
+            }
+        }
+
+        return round($minutes / 60, 1);
+    }
+
+    public function updatedSelectAllDrivers(bool $value): void
+    {
+        if (! $value) {
+            return;
+        }
+        $this->driverIds = Driver::orderBy('name')->pluck('id')->map(fn ($id) => (int) $id)->all();
+    }
+
+    public function updatedDriverIds(): void
+    {
+        if ($this->driverIds === []) {
+            $this->selectAllDrivers = false;
+        }
     }
 
     public function setQuickRange(string $range): void

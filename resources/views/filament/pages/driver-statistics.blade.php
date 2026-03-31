@@ -34,6 +34,10 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Drivers</label>
+                    <label class="inline-flex items-center gap-2 mb-2 text-xs text-gray-600 dark:text-gray-300">
+                        <input type="checkbox" wire:model.live="selectAllDrivers" class="rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800">
+                        <span>All drivers</span>
+                    </label>
                     <select wire:model.live="driverIds" multiple class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800" size="4">
                         @foreach($driversSelect ?? [] as $d)
                             <option value="{{ $d->id }}">{{ $d->name }}</option>
@@ -61,6 +65,53 @@
         </x-filament::section>
 
         @if(!empty($rows))
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <x-filament::section class="p-4">
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours by selected status filter</p>
+                    <p class="text-2xl font-bold">{{ $totalsSummary->selected_hours ?? 0 }}</p>
+                </x-filament::section>
+                <x-filament::section class="p-4">
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Worked (Completed)</p>
+                    <p class="text-2xl font-bold">{{ $totalsSummary->worked_hours ?? 0 }}</p>
+                </x-filament::section>
+                <x-filament::section class="p-4">
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Booked</p>
+                    <p class="text-2xl font-bold">{{ $totalsSummary->booked_hours ?? 0 }}</p>
+                </x-filament::section>
+                <x-filament::section class="p-4">
+                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cancelled</p>
+                    <p class="text-2xl font-bold">{{ $totalsSummary->cancelled_hours ?? 0 }}</p>
+                </x-filament::section>
+            </div>
+
+            @if(!empty($driverTotals))
+                <x-filament::section>
+                    <x-slot name="heading">Drivers by total hours (desc)</x-slot>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="text-left border-b">
+                                <tr>
+                                    <th class="p-2">Driver</th>
+                                    <th class="p-2 text-right">Total (h)</th>
+                                    <th class="p-2 text-right">Worked (h)</th>
+                                    <th class="p-2 text-right">Booked (h)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($driverTotals as $dt)
+                                    <tr class="border-b border-gray-200 dark:border-gray-700">
+                                        <td class="p-2">{{ $dt->driver_name }}</td>
+                                        <td class="p-2 text-right font-semibold">{{ number_format($dt->total_hours, 1) }}</td>
+                                        <td class="p-2 text-right">{{ number_format($dt->worked_hours, 1) }}</td>
+                                        <td class="p-2 text-right">{{ number_format($dt->booked_hours, 1) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </x-filament::section>
+            @endif
+
             {{-- KPIs --}}
             <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <x-filament::section class="p-4">
