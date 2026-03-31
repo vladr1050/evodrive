@@ -8,6 +8,7 @@
 FROM php:8.4-cli-bookworm AS composer
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
     unzip \
     libzip-dev \
     libicu-dev \
@@ -17,6 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
+
+# Fewer parallel downloads reduces flaky GitHub HTTP/2 (curl error 18); git enables prefer-source fallback.
+ENV COMPOSER_MAX_PARALLEL=6
 
 COPY composer.json composer.lock ./
 RUN composer install \
