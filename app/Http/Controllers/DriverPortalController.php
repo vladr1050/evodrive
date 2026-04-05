@@ -140,6 +140,7 @@ class DriverPortalController extends Controller
         $driverId = $driver->id;
         $editService = app(ShiftEditService::class);
         $shifts = Shift::whereIn('status', [\App\Enums\ShiftStatus::Booked, \App\Enums\ShiftStatus::Completed])
+            ->where('driver_id', $driverId)
             ->where('starts_at', '<', $weekRangeEndExclusive)
             ->where('ends_at', '>', $weekRangeStart)
             ->with(['vehicle', 'station'])
