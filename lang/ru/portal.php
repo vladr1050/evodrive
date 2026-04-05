@@ -108,7 +108,8 @@ return [
     'cancel_invalid' => 'Эту смену нельзя отменить.',
 
     // Free slots
-    'all_shifts' => 'Мои смены',
+    'all_shifts' => 'Все смены',
+    'my_shifts_tab' => 'Мои смены',
     'show_free_slots' => 'Свободные слоты',
     'no_slots_found' => 'Нет свободных слотов',
     'available' => 'Доступно',

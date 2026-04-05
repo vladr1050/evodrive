@@ -108,7 +108,8 @@ return [
     'cancel_invalid' => 'Šo maiņu nevar atcelt.',
 
     // Free slots
-    'all_shifts' => 'Manas maiņas',
+    'all_shifts' => 'Visas maiņas',
+    'my_shifts_tab' => 'Manas maiņas',
     'show_free_slots' => 'Brīvie sloti',
     'no_slots_found' => 'Nav pieejamu slotu',
     'available' => 'Pieejams',

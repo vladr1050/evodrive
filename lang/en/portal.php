@@ -111,7 +111,8 @@ return [
     'cancel_invalid' => 'This shift cannot be cancelled.',
 
     // Free slots
-    'all_shifts' => 'My Shifts',
+    'all_shifts' => 'All shifts',
+    'my_shifts_tab' => 'My shifts',
     'show_free_slots' => 'Free Slots',
     'no_slots_found' => 'No slots found',
     'available' => 'Available',

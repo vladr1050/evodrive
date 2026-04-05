@@ -12,7 +12,7 @@
             return {
                 filterStation: init.initialFilterStation || 'All',
                 isStationDropdownOpen: false,
-                showFreeSlots: false,
+                shiftsMode: 'all',
                 availableSlots: window.__SHIFTS_AVAILABLE_SLOTS__ || [],
                 stations: init.stations || [],
                 shiftsBaseUrl: init.shiftsBaseUrl || '',
@@ -117,13 +117,17 @@
         </div>
     @endif
 
-    <!-- Mode toggle: My Shifts / Free Slots -->
-    <div class="mb-6 flex items-center gap-4 bg-white p-2 rounded-3xl border border-slate-100 shadow-sm w-fit">
-        <button type="button" @click="showFreeSlots = false" :class="!showFreeSlots ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
+    <!-- Mode toggle: All shifts / My shifts / Free slots -->
+    <div class="mb-6 flex flex-wrap items-center gap-2 sm:gap-4 bg-white p-2 rounded-3xl border border-slate-100 shadow-sm w-fit max-w-full">
+        <button type="button" @click="shiftsMode = 'all'" :class="shiftsMode === 'all' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-4 sm:px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             {{ __('portal.all_shifts') }}
         </button>
-        <button type="button" @click="showFreeSlots = true" :class="showFreeSlots ? 'bg-brand-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
+        <button type="button" @click="shiftsMode = 'mine'" :class="shiftsMode === 'mine' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-4 sm:px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            {{ __('portal.my_shifts_tab') }}
+        </button>
+        <button type="button" @click="shiftsMode = 'free'" :class="shiftsMode === 'free' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-4 sm:px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
             {{ __('portal.show_free_slots') }}
         </button>
@@ -133,8 +137,12 @@
     <div class="overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0">
         <div class="grid grid-cols-1 md:grid-cols-7 gap-4 min-w-[1000px] md:min-w-0">
             @foreach($weekDates as $dayInfo)
-                @php $dayShifts = collect($shifts)->where('date_iso', $dayInfo['iso'])->sortBy(fn($s) => (int)str_replace(':', '', $s['start']))->all(); @endphp
-                <div class="space-y-4" x-data="{ dayName: '{{ $dayInfo['name'] }}', dayIso: '{{ $dayInfo['iso'] }}', dayHasShifts: {{ json_encode(!empty($dayShifts)) }} }">
+                @php
+                    $sortShifts = fn ($c) => $c->sortBy(fn ($s) => (int) str_replace(':', '', $s['start']))->all();
+                    $dayShiftsAll = $sortShifts(collect($shiftsAll)->where('date_iso', $dayInfo['iso']));
+                    $dayShiftsMine = $sortShifts(collect($shiftsMine)->where('date_iso', $dayInfo['iso']));
+                @endphp
+                <div class="space-y-4" x-data="{ dayName: '{{ $dayInfo['name'] }}', dayIso: '{{ $dayInfo['iso'] }}', dayHasShiftsAll: {{ json_encode(!empty($dayShiftsAll)) }}, dayHasShiftsMine: {{ json_encode(!empty($dayShiftsMine)) }} }">
                     <div class="flex flex-col items-center py-3 bg-slate-100 rounded-2xl border border-slate-200 relative group">
                         <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-1">{{ $dayInfo['name'] }}</span>
                         <span class="text-sm font-bold text-slate-700">{{ $dayInfo['date'] }} {{ $dayInfo['month'] }}</span>
@@ -143,16 +151,24 @@
                         </button>
                     </div>
                     <div class="space-y-3 min-h-[200px]">
-                        {{-- My Shifts mode --}}
-                        <div x-show="!showFreeSlots" class="space-y-3">
-                            @foreach($dayShifts as $shift)
+                        {{-- All drivers' shifts --}}
+                        <div x-show="shiftsMode === 'all'" class="space-y-3" x-cloak>
+                            @foreach($dayShiftsAll as $shift)
+                                <div x-data="{ stationName: {{ json_encode($shift['station'] ?? '') }} }" x-show="filterStation === 'All' || filterStation === stationName">
+                                    @include('driverportal.components.shift-block', ['shift' => $shift])
+                                </div>
+                            @endforeach
+                        </div>
+                        {{-- My shifts only --}}
+                        <div x-show="shiftsMode === 'mine'" class="space-y-3" x-cloak>
+                            @foreach($dayShiftsMine as $shift)
                                 <div x-data="{ stationName: {{ json_encode($shift['station'] ?? '') }} }" x-show="filterStation === 'All' || filterStation === stationName">
                                     @include('driverportal.components.shift-block', ['shift' => $shift])
                                 </div>
                             @endforeach
                         </div>
                         {{-- Free Slots mode --}}
-                        <div x-show="showFreeSlots" class="space-y-3">
+                        <div x-show="shiftsMode === 'free'" class="space-y-3" x-cloak>
                             <template x-for="slot in availableSlots.filter(s => s.day === dayName && (filterStation === 'All' || s.station === filterStation))" :key="slot.id">
                                 <div class="relative p-3 rounded-2xl border border-dashed border-brand-300 bg-brand-50/30 transition-all hover:bg-brand-50 hover:border-brand-400 cursor-pointer group/slot"
                                      @click="openCreateModalFromSlot(slot)">
@@ -178,13 +194,13 @@
                             </template>
                         </div>
                         {{-- Empty state --}}
-                        <div x-show="(!showFreeSlots && !dayHasShifts) || (showFreeSlots && availableSlots.filter(s => s.day === dayName && (filterStation === 'All' || s.station === filterStation)).length === 0)"
+                        <div x-show="(shiftsMode === 'all' && !dayHasShiftsAll) || (shiftsMode === 'mine' && !dayHasShiftsMine) || (shiftsMode === 'free' && availableSlots.filter(s => s.day === dayName && (filterStation === 'All' || s.station === filterStation)).length === 0)"
                              x-transition
                              class="h-full flex flex-col items-center justify-center py-12 text-center">
                             <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 mb-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                             </div>
-                            <span class="text-[10px] font-medium text-slate-300 italic" x-text="showFreeSlots ? '{{ __("portal.no_slots_found") }}' : '{{ __("portal.no_shifts_planned") }}'"></span>
+                            <span class="text-[10px] font-medium text-slate-300 italic" x-text="shiftsMode === 'free' ? '{{ __("portal.no_slots_found") }}' : '{{ __("portal.no_shifts_planned") }}'"></span>
                         </div>
                     </div>
                 </div>

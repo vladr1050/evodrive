@@ -38,13 +38,16 @@ class DriverPortalController extends Controller
             $driver = Auth::guard('driver')->user();
             if ($driver->status !== DriverStatus::Active) {
                 Auth::guard('driver')->logout();
+
                 return redirect()->route('driverportal.login', ['locale' => $locale])
                     ->withInput($request->only('email'))
                     ->with('driverportal.error', __('portal.portal_access_denied'));
             }
             $request->session()->regenerate();
+
             return redirect()->intended(route('driverportal.dashboard', ['locale' => $locale]));
         }
+
         return back()->withInput($request->only('email'))->with('driverportal.error', __('auth.failed'));
     }
 
@@ -63,14 +66,15 @@ class DriverPortalController extends Controller
             ->map(function (Shift $s) use ($tz) {
                 $startsAt = $s->starts_at->copy()->setTimezone($tz);
                 $endsAt = $s->ends_at->copy()->setTimezone($tz);
+
                 return [
                     'id' => (string) $s->id,
                     'vehicle' => $s->vehicle?->label ?? '-',
                     'station' => $s->station?->name ?? '-',
                     'station_address' => $s->station?->address ?: null,
-                    'time' => $startsAt->format('H:i') . ' - ' . $endsAt->format('H:i'),
+                    'time' => $startsAt->format('H:i').' - '.$endsAt->format('H:i'),
                     'date' => $startsAt->format('Y-m-d'),
-                    'duration' => (int) $s->durationHours() . 'h',
+                    'duration' => (int) $s->durationHours().'h',
                     'status' => $s->status->value === 'booked' ? 'Confirmed' : $s->status->value,
                 ];
             })
@@ -90,6 +94,7 @@ class DriverPortalController extends Controller
         $weeklyShiftsDone = $completedThisWeek->count();
         $weeklyTotalHours = $completedThisWeek->sum(fn ($x) => $x->durationHours());
         $weeklyShiftsTotal = count($upcomingShifts) + $weeklyShiftsDone;
+
         return view('driverportal.dashboard', [
             'driverName' => $driver->name,
             'upcomingShifts' => $upcomingShifts,
@@ -139,41 +144,41 @@ class DriverPortalController extends Controller
         $weekRangeEndExclusive = $startOfWeek->copy()->addDays(7)->startOfDay();
         $driverId = $driver->id;
         $editService = app(ShiftEditService::class);
-        $shifts = Shift::whereIn('status', [\App\Enums\ShiftStatus::Booked, \App\Enums\ShiftStatus::Completed])
-            ->where('driver_id', $driverId)
+        $mapShiftRow = function (Shift $s) use ($days, $tz, $nowInTz, $driverId, $editService): array {
+            $startsAtInTz = $s->starts_at->copy()->setTimezone($tz);
+            $endsAtInTz = $s->ends_at->copy()->setTimezone($tz);
+            $isMine = (int) $s->driver_id === (int) $driverId;
+            $cancellable = $isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz);
+            $editable = $isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz) && $editService->canEditShift($s);
+            $vehicle = $s->vehicle;
+            $vehicleLabel = $vehicle?->label ?? '-';
+            $isTesla = $vehicle && (stripos((string) $vehicle->brand, 'Tesla') !== false || stripos((string) $vehicle->model, 'Tesla') !== false);
+            $vehicleRegNumber = ($isTesla && ! empty($vehicle->registration_number)) ? $vehicle->registration_number : null;
+
+            return [
+                'id' => (string) $s->id,
+                'day' => $days[$startsAtInTz->dayOfWeek === 0 ? 6 : $startsAtInTz->dayOfWeek - 1],
+                'start' => $startsAtInTz->format('H:i'),
+                'end' => $endsAtInTz->format('H:i'),
+                'date_iso' => $startsAtInTz->format('Y-m-d'),
+                'duration' => (int) $s->durationHours(),
+                'vehicle' => $vehicleLabel,
+                'vehicle_reg_number' => $vehicleRegNumber,
+                'station' => $s->station?->name ?? '-',
+                'station_address' => $s->station?->address ?: null,
+                'status' => $s->status->value,
+                'is_mine' => $isMine,
+                'cancellable' => $cancellable,
+                'editable' => $editable,
+            ];
+        };
+        $shiftsBaseQuery = Shift::whereIn('status', [ShiftStatus::Booked, ShiftStatus::Completed])
             ->where('starts_at', '<', $weekRangeEndExclusive)
             ->where('ends_at', '>', $weekRangeStart)
             ->with(['vehicle', 'station'])
-            ->orderBy('starts_at')
-            ->get()
-            ->map(function (Shift $s) use ($days, $tz, $nowInTz, $driverId, $editService) {
-                $startsAtInTz = $s->starts_at->copy()->setTimezone($tz);
-                $endsAtInTz = $s->ends_at->copy()->setTimezone($tz);
-                $isMine = (int) $s->driver_id === (int) $driverId;
-                $cancellable = $isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz);
-                $editable = $isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz) && $editService->canEditShift($s);
-                $vehicle = $s->vehicle;
-                $vehicleLabel = $vehicle?->label ?? '-';
-                $isTesla = $vehicle && (stripos((string) $vehicle->brand, 'Tesla') !== false || stripos((string) $vehicle->model, 'Tesla') !== false);
-                $vehicleRegNumber = ($isTesla && !empty($vehicle->registration_number)) ? $vehicle->registration_number : null;
-                return [
-                    'id' => (string) $s->id,
-                    'day' => $days[$startsAtInTz->dayOfWeek === 0 ? 6 : $startsAtInTz->dayOfWeek - 1],
-                    'start' => $startsAtInTz->format('H:i'),
-                    'end' => $endsAtInTz->format('H:i'),
-                    'date_iso' => $startsAtInTz->format('Y-m-d'),
-                    'duration' => (int) $s->durationHours(),
-                    'vehicle' => $vehicleLabel,
-                    'vehicle_reg_number' => $vehicleRegNumber,
-                    'station' => $s->station?->name ?? '-',
-                    'station_address' => $s->station?->address ?: null,
-                    'status' => $s->status->value,
-                    'is_mine' => $isMine,
-                    'cancellable' => $cancellable,
-                    'editable' => $editable,
-                ];
-            })
-            ->all();
+            ->orderBy('starts_at');
+        $shiftsAll = $shiftsBaseQuery->clone()->get()->map($mapShiftRow)->all();
+        $shiftsMine = $shiftsBaseQuery->clone()->where('driver_id', $driverId)->get()->map($mapShiftRow)->all();
         $policy = $policyForTz;
         $stations = Station::where('is_active', true)->orderBy('name')->get(['id', 'name', 'address']);
         $selectedStationId = null;
@@ -201,6 +206,7 @@ class DriverPortalController extends Controller
         if (! empty($availableSlots)) {
             $availableSlots = array_values(array_filter($availableSlots, function ($slot) use ($minDate, $maxDate) {
                 $date = $slot['date_iso'] ?? null;
+
                 return $date && $date >= $minDate && $date <= $maxDate;
             }));
         }
@@ -209,7 +215,7 @@ class DriverPortalController extends Controller
         for ($w = 0; $w < $totalWeeks; $w++) {
             $mon = $firstWeekMonday->copy()->addDays($w * 7)->startOfDay();
             $sun = $mon->copy()->addDays(6);
-            $label = $w === 0 ? __('portal.current_week') : ($w === 1 ? __('portal.next_week') : $mon->format('d') . '–' . $sun->format('d') . ' ' . $sun->translatedFormat('M'));
+            $label = $w === 0 ? __('portal.current_week') : ($w === 1 ? __('portal.next_week') : $mon->format('d').'–'.$sun->format('d').' '.$sun->translatedFormat('M'));
             $weekOptions[] = ['index' => $w, 'label' => $label];
         }
         $shiftsPageInit = [
@@ -219,11 +225,13 @@ class DriverPortalController extends Controller
             'currentView' => (string) $weekIndex,
             'weekOptions' => $weekOptions,
         ];
+
         return view('driverportal.shifts', [
             'view' => (string) $weekIndex,
             'weekOptions' => $weekOptions,
             'weekDates' => $weekDates,
-            'shifts' => $shifts,
+            'shiftsAll' => $shiftsAll,
+            'shiftsMine' => $shiftsMine,
             'stations' => $stations,
             'allowedDurations' => $allowedDurations,
             'timeSlotMinutes' => $timeSlotMinutes,
@@ -247,7 +255,7 @@ class DriverPortalController extends Controller
         ]);
         try {
             $tz = ShiftPolicy::active()?->timezone ?: 'Europe/Riga';
-            $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
+            $startsAt = Carbon::parse($request->input('date').' '.$request->input('start_time'), $tz);
             if ($startsAt->lte(now($tz))) {
                 return response()->json([
                     'available' => false,
@@ -262,6 +270,7 @@ class DriverPortalController extends Controller
                 $startsAt,
                 $durationHours
             );
+
             return response()->json([
                 'available' => $result['count'] > 0,
                 'count' => $result['count'],
@@ -300,7 +309,7 @@ class DriverPortalController extends Controller
                     'reason_code' => 'DATE_OUTSIDE_PLANNING_WINDOW',
                 ], 422);
             }
-            $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
+            $startsAt = Carbon::parse($request->input('date').' '.$request->input('start_time'), $tz);
             if ($startsAt->lte($nowInTz)) {
                 return response()->json([
                     'success' => false,
@@ -315,6 +324,7 @@ class DriverPortalController extends Controller
                 $startsAt,
                 $durationHours
             );
+
             return response()->json([
                 'success' => true,
                 'shift' => [
@@ -337,13 +347,14 @@ class DriverPortalController extends Controller
     public function profile(): View
     {
         $driver = Auth::guard('driver')->user();
+
         return view('driverportal.profile', [
             'driverName' => $driver->name,
             'driverEmail' => $driver->email,
             'driverPhone' => $driver->phone ?? '',
             'driverAtd' => $driver->atd_number ?? '',
             'driverLicense' => $driver->license_number ?? '',
-            'driverId' => '#EVO-' . $driver->id,
+            'driverId' => '#EVO-'.$driver->id,
             'documents' => [
                 ['name' => __('portal.taxi_license_atd'), 'number' => $driver->atd_number ?? '', 'status' => __('portal.verified')],
                 ['name' => __('portal.driver_license'), 'number' => $driver->license_number ?? '', 'status' => __('portal.verified')],
@@ -361,6 +372,7 @@ class DriverPortalController extends Controller
         $driver = Auth::guard('driver')->user();
         $driver->update($request->only('name', 'phone', 'atd_number'));
         $locale = $request->route('locale', 'en');
+
         return redirect()->route('driverportal.profile', ['locale' => $locale])->with('status', 'saved');
     }
 
@@ -370,6 +382,7 @@ class DriverPortalController extends Controller
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'message' => __('portal.copied')]);
         }
+
         return redirect()->route('driverportal.shifts', ['locale' => $locale]);
     }
 
@@ -381,6 +394,7 @@ class DriverPortalController extends Controller
         $driver = Auth::guard('driver')->user();
         $targetWeekStart = Carbon::parse($request->input('target_week_start'))->startOfDay();
         $result = app(ShiftCopyService::class)->previewCopyWeek($driver, $targetWeekStart);
+
         return response()->json($result);
     }
 
@@ -397,6 +411,7 @@ class DriverPortalController extends Controller
         if ($result['success']) {
             return response()->json($result);
         }
+
         return response()->json($result, 422);
     }
 
@@ -424,7 +439,7 @@ class DriverPortalController extends Controller
                     'reason_code' => 'DATE_OUTSIDE_PLANNING_WINDOW',
                 ], 422);
             }
-            $startsAt = Carbon::parse($request->input('date') . ' ' . $request->input('start_time'), $tz);
+            $startsAt = Carbon::parse($request->input('date').' '.$request->input('start_time'), $tz);
             if ($startsAt->lte($nowInTz)) {
                 return response()->json([
                     'success' => false,
@@ -434,6 +449,7 @@ class DriverPortalController extends Controller
             }
             $durationHours = (float) $request->input('duration_hours');
             $updated = app(ShiftEditService::class)->updateShift($shift, $startsAt, $durationHours);
+
             return response()->json([
                 'success' => true,
                 'shift' => [
@@ -479,6 +495,7 @@ class DriverPortalController extends Controller
             ], 422);
         }
         app(ShiftCancellationService::class)->cancelShift($shift, $driver, 'cancelled_by_driver');
+
         return response()->json(['success' => true]);
     }
 
@@ -488,6 +505,7 @@ class DriverPortalController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
         $locale = $request->route('locale', 'en');
+
         return redirect()->route('driverportal.login', ['locale' => $locale]);
     }
 }
