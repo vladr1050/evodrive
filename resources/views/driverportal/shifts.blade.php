@@ -133,7 +133,7 @@
     <div class="overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0">
         <div class="grid grid-cols-1 md:grid-cols-7 gap-4 min-w-[1000px] md:min-w-0">
             @foreach($weekDates as $dayInfo)
-                @php $dayShifts = collect($shifts)->where('day', $dayInfo['name'])->sortBy(fn($s) => (int)str_replace(':', '', $s['start']))->all(); @endphp
+                @php $dayShifts = collect($shifts)->where('date_iso', $dayInfo['iso'])->sortBy(fn($s) => (int)str_replace(':', '', $s['start']))->all(); @endphp
                 <div class="space-y-4" x-data="{ dayName: '{{ $dayInfo['name'] }}', dayIso: '{{ $dayInfo['iso'] }}', dayHasShifts: {{ json_encode(!empty($dayShifts)) }} }">
                     <div class="flex flex-col items-center py-3 bg-slate-100 rounded-2xl border border-slate-200 relative group">
                         <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-1">{{ $dayInfo['name'] }}</span>

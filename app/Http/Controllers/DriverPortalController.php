@@ -133,13 +133,15 @@ class DriverPortalController extends Controller
                 'iso' => $d->format('Y-m-d'),
             ];
         }
-        $weekStart = $startOfWeek->copy();
-        $weekEnd = $startOfWeek->copy()->addDays(6)->endOfDay();
+        // Overlap with [Mon 00:00, next Mon 00:00) in policy TZ — not "fully inside" Sun 23:59,
+        // so overnight shifts (e.g. Sun 23:00 → Mon 07:00) are not dropped from the week they start in.
+        $weekRangeStart = $startOfWeek->copy()->startOfDay();
+        $weekRangeEndExclusive = $startOfWeek->copy()->addDays(7)->startOfDay();
         $driverId = $driver->id;
         $editService = app(ShiftEditService::class);
         $shifts = Shift::whereIn('status', [\App\Enums\ShiftStatus::Booked, \App\Enums\ShiftStatus::Completed])
-            ->where('starts_at', '>=', $weekStart)
-            ->where('ends_at', '<=', $weekEnd)
+            ->where('starts_at', '<', $weekRangeEndExclusive)
+            ->where('ends_at', '>', $weekRangeStart)
             ->with(['vehicle', 'station'])
             ->orderBy('starts_at')
             ->get()
