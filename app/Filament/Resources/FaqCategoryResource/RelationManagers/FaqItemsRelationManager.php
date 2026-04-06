@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\FaqCategoryResource\RelationManagers;
 
+use App\Models\FaqItem;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -45,7 +46,7 @@ class FaqItemsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('question')
+            ->recordTitle(fn (FaqItem $record): string => $record->getTranslatedQuestion() ?? ('#'.$record->getKey()))
             ->columns([
                 Tables\Columns\TextColumn::make('sort_order')->sortable(),
                 Tables\Columns\TextColumn::make('question')
