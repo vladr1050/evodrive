@@ -13,7 +13,7 @@ class Lead extends Model
         'source', 'intent', 'rent_car_id', 'phone', 'name', 'email', 'atd_license', 'atd_number',
         'driving_experience', 'latvian_b1', 'shift_preference', 'area',
         'utm_source', 'utm_campaign', 'utm_medium', 'utm_content', 'utm_term',
-        'status', 'ip_address', 'user_agent',
+        'status', 'admin_notes', 'ip_address', 'user_agent',
     ];
 
     protected $casts = [

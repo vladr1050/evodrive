@@ -71,6 +71,11 @@ class LeadResource extends Resource
                         Forms\Components\Select::make('status')
                             ->options(array_combine(Lead::STATUSES, array_map(fn ($s) => ucfirst($s), Lead::STATUSES)))
                             ->required(),
+                        Forms\Components\Textarea::make('admin_notes')
+                            ->label('Internal comment')
+                            ->placeholder('Notes for the team (not visible to the applicant)')
+                            ->rows(5)
+                            ->columnSpanFull(),
                         Forms\Components\TextInput::make('source'),
                         Forms\Components\Section::make('UTM')
                             ->schema([
@@ -107,6 +112,12 @@ class LeadResource extends Resource
                     'new' => 'primary', 'contacted' => 'info', 'approved' => 'success', 'rejected' => 'danger', 'archived' => 'gray',
                     default => 'gray',
                 }),
+                Tables\Columns\TextColumn::make('admin_notes')
+                    ->label('Comment')
+                    ->limit(40)
+                    ->tooltip(fn ($record) => $record->admin_notes)
+                    ->toggleable()
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
