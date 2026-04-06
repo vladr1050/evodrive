@@ -49,8 +49,9 @@ class ApplyController extends Controller
             ],
             'atd_license' => 'required|in:yes,no',
             'driving_experience' => 'required|in:3-5,5-10,10+',
-            'latvian_b1' => 'required_if:intent,work|in:yes,no',
-            'shift_preference' => 'required_if:intent,work|in:early_day,late_night,mixed',
+            // Work-only: empty hidden values for rent must not fail `in:` — use exclude_unless.
+            'latvian_b1' => ['exclude_unless:intent,work', 'required', 'in:yes,no'],
+            'shift_preference' => ['exclude_unless:intent,work', 'required', 'in:early_day,late_night,mixed'],
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
             'area' => 'required|string|max:100',
@@ -72,10 +73,10 @@ class ApplyController extends Controller
             'atd_license' => $validated['atd_license'] === 'yes',
             'driving_experience' => $validated['driving_experience'],
             'latvian_b1' => $validated['intent'] === 'work'
-                ? ($validated['latvian_b1'] === 'yes')
+                ? (($validated['latvian_b1'] ?? '') === 'yes')
                 : null,
             'shift_preference' => $validated['intent'] === 'work'
-                ? $validated['shift_preference']
+                ? ($validated['shift_preference'] ?? null)
                 : null,
             'name' => $validated['name'],
             'email' => $validated['email'],

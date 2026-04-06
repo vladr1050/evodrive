@@ -146,6 +146,31 @@ class ApplyFlowTest extends TestCase
         $this->assertSame('cpc', $lead->utm_medium);
     }
 
+    public function test_rent_intent_succeeds_with_empty_work_only_hidden_fields(): void
+    {
+        $this->get('/en/apply');
+        $payload = [
+            'phone' => '+37121111111',
+            'intent' => 'rent',
+            'atd_license' => 'no',
+            'driving_experience' => '3-5',
+            'latvian_b1' => '',
+            'shift_preference' => '',
+            'name' => 'Rent User',
+            'email' => 'rent@example.com',
+            'area' => 'Riga',
+            '_token' => csrf_token(),
+        ];
+
+        $response = $this->post('/en/apply', $payload);
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('thanks', $response->headers->get('Location'));
+        $lead = Lead::where('phone', '+37121111111')->first();
+        $this->assertNotNull($lead);
+        $this->assertSame('rent', $lead->intent);
+    }
+
     public function test_rent_detail_prefill_stores_rent_car_id_and_intent(): void
     {
         $rental = RentalVehicle::factory()->create(['is_active' => true]);
