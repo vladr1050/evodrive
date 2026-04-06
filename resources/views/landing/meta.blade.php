@@ -45,9 +45,12 @@
                         {{ __('ui.rent_pricing_title') }}
                     </h3>
                     <div class="space-y-6">
-                        <div class="flex justify-between items-center py-3 border-b border-white/10">
+                        <div class="flex justify-between items-start gap-3 py-3 border-b border-white/10">
                             <span class="text-slate-400 font-bold">{{ $exampleCar }}</span>
-                            <span class="font-black">€{{ $examplePriceFormatted }} <span class="text-[10px] uppercase text-slate-500">{{ __('ui.rent_price_week_suffix') }}</span></span>
+                            <div class="text-right shrink-0">
+                                <span class="font-black">€{{ $examplePriceFormatted }} <span class="text-[10px] uppercase text-slate-500">{{ __('ui.rent_price_week_suffix') }}</span></span>
+                                <span class="block text-[9px] font-bold text-slate-500 mt-0.5 normal-case">{{ __('ui.rent_price_ex_vat') }}</span>
+                            </div>
                         </div>
                         <div class="flex justify-between items-center py-3 border-b border-white/10">
                             <span class="text-slate-400 font-bold">{{ __('ui.rent_insurance') }}</span>
@@ -57,9 +60,12 @@
                             <span class="text-slate-400 font-bold">{{ __('ui.rent_maintenance') }}</span>
                             <span class="text-emerald-400 font-black">{{ __('ui.rent_included') }}</span>
                         </div>
-                        <div class="pt-4 flex justify-between items-center">
+                        <div class="pt-4 flex justify-between items-start gap-3">
                             <span class="text-lg font-black uppercase tracking-widest text-slate-500">{{ __('ui.rent_fixed_cost') }}</span>
-                            <span class="text-2xl font-black text-brand-600">€{{ $examplePriceFormatted }} <span class="text-[10px] uppercase text-slate-500">{{ __('ui.rent_price_week_suffix') }}</span></span>
+                            <div class="text-right shrink-0">
+                                <span class="text-2xl font-black text-brand-600">€{{ $examplePriceFormatted }} <span class="text-[10px] uppercase text-slate-500">{{ __('ui.rent_price_week_suffix') }}</span></span>
+                                <span class="block text-[9px] font-bold text-slate-500 mt-0.5 normal-case">{{ __('ui.rent_price_ex_vat') }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -125,9 +131,10 @@
                                 <h3 class="text-3xl font-black text-slate-900 tracking-tighter">{{ $car['make'] }} {{ $car['model'] }}</h3>
                                 <div class="text-sm font-bold text-slate-400 mt-2 uppercase tracking-widest">{{ $car['year'] }} • {{ $car['type'] }}</div>
                             </div>
-                            <div class="text-right">
+                            <div class="text-right shrink-0">
                                 <div class="text-4xl font-black text-brand-600">€{{ $car['price'] }}</div>
                                 <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ __('ui.rent_weekly') }}</div>
+                                <div class="text-[9px] font-bold text-slate-400 mt-0.5 normal-case">{{ __('ui.rent_price_ex_vat') }}</div>
                             </div>
                         </div>
 

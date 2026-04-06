@@ -124,6 +124,7 @@ return [
     'rent_seats' => 'Vietas',
     'rent_weekly' => 'nedēļā',
     'rent_price_week_suffix' => '/ned',
+    'rent_price_ex_vat' => 'bez PVN',
     'rent_deposit' => 'Drošības nauda',
     'rent_now' => 'Īrēt tagad',
     'rent_back_to_fleet' => 'Atpakaļ uz floti',

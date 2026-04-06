@@ -124,6 +124,7 @@ return [
     'rent_seats' => 'Seats',
     'rent_weekly' => 'per week',
     'rent_price_week_suffix' => '/wk',
+    'rent_price_ex_vat' => 'without VAT',
     'rent_deposit' => 'Deposit',
     'rent_now' => 'Rent Now',
     'rent_back_to_fleet' => 'Back to fleet',

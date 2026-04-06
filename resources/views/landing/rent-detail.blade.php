@@ -20,7 +20,10 @@
             <div class="hidden sm:block text-center">
                 <h1 class="text-sm font-black text-slate-900 uppercase tracking-tight">{{ $car['make'] }} {{ $car['model'] }}</h1>
             </div>
-            <div class="text-xl font-black text-brand-600">€{{ $car['price'] }}<span class="text-[10px] font-bold text-slate-400 ml-1">{{ __('ui.rent_price_week_suffix') }}</span></div>
+            <div class="text-right shrink-0">
+                <div class="text-xl font-black text-brand-600 leading-tight">€{{ $car['price'] }}<span class="text-[10px] font-bold text-slate-400 ml-1">{{ __('ui.rent_price_week_suffix') }}</span></div>
+                <div class="text-[9px] font-bold text-slate-400 mt-0.5">{{ __('ui.rent_price_ex_vat') }}</div>
+            </div>
         </div>
     </div>
 
@@ -112,17 +115,17 @@
                         </form>
 
                         <div class="mt-12 pt-8 border-t border-slate-100 space-y-4">
-                            <div class="flex justify-between text-sm font-bold">
+                            <div class="flex justify-between items-baseline gap-2 text-sm font-bold">
                                 <span class="text-slate-400 uppercase tracking-widest text-[11px]">{{ __('ui.rent_weekly_rent') }}</span>
-                                <span class="text-slate-900">€{{ $car['price'] }}</span>
+                                <span class="text-slate-900 text-right shrink-0">€{{ $car['price'] }} <span class="text-slate-400 font-bold text-[10px] normal-case">{{ __('ui.rent_price_ex_vat') }}</span></span>
                             </div>
                             <div class="flex justify-between text-sm font-bold">
                                 <span class="text-slate-400 uppercase tracking-widest text-[11px]">{{ __('ui.rent_deposit_label') }}</span>
                                 <span class="text-slate-900">€{{ $car['deposit'] }}</span>
                             </div>
-                            <div class="flex justify-between items-center pt-4">
+                            <div class="flex justify-between items-start gap-3 pt-4">
                                 <span class="font-black text-slate-900 uppercase tracking-tighter text-lg">{{ __('ui.rent_total_upfront') }}</span>
-                                <span class="text-3xl font-black text-brand-600 tracking-tighter">€{{ $car['price'] + $car['deposit'] }}</span>
+                                <span class="text-3xl font-black text-brand-600 tracking-tighter text-right shrink-0 leading-tight">€{{ $car['price'] + $car['deposit'] }} <span class="block text-xs font-bold text-slate-400 normal-case mt-0.5">{{ __('ui.rent_price_ex_vat') }}</span></span>
                             </div>
                         </div>
                     </div>
