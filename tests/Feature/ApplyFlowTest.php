@@ -33,8 +33,12 @@ class ApplyFlowTest extends TestCase
             'phone' => '+37121234567',
             'intent' => 'work',
             'atd_license' => 'yes',
+            'atd_number' => 'ATD123456',
             'driving_experience' => '5-10',
+            'latvian_b1' => 'yes',
+            'shift_preference' => 'mixed',
             'name' => 'John Doe',
+            'email' => 'john@example.com',
             'area' => 'Riga',
             '_token' => csrf_token(),
         ];
@@ -50,7 +54,11 @@ class ApplyFlowTest extends TestCase
         $this->assertTrue($lead->atd_license);
         $this->assertSame('5-10', $lead->driving_experience);
         $this->assertSame('John Doe', $lead->name);
+        $this->assertSame('john@example.com', $lead->email);
         $this->assertSame('Riga', $lead->area);
+        $this->assertTrue($lead->latvian_b1);
+        $this->assertSame('mixed', $lead->shift_preference);
+        $this->assertSame('ATD123456', $lead->atd_number);
         $this->assertNotNull($lead->ip_address);
         $this->assertNotNull($lead->user_agent);
     }
@@ -62,8 +70,12 @@ class ApplyFlowTest extends TestCase
             'phone' => '+37121234567',
             'intent' => 'work',
             'atd_license' => 'yes',
+            'atd_number' => 'X',
             'driving_experience' => '5-10',
+            'latvian_b1' => 'yes',
+            'shift_preference' => 'early_day',
             'name' => 'John Doe',
+            'email' => 'j@ex.com',
             'area' => 'Riga',
             'website_url' => 'https://spam.com',
             '_token' => csrf_token(),
@@ -78,7 +90,7 @@ class ApplyFlowTest extends TestCase
     public function test_throttle_exceeds_10_per_minute_returns_429(): void
     {
         $ip = '192.168.100.1';
-        $key = sha1('|' . $ip);
+        $key = sha1('|'.$ip);
 
         RateLimiter::clear($key);
         for ($i = 0; $i < 10; $i++) {
@@ -89,9 +101,12 @@ class ApplyFlowTest extends TestCase
         $payload = [
             'phone' => '+37129999999',
             'intent' => 'work',
-            'atd_license' => 'yes',
+            'atd_license' => 'no',
             'driving_experience' => '5-10',
+            'latvian_b1' => 'no',
+            'shift_preference' => 'mixed',
             'name' => 'John Doe',
+            'email' => 'j@ex.com',
             'area' => 'Riga',
             '_token' => csrf_token(),
         ];
@@ -109,8 +124,12 @@ class ApplyFlowTest extends TestCase
             'phone' => '+37121234567',
             'intent' => 'work',
             'atd_license' => 'yes',
+            'atd_number' => 'N',
             'driving_experience' => '5-10',
+            'latvian_b1' => 'yes',
+            'shift_preference' => 'late_night',
             'name' => 'John Doe',
+            'email' => 'j@ex.com',
             'area' => 'Riga',
             'utm_source' => 'google',
             'utm_campaign' => 'test-campaign',
@@ -137,8 +156,10 @@ class ApplyFlowTest extends TestCase
             'intent' => 'rent',
             'rent_car_id' => (string) $rental->id,
             'atd_license' => 'yes',
+            'atd_number' => 'R999',
             'driving_experience' => '10+',
             'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
             'area' => 'Riga',
             '_token' => csrf_token(),
         ];
@@ -149,5 +170,8 @@ class ApplyFlowTest extends TestCase
         $this->assertNotNull($lead);
         $this->assertSame('rent', $lead->intent);
         $this->assertSame($rental->id, $lead->rent_car_id);
+        $this->assertNull($lead->latvian_b1);
+        $this->assertNull($lead->shift_preference);
+        $this->assertSame('jane@example.com', $lead->email);
     }
 }

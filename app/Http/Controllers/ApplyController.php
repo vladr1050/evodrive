@@ -6,6 +6,7 @@ use App\Models\Lead;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ApplyController extends Controller
@@ -28,8 +29,8 @@ class ApplyController extends Controller
         return view('apply.index', [
             'sessionData' => $sessionData,
             'source' => $this->resolveSource($request),
-            'metaDescription' => __('apply.step_phone_title') . ' — Evo.drive. ' . __('ui.home_hero_sub'),
-            'ogTitle' => __('apply.personal_info') . ' — Evo.drive',
+            'metaDescription' => __('apply.step_phone_title').' — Evo.drive. '.__('ui.home_hero_sub'),
+            'ogTitle' => __('apply.personal_info').' — Evo.drive',
             'ogDescription' => __('ui.home_hero_sub'),
         ]);
     }
@@ -40,10 +41,18 @@ class ApplyController extends Controller
             'phone' => 'required|string|min:8|max:15',
             'intent' => 'required|in:work,rent',
             'rent_car_id' => 'nullable|exists:rental_vehicles,id',
-            'atd_number' => 'nullable|string|max:50',
+            'atd_number' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::requiredIf(fn () => $request->input('atd_license') === 'yes'),
+            ],
             'atd_license' => 'required|in:yes,no',
             'driving_experience' => 'required|in:3-5,5-10,10+',
+            'latvian_b1' => 'required_if:intent,work|in:yes,no',
+            'shift_preference' => 'required_if:intent,work|in:early_day,late_night,mixed',
             'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
             'area' => 'required|string|max:100',
             'website_url' => 'nullable|max:0', // honeypot - must be empty
         ]);
@@ -62,7 +71,14 @@ class ApplyController extends Controller
             'atd_number' => $validated['atd_number'] ?? null,
             'atd_license' => $validated['atd_license'] === 'yes',
             'driving_experience' => $validated['driving_experience'],
+            'latvian_b1' => $validated['intent'] === 'work'
+                ? ($validated['latvian_b1'] === 'yes')
+                : null,
+            'shift_preference' => $validated['intent'] === 'work'
+                ? $validated['shift_preference']
+                : null,
             'name' => $validated['name'],
+            'email' => $validated['email'],
             'area' => $validated['area'],
             'source' => $source,
             'status' => 'new',
@@ -89,8 +105,8 @@ class ApplyController extends Controller
 
         return view('apply.thanks', [
             'phone' => $phone,
-            'metaDescription' => __('apply.done') . ' — ' . __('ui.home_hero_sub'),
-            'ogTitle' => __('apply.done') . ' — Evo.drive',
+            'metaDescription' => __('apply.done').' — '.__('ui.home_hero_sub'),
+            'ogTitle' => __('apply.done').' — Evo.drive',
             'ogDescription' => __('ui.home_hero_sub'),
         ]);
     }

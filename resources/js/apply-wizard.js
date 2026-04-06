@@ -2,43 +2,77 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('apply-form');
     if (!form) return;
 
-    const steps = Array.from(document.querySelectorAll('[data-step]'));
+    const FLOW_WORK = ['phone', 'path', 'qual', 'latvian', 'shifts', 'details', 'ready'];
+    const FLOW_RENT = ['phone', 'path', 'qual', 'details', 'ready'];
+
     const progressBar = document.getElementById('progress-bar');
     const stepLabel = document.getElementById('step-label');
     const stepInput = document.getElementById('step-input');
-    const totalSteps = 5;
-    let currentStep = 1;
+    const intentInput = document.getElementById('intent-input');
 
-    function showStep(n) {
-        currentStep = Math.max(1, Math.min(totalSteps, n));
-        if (stepInput) stepInput.value = currentStep;
-        if (stepLabel) {
-            const tpl = stepLabel.dataset.template || 'Step ' + currentStep + ' of ' + totalSteps;
-            stepLabel.textContent = tpl.replace(':current', currentStep).replace(':total', totalSteps);
-        }
-        steps.forEach((el, i) => {
-            el.classList.toggle('hidden', i + 1 !== currentStep);
+    let flowIndex = 0;
+
+    function getIntent() {
+        return intentInput?.value || '';
+    }
+
+    function getFlow() {
+        return getIntent() === 'work' ? FLOW_WORK : FLOW_RENT;
+    }
+
+    function showFlowStep(index) {
+        const flow = getFlow();
+        const last = flow.length - 1;
+        flowIndex = Math.max(0, Math.min(index, last));
+        const panel = flow[flowIndex];
+
+        document.querySelectorAll('[data-flow-panel]').forEach((el) => {
+            el.classList.toggle('hidden', el.dataset.flowPanel !== panel);
         });
-        if (progressBar) progressBar.style.width = (currentStep / totalSteps) * 100 + '%';
+
+        const total = flow.length;
+        const current = flowIndex + 1;
+        if (stepInput) stepInput.value = String(current);
+        if (stepLabel) {
+            const tpl = stepLabel.dataset.template || 'Step :current of :total';
+            stepLabel.textContent = tpl.replace(':current', String(current)).replace(':total', String(total));
+        }
+        if (progressBar) progressBar.style.width = (current / total) * 100 + '%';
 
         const prevBtn = document.getElementById('prev-btn');
         const logoBtn = document.getElementById('logo-btn');
-        if (prevBtn) prevBtn.classList.toggle('hidden', currentStep <= 1);
-        if (logoBtn) logoBtn.classList.toggle('hidden', currentStep > 1);
+        if (prevBtn) prevBtn.classList.toggle('hidden', flowIndex <= 0);
+        if (logoBtn) logoBtn.classList.toggle('hidden', flowIndex > 0);
     }
 
     const prevBtn = document.getElementById('prev-btn');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => showFlowStep(flowIndex - 1));
+    }
+
     const nextBtn = document.getElementById('next-btn');
-    if (prevBtn) prevBtn.addEventListener('click', () => showStep(currentStep - 1));
-    if (nextBtn) nextBtn.addEventListener('click', () => showStep(currentStep + 1));
+    if (nextBtn) nextBtn.addEventListener('click', () => showFlowStep(1));
 
     document.querySelectorAll('[data-goto]').forEach((btn) => {
         btn.addEventListener('click', () => {
-            const intentInput = document.querySelector('[name="intent"]');
             if (intentInput) intentInput.value = btn.dataset.intent || '';
-            showStep(currentStep + 1);
+            showFlowStep(2);
         });
     });
+
+    function atdLicenseValue() {
+        return document.querySelector('[name="atd_license"]')?.value || '';
+    }
+
+    function checkQualContinue() {
+        const atd = atdLicenseValue();
+        const exp = document.querySelector('[name="driving_experience"]')?.value || '';
+        const atdNum = document.querySelector('[name="atd_number"]')?.value?.trim() || '';
+        const needCard = atd === 'yes';
+        const cardOk = !needCard || atdNum.length > 0;
+        const nextBtnQual = document.getElementById('next-btn-qual');
+        if (nextBtnQual) nextBtnQual.disabled = !(atd && exp && cardOk);
+    }
 
     document.querySelectorAll('[data-atd]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -50,7 +84,7 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.classList.add('border-brand-600', 'bg-brand-50', 'text-brand-600');
             const atdLicense = document.querySelector('[name="atd_license"]');
             if (atdLicense) atdLicense.value = btn.dataset.atd || '';
-            checkStep3();
+            checkQualContinue();
         });
     });
 
@@ -64,31 +98,83 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.classList.add('border-brand-600', 'bg-brand-50', 'text-brand-600');
             const drivingExp = document.querySelector('[name="driving_experience"]');
             if (drivingExp) drivingExp.value = btn.dataset.exp || '';
-            checkStep3();
+            checkQualContinue();
         });
     });
 
-    function checkStep3() {
-        const atd = document.querySelector('[name="atd_license"]');
-        const exp = document.querySelector('[name="driving_experience"]');
-        const nextBtn3 = document.getElementById('next-btn-3');
-        if (nextBtn3) nextBtn3.disabled = !(atd && atd.value && exp && exp.value);
+    document.querySelector('[name="atd_number"]')?.addEventListener('input', checkQualContinue);
+
+    document.querySelectorAll('[data-latvian]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('[data-latvian]').forEach((b) => {
+                b.classList.remove('border-brand-600', 'bg-brand-50', 'text-brand-600');
+                b.classList.add('border-slate-50', 'bg-slate-50', 'text-slate-400');
+            });
+            btn.classList.remove('border-slate-50', 'bg-slate-50', 'text-slate-400');
+            btn.classList.add('border-brand-600', 'bg-brand-50', 'text-brand-600');
+            const h = document.querySelector('[name="latvian_b1"]');
+            if (h) h.value = btn.dataset.latvian || '';
+            const nextLatvian = document.getElementById('next-btn-latvian');
+            if (nextLatvian) nextLatvian.disabled = false;
+        });
+    });
+
+    document.querySelectorAll('[data-shift]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('[data-shift]').forEach((b) => {
+                b.classList.remove('border-brand-600', 'bg-brand-50', 'text-brand-600');
+                b.classList.add('border-slate-50', 'bg-slate-50', 'text-slate-400');
+            });
+            btn.classList.remove('border-slate-50', 'bg-slate-50', 'text-slate-400');
+            btn.classList.add('border-brand-600', 'bg-brand-50', 'text-brand-600');
+            const h = document.querySelector('[name="shift_preference"]');
+            if (h) h.value = btn.dataset.shift || '';
+            const nextShifts = document.getElementById('next-btn-shifts');
+            if (nextShifts) nextShifts.disabled = false;
+        });
+    });
+
+    const nextBtnQual = document.getElementById('next-btn-qual');
+    if (nextBtnQual) {
+        nextBtnQual.addEventListener('click', () => {
+            if (getIntent() === 'work') {
+                showFlowStep(getFlow().indexOf('latvian'));
+            } else {
+                showFlowStep(getFlow().indexOf('details'));
+            }
+        });
     }
 
-    const nextBtn3 = document.getElementById('next-btn-3');
-    if (nextBtn3) nextBtn3.addEventListener('click', () => showStep(4));
+    const nextBtnLatvian = document.getElementById('next-btn-latvian');
+    if (nextBtnLatvian) {
+        nextBtnLatvian.addEventListener('click', () => showFlowStep(getFlow().indexOf('shifts')));
+    }
 
-    document.querySelectorAll('[name="name"], [name="area"]').forEach((inp) => {
-        inp.addEventListener('input', () => {
-            const n = document.querySelector('[name="name"]');
-            const a = document.querySelector('[name="area"]');
-            const nextBtn4 = document.getElementById('next-btn-4');
-            if (nextBtn4) nextBtn4.disabled = !(n && n.value.trim() && a && a.value.trim());
-        });
+    const nextBtnShifts = document.getElementById('next-btn-shifts');
+    if (nextBtnShifts) {
+        nextBtnShifts.addEventListener('click', () => showFlowStep(getFlow().indexOf('details')));
+    }
+
+    function checkDetailsContinue() {
+        const n = document.querySelector('[name="name"]');
+        const e = document.querySelector('[name="email"]');
+        const a = document.querySelector('[name="area"]');
+        const emailVal = e?.value?.trim() || '';
+        const emailOk = emailVal.length > 3 && emailVal.includes('@');
+        const nextBtnDetails = document.getElementById('next-btn-details');
+        if (nextBtnDetails) {
+            nextBtnDetails.disabled = !(n?.value?.trim() && emailOk && a?.value?.trim());
+        }
+    }
+
+    document.querySelectorAll('[name="name"], [name="email"], [name="area"]').forEach((inp) => {
+        inp.addEventListener('input', checkDetailsContinue);
     });
 
-    const nextBtn4 = document.getElementById('next-btn-4');
-    if (nextBtn4) nextBtn4.addEventListener('click', () => showStep(5));
+    const nextBtnDetails = document.getElementById('next-btn-details');
+    if (nextBtnDetails) {
+        nextBtnDetails.addEventListener('click', () => showFlowStep(getFlow().indexOf('ready')));
+    }
 
     const submitBtn = document.getElementById('submit-btn');
     if (submitBtn) submitBtn.addEventListener('click', () => form.submit());
@@ -96,12 +182,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const phoneInput = document.querySelector('[name="phone"]');
     if (phoneInput) {
         phoneInput.addEventListener('input', function () {
-            const nextBtn = document.getElementById('next-btn');
-            if (nextBtn) nextBtn.disabled = this.value.replace(/\D/g, '').length < 8;
+            const nb = document.getElementById('next-btn');
+            if (nb) nb.disabled = this.value.replace(/\D/g, '').length < 8;
         });
     }
 
-    const startStepInput = document.getElementById('apply-start-step');
-    const startStep = startStepInput ? parseInt(startStepInput.value, 10) : 1;
-    showStep(isNaN(startStep) ? 1 : Math.max(1, Math.min(startStep, totalSteps)));
+    const startIdxEl = document.getElementById('apply-start-flow-index');
+    let startIdx = startIdxEl ? parseInt(startIdxEl.value, 10) : 0;
+    if (isNaN(startIdx)) startIdx = 0;
+    showFlowStep(startIdx);
+    checkQualContinue();
+    checkDetailsContinue();
 });

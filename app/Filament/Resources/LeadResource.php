@@ -45,14 +45,25 @@ class LeadResource extends Resource
                             ->label('Rental Vehicle')
                             ->options(
                                 fn () => RentalVehicle::where('is_active', true)->orderBy('make')->get()
-                                    ->mapWithKeys(fn (RentalVehicle $r) => [$r->id => $r->make . ' ' . $r->model . ' (€' . $r->price . __('ui.rent_price_week_suffix') . ')'])
+                                    ->mapWithKeys(fn (RentalVehicle $r) => [$r->id => $r->make.' '.$r->model.' (€'.$r->price.__('ui.rent_price_week_suffix').')'])
                                     ->all()
                             )
                             ->searchable()
-                            ->getOptionLabelUsing(fn ($value): ?string => $value ? (($r = RentalVehicle::find($value)) ? $r->make . ' ' . $r->model . ' (€' . $r->price . __('ui.rent_price_week_suffix') . ')' : '—') : null),
+                            ->getOptionLabelUsing(fn ($value): ?string => $value ? (($r = RentalVehicle::find($value)) ? $r->make.' '.$r->model.' (€'.$r->price.__('ui.rent_price_week_suffix').')' : '—') : null),
                         Forms\Components\Toggle::make('atd_license')->label('ATD License'),
                         Forms\Components\TextInput::make('atd_number')->label('ATD Card Number')->maxLength(50),
                         Forms\Components\TextInput::make('driving_experience')->maxLength(20),
+                        Forms\Components\Toggle::make('latvian_b1')
+                            ->label('Latvian B1+')
+                            ->nullable(),
+                        Forms\Components\Select::make('shift_preference')
+                            ->label('Shift preference')
+                            ->options([
+                                'early_day' => 'Early morning / day',
+                                'late_night' => 'Late evening / night',
+                                'mixed' => 'Mixed',
+                            ])
+                            ->nullable(),
                         Forms\Components\TextInput::make('area')->maxLength(100),
                     ])->columns(2),
                 Forms\Components\Section::make('Status & Source')
@@ -87,7 +98,7 @@ class LeadResource extends Resource
                 }),
                 Tables\Columns\TextColumn::make('rentalVehicle.make')
                     ->label('Rental Car')
-                    ->formatStateUsing(fn ($record) => $record->rentalVehicle ? $record->rentalVehicle->make . ' ' . $record->rentalVehicle->model : '-')
+                    ->formatStateUsing(fn ($record) => $record->rentalVehicle ? $record->rentalVehicle->make.' '.$record->rentalVehicle->model : '-')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('source')->badge()->color(fn ($state) => match ($state) {
                     'google' => 'success', 'meta' => 'info', default => 'gray',
