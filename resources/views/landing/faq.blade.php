@@ -13,6 +13,16 @@
 @endphp
 <style>
 .faq-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-in-out; }
+.faq-answer :where(p) { margin-top: 0.5rem; margin-bottom: 0.5rem; }
+.faq-answer :where(p:first-child) { margin-top: 0; }
+.faq-answer :where(p:last-child) { margin-bottom: 0; }
+.faq-answer :where(ul) { list-style: disc; padding-left: 1.25rem; margin: 0.5rem 0; }
+.faq-answer :where(ol) { list-style: decimal; padding-left: 1.25rem; margin: 0.5rem 0; }
+.faq-answer :where(li) { margin-top: 0.125rem; margin-bottom: 0.125rem; }
+.faq-answer :where(a) { color: #2563eb; font-weight: 600; text-decoration: underline; }
+.faq-answer :where(a:hover) { color: #1d4ed8; }
+.faq-answer :where(strong, b) { font-weight: 700; color: #0f172a; }
+.faq-answer :where(em, i) { font-style: italic; }
 </style>
 <div class="min-h-screen bg-white py-20 px-4 font-sans text-slate-900" id="faq-page" data-default-category="{{ $defaultSlug }}">
     <div class="mx-auto max-w-3xl">
@@ -71,9 +81,11 @@
                                 </div>
                             </button>
                             <div class="faq-content overflow-hidden transition-all duration-300 ease-in-out max-h-0">
-                                <div class="px-6 pt-2 pb-6 text-slate-500 text-sm leading-relaxed font-medium">
+                                <div class="px-6 pt-2 pb-6 text-sm leading-relaxed font-medium text-slate-500">
                                     <div class="h-px w-full bg-slate-50 mb-4"></div>
-                                    {{ $a }}
+                                    <div class="faq-answer">
+                                        {!! str($a)->sanitizeHtml() !!}
+                                    </div>
                                 </div>
                             </div>
                         </div>

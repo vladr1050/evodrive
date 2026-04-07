@@ -11,7 +11,7 @@
                     'name' => $q,
                     'acceptedAnswer' => [
                         '@type' => 'Answer',
-                        'text' => $a,
+                        'text' => html_entity_decode(strip_tags($a), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                     ],
                 ];
             }

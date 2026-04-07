@@ -26,17 +26,51 @@ class FaqItemsRelationManager extends RelationManager
                         Forms\Components\Tabs\Tab::make('EN')
                             ->schema([
                                 Forms\Components\TextInput::make('question.en')->label('Question')->required()->maxLength(500),
-                                Forms\Components\Textarea::make('answer.en')->label('Answer')->required()->rows(4),
+                                Forms\Components\RichEditor::make('answer.en')
+                                    ->label('Answer')
+                                    ->required()
+                                    ->toolbarButtons([
+                                        'bold',
+                                        'italic',
+                                        'bulletList',
+                                        'orderedList',
+                                        'link',
+                                        'redo',
+                                        'undo',
+                                    ])
+                                    ->columnSpanFull(),
                             ]),
                         Forms\Components\Tabs\Tab::make('RU')
                             ->schema([
                                 Forms\Components\TextInput::make('question.ru')->label('Вопрос')->maxLength(500),
-                                Forms\Components\Textarea::make('answer.ru')->label('Ответ')->rows(4),
+                                Forms\Components\RichEditor::make('answer.ru')
+                                    ->label('Ответ')
+                                    ->toolbarButtons([
+                                        'bold',
+                                        'italic',
+                                        'bulletList',
+                                        'orderedList',
+                                        'link',
+                                        'redo',
+                                        'undo',
+                                    ])
+                                    ->columnSpanFull(),
                             ]),
                         Forms\Components\Tabs\Tab::make('LV')
                             ->schema([
                                 Forms\Components\TextInput::make('question.lv')->label('Jautājums')->maxLength(500),
-                                Forms\Components\Textarea::make('answer.lv')->label('Atbilde')->rows(4),
+                                Forms\Components\RichEditor::make('answer.lv')
+                                    ->label('Atbilde')
+                                    ->toolbarButtons([
+                                        'bold',
+                                        'italic',
+                                        'bulletList',
+                                        'orderedList',
+                                        'link',
+                                        'redo',
+                                        'undo',
+                                    ])
+                                    ->columnSpanFull(),
                             ]),
                     ])
                     ->columnSpanFull(),
