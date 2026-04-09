@@ -13,7 +13,7 @@
     @php
         $locale = app()->getLocale();
         $heroContent = ($sections['hero'] ?? null)?->getContentForLocale() ?? [];
-        $heroImg = $heroContent['hero_image'] ?? 'https://images.unsplash.com/photo-1560958089-b8a1929cea89?auto=format&fit=crop&w=1200&q=80';
+        $heroImg = $heroContent['hero_image'] ?? asset('images/fleet-hero-google.jpg');
     @endphp
 
     {{-- Hero Section --}}
@@ -34,8 +34,8 @@
                 </a>
             </div>
             <div class="relative">
-                <img src="{{ $heroImg }}" alt="Fleet" loading="lazy"
-                     class="w-full h-[500px] object-cover rounded-[40px] shadow-2xl grayscale-[0.1]">
+                <img src="{{ $heroImg }}" alt="{{ __('ui.modern_fleet') }}" loading="lazy" width="1024" height="682"
+                     class="w-full h-[500px] object-cover object-center rounded-[40px] shadow-2xl">
             </div>
         </div>
     </section>
