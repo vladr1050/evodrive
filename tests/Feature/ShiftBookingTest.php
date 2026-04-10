@@ -390,4 +390,42 @@ class ShiftBookingTest extends TestCase
 
         Carbon::setTestNow();
     }
+
+    /** Hard-deleting a started booked shift frees the vehicle; availability is recomputed from remaining booked shifts only. */
+    public function test_deleting_started_booked_shift_frees_vehicle_for_booking(): void
+    {
+        $tz = 'Europe/Riga';
+        $this->policy->update([
+            'vehicle_downtime_hours' => 1,
+            'min_duration_hours' => 4,
+            'allowed_durations_json' => [4, 6, 8],
+            'time_slot_minutes' => 60,
+            'timezone' => $tz,
+        ]);
+        $this->policy->refresh();
+
+        $day = Carbon::parse('2030-06-02 00:00:00', $tz);
+        Carbon::setTestNow(Carbon::parse('2030-06-02 09:00:00', $tz));
+
+        $shift = Shift::factory()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'driver_id' => $this->driver1->id,
+            'starts_at' => $day->copy()->setTime(8, 0),
+            'ends_at' => $day->copy()->setTime(15, 0),
+            'status' => ShiftStatus::Booked,
+        ]);
+
+        $svc = app(ShiftAvailabilityService::class);
+        $tryStart = $day->copy()->setTime(10, 0);
+        $before = $svc->checkAvailability($this->station->id, $tryStart, 4.0);
+        $this->assertSame(0, $before['count']);
+
+        $shift->delete();
+
+        $after = $svc->checkAvailability($this->station->id, $tryStart, 4.0);
+        $this->assertGreaterThan(0, $after['count']);
+
+        Carbon::setTestNow();
+    }
 }

@@ -4,23 +4,24 @@ namespace App\Filament\Resources;
 
 use App\Enums\ShiftStatus;
 use App\Events\ShiftCancelled;
-use App\Helpers\Latvian;
-use Carbon\Carbon;
 use App\Filament\Resources\ShiftResource\Pages;
+use App\Helpers\Latvian;
 use App\Models\Shift;
 use App\Models\ShiftEvent;
 use App\Models\ShiftPolicy;
 use App\Models\Station;
+use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Table;
 use Filament\Tables\Filters\Indicator;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 
 class ShiftResource extends Resource
 {
@@ -59,7 +60,7 @@ class ShiftResource extends Resource
                     ->state(fn (Shift $r) => number_format($r->durationHours(), 1)),
                 Tables\Columns\TextColumn::make('driver.name')
                     ->label('Driver')
-                    ->formatStateUsing(fn (Shift $r) => $r->driver ? $r->driver->name . ' (' . $r->driver->email . ')' : '-')
+                    ->formatStateUsing(fn (Shift $r) => $r->driver ? $r->driver->name.' ('.$r->driver->email.')' : '-')
                     ->searchable(query: function (Builder $q, string $search) {
                         $search = trim((string) $search);
                         if ($search === '') {
@@ -70,7 +71,7 @@ class ShiftResource extends Resource
                             $q->whereHas('driver', function (Builder $sub) use ($variants) {
                                 foreach (['first_name', 'last_name', 'email'] as $col) {
                                     foreach ($variants as $v) {
-                                        $sub->orWhere($col, 'like', '%' . $v . '%');
+                                        $sub->orWhere($col, 'like', '%'.$v.'%');
                                     }
                                 }
                             });
@@ -81,7 +82,7 @@ class ShiftResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('vehicle.registration_number')
                     ->label('Vehicle')
-                    ->formatStateUsing(fn (Shift $r) => $r->vehicle ? $r->vehicle->registration_number . ' – ' . trim(($r->vehicle->brand ?? '') . ' ' . ($r->vehicle->model ?? '')) : '-')
+                    ->formatStateUsing(fn (Shift $r) => $r->vehicle ? $r->vehicle->registration_number.' – '.trim(($r->vehicle->brand ?? '').' '.($r->vehicle->model ?? '')) : '-')
                     ->searchable(query: function (Builder $q, string $search) {
                         $search = trim((string) $search);
                         if ($search === '') {
@@ -92,7 +93,7 @@ class ShiftResource extends Resource
                             $q->whereHas('vehicle', function (Builder $sub) use ($variants) {
                                 foreach (['registration_number', 'brand', 'model'] as $col) {
                                     foreach ($variants as $v) {
-                                        $sub->orWhere($col, 'like', '%' . $v . '%');
+                                        $sub->orWhere($col, 'like', '%'.$v.'%');
                                     }
                                 }
                             });
@@ -111,8 +112,8 @@ class ShiftResource extends Resource
                             $variants = Latvian::searchVariants($search);
                             $q->whereHas('station', function (Builder $sub) use ($variants) {
                                 foreach ($variants as $v) {
-                                    $sub->orWhere('name', 'like', '%' . $v . '%')
-                                        ->orWhere('address', 'like', '%' . $v . '%');
+                                    $sub->orWhere('name', 'like', '%'.$v.'%')
+                                        ->orWhere('address', 'like', '%'.$v.'%');
                                 }
                             });
                         } catch (\Throwable) {
@@ -156,18 +157,20 @@ class ShiftResource extends Resource
                             $until = Carbon::parse($data['starts_until'], $tz)->endOfDay()->utc();
                             $query->where('starts_at', '<=', $until);
                         }
+
                         return $query;
                     })
                     ->indicateUsing(function (array $data): array {
                         $indicators = [];
                         if (! empty($data['starts_from'])) {
-                            $indicators[] = Indicator::make('From ' . Carbon::parse($data['starts_from'])->format('d M Y'))
+                            $indicators[] = Indicator::make('From '.Carbon::parse($data['starts_from'])->format('d M Y'))
                                 ->removeField('starts_from');
                         }
                         if (! empty($data['starts_until'])) {
-                            $indicators[] = Indicator::make('Until ' . Carbon::parse($data['starts_until'])->format('d M Y'))
+                            $indicators[] = Indicator::make('Until '.Carbon::parse($data['starts_until'])->format('d M Y'))
                                 ->removeField('starts_until');
                         }
+
                         return $indicators;
                     }),
                 Tables\Filters\SelectFilter::make('station_id')
@@ -178,11 +181,12 @@ class ShiftResource extends Resource
                         $query = Station::query()->where('is_active', true);
                         if (filled($search)) {
                             $driver = DB::connection()->getDriverName();
-                            $pattern = '%' . mb_strtolower(Latvian::normalize(trim($search))) . '%';
+                            $pattern = '%'.mb_strtolower(Latvian::normalize(trim($search))).'%';
                             $nameExpr = Latvian::sqlNormalizedColumn($driver, 'name');
                             $addrExpr = Latvian::sqlNormalizedColumn($driver, 'address');
                             $query->whereRaw("({$nameExpr} LIKE ?) OR ({$addrExpr} LIKE ?)", [$pattern, $pattern]);
                         }
+
                         return $query->orderBy('name')->limit(100)->pluck('name', 'id')->toArray();
                     }),
                 Tables\Filters\SelectFilter::make('vehicle_id')
@@ -192,7 +196,7 @@ class ShiftResource extends Resource
                 Tables\Filters\SelectFilter::make('driver_id')
                     ->label('Driver')
                     ->relationship('driver', 'email')
-                    ->getOptionLabelFromRecordUsing(fn (Model $r) => $r->name . ' (' . $r->email . ')')
+                    ->getOptionLabelFromRecordUsing(fn (Model $r) => $r->name.' ('.$r->email.')')
                     ->searchable(['first_name', 'last_name', 'email']),
                 Tables\Filters\SelectFilter::make('status')
                     ->options(collect(ShiftStatus::cases())->mapWithKeys(fn ($c) => [$c->value => ucfirst($c->value)])),
@@ -219,6 +223,38 @@ class ShiftResource extends Resource
                         }
                         \Filament\Notifications\Notification::make()
                             ->title('Shift cancelled')
+                            ->success()
+                            ->send();
+                    }),
+                Tables\Actions\Action::make('removeStartedNoShow')
+                    ->label('Remove shift (free vehicle)')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Permanently remove this shift?')
+                    ->modalDescription('Use when the driver did not show up and the shift should not remain as booked or cancelled. The shift row will be deleted (including from utilization), and the vehicle time until the original end will follow normal free-slot rules: charging buffer, minimum duration, slots after now, etc.')
+                    ->visible(function (Shift $record): bool {
+                        if (! static::canAccess()) {
+                            return false;
+                        }
+
+                        return $record->status === ShiftStatus::Booked && $record->starts_at->lte(now());
+                    })
+                    ->action(function (Shift $record): void {
+                        $meta = [
+                            'shift_id' => $record->id,
+                            'station_id' => $record->station_id,
+                            'vehicle_id' => $record->vehicle_id,
+                            'driver_id' => $record->driver_id,
+                            'starts_at' => $record->starts_at?->toIso8601String(),
+                            'ends_at' => $record->ends_at?->toIso8601String(),
+                            'admin_user_id' => auth()->id(),
+                        ];
+                        $record->delete();
+                        Log::info('shift.admin_removed_no_show', $meta);
+                        \Filament\Notifications\Notification::make()
+                            ->title('Shift removed')
+                            ->body('The vehicle is available for booking again according to shift policy.')
                             ->success()
                             ->send();
                     }),
