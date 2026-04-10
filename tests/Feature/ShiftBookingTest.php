@@ -21,9 +21,13 @@ class ShiftBookingTest extends TestCase
     use RefreshDatabase;
 
     protected ShiftPolicy $policy;
+
     protected Station $station;
+
     protected FleetVehicle $vehicle;
+
     protected Driver $driver1;
+
     protected Driver $driver2;
 
     protected function setUp(): void
@@ -245,7 +249,7 @@ class ShiftBookingTest extends TestCase
         $startsAt = Carbon::tomorrow()->setTime(8, 0);
         $startsAtIso = $startsAt->toIso8601String();
         $basePath = base_path();
-        $script = $basePath . '/tests/scripts/try_booking.php';
+        $script = $basePath.'/tests/scripts/try_booking.php';
 
         $env = array_merge(getenv() ?: [], [
             'DB_CONNECTION' => 'pgsql',
@@ -282,8 +286,8 @@ class ShiftBookingTest extends TestCase
         $secondFailed = str_contains($otherOut, 'FAIL:') || str_contains($otherOut, 'database is locked')
             || str_contains($otherErr, 'database is locked');
 
-        $this->assertSame(1, $successCount, 'Exactly one booking must succeed. Outputs: ' . $out1 . ' / ' . $out2);
-        $this->assertTrue($secondFailed, 'Second attempt must fail (NO_VEHICLES, OVERLAP, or DB lock). Out: ' . $out1 . ' / ' . $out2 . ' Err: ' . $err1 . ' / ' . $err2);
+        $this->assertSame(1, $successCount, 'Exactly one booking must succeed. Outputs: '.$out1.' / '.$out2);
+        $this->assertTrue($secondFailed, 'Second attempt must fail (NO_VEHICLES, OVERLAP, or DB lock). Out: '.$out1.' / '.$out2.' Err: '.$err1.' / '.$err2);
 
         $shiftCount = Shift::where('station_id', $station->id)
             ->where('starts_at', $startsAt)
@@ -330,8 +334,60 @@ class ShiftBookingTest extends TestCase
         $slots = app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($weekStart, $dayNames);
 
         $overnightSlots = collect($slots)->filter(fn ($s) => isset($s['end_date_iso']) && ! empty($s['vehicles'] ?? []));
-        $this->assertTrue($overnightSlots->isNotEmpty(), 'At least one overnight slot (with vehicles) should appear. Slots: ' . json_encode($slots));
+        $this->assertTrue($overnightSlots->isNotEmpty(), 'At least one overnight slot (with vehicles) should appear. Slots: '.json_encode($slots));
         $overnight = $overnightSlots->first();
         $this->assertGreaterThanOrEqual(6, $overnight['duration']);
+    }
+
+    /**
+     * Shift Sun→Mon ending exactly at Monday 00:00 must apply downtime on Monday; free-slot grid must not offer 00:00
+     * while booking already rejects it (avoids "slot visible but not bookable").
+     */
+    public function test_week_query_includes_shift_ending_at_week_start_for_midnight_downtime(): void
+    {
+        $this->policy->update([
+            'vehicle_downtime_hours' => 1,
+            'min_duration_hours' => 4,
+            'allowed_durations_json' => [4, 6, 8],
+            'time_slot_minutes' => 60,
+            'timezone' => 'Europe/Riga',
+        ]);
+        $this->policy->refresh();
+
+        $tz = 'Europe/Riga';
+        Carbon::setTestNow(Carbon::parse('2030-01-05 10:00:00', $tz));
+
+        $weekStart = Carbon::parse('2030-01-06 00:00:00', $tz);
+        $sundayNoon = Carbon::parse('2030-01-05 12:00:00', $tz);
+        $mondayMidnight = Carbon::parse('2030-01-06 00:00:00', $tz);
+
+        Shift::factory()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'driver_id' => $this->driver1->id,
+            'starts_at' => $sundayNoon,
+            'ends_at' => $mondayMidnight,
+            'status' => ShiftStatus::Booked,
+        ]);
+
+        $dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        $slots = app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($weekStart, $dayNames);
+
+        $mondaySlots = collect($slots)->filter(fn ($s) => ($s['date_iso'] ?? '') === '2030-01-06');
+        $hasMidnightStart = $mondaySlots->contains(fn ($s) => ($s['start'] ?? '') === '00:00');
+        $this->assertFalse($hasMidnightStart, 'Monday 00:00 must not be offered when previous shift ends at 00:00 with downtime');
+
+        $service = app(ShiftAvailabilityService::class);
+        $badStart = $mondayMidnight->copy()->utc();
+        $badEnd = $badStart->copy()->addHours(4);
+        $availBad = $service->checkAvailability($this->station->id, $badStart, 4.0);
+        $this->assertSame(0, $availBad['count'], 'Booking at 00:00 must stay unavailable (downtime after prior shift)');
+
+        $okStart = $mondayMidnight->copy()->addHour()->utc();
+        $okEnd = $okStart->copy()->addHours(4);
+        $availOk = $service->checkAvailability($this->station->id, $okStart, 4.0);
+        $this->assertGreaterThan(0, $availOk['count'], 'Booking at 01:00 should be available after 1h downtime');
+
+        Carbon::setTestNow();
     }
 }

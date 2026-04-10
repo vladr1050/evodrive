@@ -152,6 +152,7 @@ class ShiftAvailabilityService
             if ($from->gte($to)) {
                 return 0;
             }
+
             return $from->diffInMinutes($to);
         });
 
@@ -193,6 +194,8 @@ class ShiftAvailabilityService
         $nowInTz = now($tz);
 
         $weekEnd = $weekStart->copy()->addDays(7)->setTimezone($tz);
+        $weekStartUtc = $weekStart->copy()->utc();
+        $weekEndUtc = $weekEnd->copy()->utc();
         $vehicles = FleetVehicle::whereIn('home_station_id', $stations->pluck('id'))
             ->where('status', VehicleStatus::Active)
             ->get(['id', 'home_station_id', 'brand', 'model', 'registration_number', 'label']);
@@ -203,10 +206,11 @@ class ShiftAvailabilityService
             return [];
         }
 
+        // Include shifts that end exactly at week start (e.g. Sun→Mon 00:00): they still need downtime on the first day.
         $shifts = Shift::whereIn('vehicle_id', $allVehicleIds)
             ->where('status', ShiftStatus::Booked)
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart)
+            ->where('starts_at', '<', $weekEndUtc)
+            ->where('ends_at', '>=', $weekStartUtc)
             ->orderBy('vehicle_id')
             ->orderBy('starts_at')
             ->get()
@@ -246,7 +250,7 @@ class ShiftAvailabilityService
                 continue;
             }
             $dateIso = $dayStart->format('Y-m-d');
-            $dayName = $dayNames[$dayIndex] ?? 'Day' . ($dayIndex + 1);
+            $dayName = $dayNames[$dayIndex] ?? 'Day'.($dayIndex + 1);
 
             foreach ($stations as $station) {
                 $freeIntervals = $freeByDay[$dayIndex][$station->id] ?? [];
@@ -271,8 +275,8 @@ class ShiftAvailabilityService
                         $m2 = $endMinTry % 60;
                         $slotStart = sprintf('%02d:%02d', $h1, $m1);
                         $slotEnd = sprintf('%02d:%02d', $h2, $m2);
-                        $slotStartsAt = Carbon::parse($dateIso . ' ' . $slotStart, $tz);
-                        $slotEndsAt = Carbon::parse($dateIso . ' ' . $slotEnd, $tz);
+                        $slotStartsAt = Carbon::parse($dateIso.' '.$slotStart, $tz);
+                        $slotEndsAt = Carbon::parse($dateIso.' '.$slotEnd, $tz);
                         if ($slotEndsAt->lte($slotStartsAt)) {
                             $slotEndsAt->addDay();
                         }
@@ -292,7 +296,7 @@ class ShiftAvailabilityService
                         }
                         $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
                         $slots[] = [
-                            'id' => 'as' . (++$slotId),
+                            'id' => 'as'.(++$slotId),
                             'day' => $dayName,
                             'start' => $slotStart,
                             'end' => $slotEnd,
@@ -340,8 +344,8 @@ class ShiftAvailabilityService
                                 $m2 = $endMinNext % 60;
                                 $slotStart = sprintf('%02d:%02d', $h1, $m1);
                                 $slotEnd = sprintf('%02d:%02d', $h2, $m2);
-                                $slotStartsAt = Carbon::parse($dateIso . ' ' . $slotStart, $tz);
-                                $slotEndsAt = Carbon::parse($nextDayStart->format('Y-m-d') . ' ' . $slotEnd, $tz);
+                                $slotStartsAt = Carbon::parse($dateIso.' '.$slotStart, $tz);
+                                $slotEndsAt = Carbon::parse($nextDayStart->format('Y-m-d').' '.$slotEnd, $tz);
                                 $availableVehicleIds = $this->availableVehicleIdsForSlot(
                                     $station->id,
                                     $vehiclesByStation[$station->id] ?? [],
@@ -355,7 +359,7 @@ class ShiftAvailabilityService
                                 }
                                 $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
                                 $slots[] = [
-                                    'id' => 'as' . (++$slotId),
+                                    'id' => 'as'.(++$slotId),
                                     'day' => $dayName,
                                     'start' => $slotStart,
                                     'end' => $slotEnd,
@@ -406,8 +410,8 @@ class ShiftAvailabilityService
                             $m2 = $endMinThis % 60;
                             $slotStart = sprintf('%02d:%02d', $h1, $m1);
                             $slotEnd = sprintf('%02d:%02d', $h2, $m2);
-                            $slotStartsAt = Carbon::parse($prevDateIso . ' ' . $slotStart, $tz);
-                            $slotEndsAt = Carbon::parse($dateIso . ' ' . $slotEnd, $tz);
+                            $slotStartsAt = Carbon::parse($prevDateIso.' '.$slotStart, $tz);
+                            $slotEndsAt = Carbon::parse($dateIso.' '.$slotEnd, $tz);
                             if ($slotEndsAt->lte($nowInTz)) {
                                 continue;
                             }
@@ -424,7 +428,7 @@ class ShiftAvailabilityService
                             }
                             $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
                             $slots[] = [
-                                'id' => 'as' . (++$slotId),
+                                'id' => 'as'.(++$slotId),
                                 'day' => $dayName,
                                 'start' => $slotStart,
                                 'end' => $slotEnd,
@@ -491,10 +495,12 @@ class ShiftAvailabilityService
         $shifts = [];
         if (! empty($allVehicleIds)) {
             $weekEnd = $weekStart->copy()->addDays(7)->setTimezone($tz);
+            $weekStartUtc = $weekStart->copy()->utc();
+            $weekEndUtc = $weekEnd->copy()->utc();
             $shifts = Shift::whereIn('vehicle_id', $allVehicleIds)
                 ->where('status', ShiftStatus::Booked)
-                ->where('starts_at', '<', $weekEnd)
-                ->where('ends_at', '>', $weekStart)
+                ->where('starts_at', '<', $weekEndUtc)
+                ->where('ends_at', '>=', $weekStartUtc)
                 ->orderBy('vehicle_id')
                 ->orderBy('starts_at')
                 ->get()
@@ -527,7 +533,7 @@ class ShiftAvailabilityService
         $slots = $this->getAvailableSlotsForWeek($weekStart, $dayNames);
         $slotsByDayStation = [];
         foreach ($slots as $s) {
-            $key = $s['day'] . '|' . ($s['station_id'] ?? 0);
+            $key = $s['day'].'|'.($s['station_id'] ?? 0);
             $slotsByDayStation[$key] = ($slotsByDayStation[$key] ?? 0) + 1;
         }
 
@@ -537,7 +543,7 @@ class ShiftAvailabilityService
             $dayEnd = $dayStart->copy()->endOfDay();
             $skipped = $dayEnd->lt($nowInTz);
             $dateIso = $dayStart->format('Y-m-d');
-            $dayName = $dayNames[$dayIndex] ?? 'Day' . ($dayIndex + 1);
+            $dayName = $dayNames[$dayIndex] ?? 'Day'.($dayIndex + 1);
             $stationsDebug = [];
             foreach ($stations as $station) {
                 $intervals = $freeByDay[$dayIndex][$station->id] ?? [];
@@ -545,7 +551,7 @@ class ShiftAvailabilityService
                     'station_name' => $station->name,
                     'intervals' => array_map(fn ($iv) => [sprintf('%02d:%02d', (int) floor($iv[0] / 60), $iv[0] % 60), sprintf('%02d:%02d', (int) floor($iv[1] / 60), $iv[1] % 60)], $intervals),
                 ];
-                $key = $dayName . '|' . $station->id;
+                $key = $dayName.'|'.$station->id;
                 $stationsDebug[$station->id]['slots_count'] = $slotsByDayStation[$key] ?? 0;
             }
             $days[] = [
@@ -593,6 +599,7 @@ class ShiftAvailabilityService
                 $availableIds[] = $vehicleId;
             }
         }
+
         return $availableIds;
     }
 
@@ -611,12 +618,13 @@ class ShiftAvailabilityService
             if (! $v) {
                 continue;
             }
-            $model = trim(($v->brand ?? '') . ' ' . ($v->model ?? '')) ?: ($v->label ?? '—');
+            $model = trim(($v->brand ?? '').' '.($v->model ?? '')) ?: ($v->label ?? '—');
             $out[] = [
                 'model' => $model,
                 'number' => $v->registration_number ?: null,
             ];
         }
+
         return $out;
     }
 
@@ -646,8 +654,9 @@ class ShiftAvailabilityService
         $nextDayStart = $dayStart->copy()->addDay();
 
         foreach ($vehicleIds as $vehicleId) {
+            // ends_at > dayStart excluded shifts ending exactly at local midnight; those still block 00:00–downtime via padding (endMin=0).
             $vehicleShifts = $shiftsByVehicle->get($vehicleId, collect())
-                ->filter(fn (Shift $s) => $s->starts_at->lt($dayEndUtc) && $s->ends_at->gt($dayStartUtc))
+                ->filter(fn (Shift $s) => $s->starts_at->lt($dayEndUtc) && ! $s->ends_at->lt($dayStartUtc))
                 ->sortBy('starts_at')
                 ->values();
 
@@ -677,6 +686,7 @@ class ShiftAvailabilityService
             $hasShiftEndingAtMidnight = $shiftsByVehicle->get($vehicleId, collect())
                 ->contains(function (Shift $s) use ($dayStart) {
                     $endLocal = $s->ends_at->copy()->setTimezone($dayStart->timezoneName);
+
                     return $endLocal->isStartOfDay() && $endLocal->isSameDay($dayStart);
                 });
             if ($hasShiftEndingAtMidnight && $downtimeMinutes > 0) {
@@ -737,6 +747,7 @@ class ShiftAvailabilityService
         if ($prevEnd < $dayEnd) {
             $gaps[] = [$prevEnd, $dayEnd];
         }
+
         return $gaps;
     }
 
@@ -759,6 +770,7 @@ class ShiftAvailabilityService
                 $out[] = $intervals[$i];
             }
         }
+
         return $out;
     }
 
