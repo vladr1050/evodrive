@@ -50,8 +50,31 @@ document.addEventListener('DOMContentLoaded', () => {
         filterFAQ();
     });
 
-    // Accordion Logic
-    triggers.forEach(trigger => {
+    function closeAccordionItem(item) {
+        item.classList.remove('faq-open', 'border-brand-600/20', 'shadow-xl', 'shadow-brand-600/5', 'ring-1', 'ring-brand-600/5');
+        item.classList.add('border-slate-100', 'hover:border-slate-200');
+        const content = item.querySelector('.faq-content');
+        if (content) {
+            content.style.maxHeight = '0px';
+        }
+        const chevron = item.querySelector('.faq-chevron');
+        if (chevron) {
+            chevron.classList.remove('bg-brand-600', 'text-white', 'rotate-180', 'shadow-md', 'shadow-brand-600/30');
+            chevron.classList.add('bg-slate-50', 'text-slate-300');
+        }
+        const question = item.querySelector('.faq-question');
+        if (question) {
+            question.classList.remove('text-slate-900');
+            question.classList.add('text-slate-600');
+        }
+    }
+
+    function closeAllAccordions() {
+        items.forEach((item) => closeAccordionItem(item));
+    }
+
+    // Accordion: close only other items when opening (avoids scrollHeight = 0 in some browsers after zeroing the same panel).
+    triggers.forEach((trigger) => {
         trigger.addEventListener('click', () => {
             const item = trigger.closest('.faq-item');
             const content = item.querySelector('.faq-content');
@@ -59,41 +82,39 @@ document.addEventListener('DOMContentLoaded', () => {
             const question = item.querySelector('.faq-question');
             const isOpen = item.classList.contains('faq-open');
 
-            closeAllAccordions();
+            if (isOpen) {
+                closeAccordionItem(item);
+                return;
+            }
 
-            if (!isOpen && content && chevron) {
-                item.classList.add('faq-open');
-                item.classList.remove('border-slate-100', 'hover:border-slate-200');
-                item.classList.add('border-brand-600/20', 'shadow-xl', 'shadow-brand-600/5', 'ring-1', 'ring-brand-600/5');
-                content.style.maxHeight = content.scrollHeight + 'px';
-                chevron.classList.remove('bg-slate-50', 'text-slate-300');
-                chevron.classList.add('bg-brand-600', 'text-white', 'rotate-180', 'shadow-md', 'shadow-brand-600/30');
-                if (question) {
-                    question.classList.remove('text-slate-600');
-                    question.classList.add('text-slate-900');
+            items.forEach((other) => {
+                if (other !== item) {
+                    closeAccordionItem(other);
                 }
+            });
+
+            if (!content || !chevron) {
+                return;
+            }
+
+            item.classList.add('faq-open');
+            item.classList.remove('border-slate-100', 'hover:border-slate-200');
+            item.classList.add('border-brand-600/20', 'shadow-xl', 'shadow-brand-600/5', 'ring-1', 'ring-brand-600/5');
+
+            const expand = () => {
+                content.style.maxHeight = content.scrollHeight + 'px';
+            };
+            expand();
+            requestAnimationFrame(expand);
+
+            chevron.classList.remove('bg-slate-50', 'text-slate-300');
+            chevron.classList.add('bg-brand-600', 'text-white', 'rotate-180', 'shadow-md', 'shadow-brand-600/30');
+            if (question) {
+                question.classList.remove('text-slate-600');
+                question.classList.add('text-slate-900');
             }
         });
     });
-
-    function closeAllAccordions() {
-        items.forEach(item => {
-            item.classList.remove('faq-open', 'border-brand-600/20', 'shadow-xl', 'shadow-brand-600/5', 'ring-1', 'ring-brand-600/5');
-            item.classList.add('border-slate-100', 'hover:border-slate-200');
-            const content = item.querySelector('.faq-content');
-            if (content) content.style.maxHeight = '0px';
-            const chevron = item.querySelector('.faq-chevron');
-            if (chevron) {
-                chevron.classList.remove('bg-brand-600', 'text-white', 'rotate-180', 'shadow-md', 'shadow-brand-600/30');
-                chevron.classList.add('bg-slate-50', 'text-slate-300');
-            }
-            const question = item.querySelector('.faq-question');
-            if (question) {
-                question.classList.remove('text-slate-900');
-                question.classList.add('text-slate-600');
-            }
-        });
-    }
 
     filterFAQ();
 

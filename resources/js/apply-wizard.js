@@ -179,18 +179,38 @@ document.addEventListener('DOMContentLoaded', function () {
     const submitBtn = document.getElementById('submit-btn');
     if (submitBtn) submitBtn.addEventListener('click', () => form.submit());
 
+    function countLocalPhoneDigits(value) {
+        if (!value) {
+            return 0;
+        }
+        try {
+            return value.normalize('NFKC').replace(/\D/g, '').length;
+        } catch {
+            return value.replace(/\D/g, '').length;
+        }
+    }
+
+    function checkPhoneContinue() {
+        const phoneInput = document.querySelector('[name="phone"]');
+        const nb = document.getElementById('next-btn');
+        if (!phoneInput || !nb) {
+            return;
+        }
+        nb.disabled = countLocalPhoneDigits(phoneInput.value) < 8;
+    }
+
     const phoneInput = document.querySelector('[name="phone"]');
     if (phoneInput) {
-        phoneInput.addEventListener('input', function () {
-            const nb = document.getElementById('next-btn');
-            if (nb) nb.disabled = this.value.replace(/\D/g, '').length < 8;
-        });
+        phoneInput.addEventListener('input', checkPhoneContinue);
+        phoneInput.addEventListener('change', checkPhoneContinue);
+        phoneInput.addEventListener('blur', checkPhoneContinue);
     }
 
     const startIdxEl = document.getElementById('apply-start-flow-index');
     let startIdx = startIdxEl ? parseInt(startIdxEl.value, 10) : 0;
     if (isNaN(startIdx)) startIdx = 0;
     showFlowStep(startIdx);
+    checkPhoneContinue();
     checkQualContinue();
     checkDetailsContinue();
 });
