@@ -7,6 +7,13 @@
 @endpush
 
 @section('content')
+<style>
+    @keyframes apply-phone-autofill { from { opacity: 1; } to { opacity: 1; } }
+    input[name="phone"]:-webkit-autofill {
+        animation-name: apply-phone-autofill;
+        animation-duration: 0.001s;
+    }
+</style>
 <div class="min-h-screen flex flex-col items-center justify-center p-4 md:p-8">
         <div class="w-full max-w-xl bg-white rounded-[48px] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden flex flex-col relative">
         <form id="apply-form" action="{{ route('apply.submit', ['locale' => app()->getLocale()]) }}" method="POST" class="flex flex-col">
@@ -63,11 +70,11 @@
                     </div>
                     <div class="relative group">
                         <div class="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xl group-focus-within:text-brand-600 transition-colors">+371</div>
-                        <input type="tel" name="phone" data-testid="apply-phone" required minlength="8" maxlength="15" autofocus
+                        <input type="tel" name="phone" inputmode="numeric" autocomplete="tel-national" autocorrect="off" spellcheck="false" data-testid="apply-phone" required minlength="8" maxlength="15" autofocus
                                class="w-full pl-24 pr-6 py-6 bg-slate-50 border-2 border-slate-200 focus:border-brand-600 focus:bg-white rounded-[24px] outline-none text-2xl font-black transition-all shadow-sm focus:shadow-xl focus:shadow-brand-600/5"
                                placeholder="2XXXXXXX" value="{{ old('phone', $sessionData['phone'] ?? '') }}">
                     </div>
-                    <button type="button" id="next-btn" data-testid="apply-next" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-5 rounded-2xl text-lg min-h-[72px] hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-600/20" disabled>{{ __('apply.next_step') }}</button>
+                    <button type="button" id="next-btn" data-testid="apply-next" aria-disabled="true" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-5 rounded-2xl text-lg min-h-[72px] hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-600/20" disabled>{{ __('apply.next_step') }}</button>
                 </div>
 
                 <div data-flow-panel="path" class="hidden space-y-8">
