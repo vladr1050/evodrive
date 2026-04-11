@@ -74,7 +74,8 @@
                                class="w-full pl-24 pr-6 py-6 bg-slate-50 border-2 border-slate-200 focus:border-brand-600 focus:bg-white rounded-[24px] outline-none text-2xl font-black transition-all shadow-sm focus:shadow-xl focus:shadow-brand-600/5"
                                placeholder="2XXXXXXX" value="{{ old('phone', $sessionData['phone'] ?? '') }}">
                     </div>
-                    <button type="button" id="next-btn" data-testid="apply-next" aria-disabled="true" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-5 rounded-2xl text-lg min-h-[72px] hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-brand-600/20" disabled>{{ __('apply.next_step') }}</button>
+                    <button type="button" id="next-btn" data-testid="apply-next" aria-describedby="apply-phone-error" class="w-full inline-flex items-center justify-center bg-brand-600 text-white font-bold py-5 rounded-2xl text-lg min-h-[72px] hover:bg-brand-700 transition-all shadow-lg shadow-brand-600/20 opacity-60">{{ __('apply.next_step') }}</button>
+                    <p id="apply-phone-error" class="hidden text-center text-sm font-bold text-red-600" role="alert">{{ __('apply.phone_too_short') }}</p>
                 </div>
 
                 <div data-flow-panel="path" class="hidden space-y-8">

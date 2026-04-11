@@ -27,6 +27,7 @@ return [
     'close' => 'Aizvērt un iziet',
     'step_phone_title' => 'Jūsu tālrunis',
     'step_phone_sub' => 'Mēs to izmantosim sākuma koordinēšanai.',
+    'phone_too_short' => 'Ievadiet vismaz 8 ciparus (pēc +371), tad vēlreiz pieskarieties “Tālāk”.',
     'step_path_title' => 'Izvēlieties ceļu',
     'step_path_sub' => 'Kā vēlaties sadarboties?',
     'path_company_fleet' => 'Uzņēmuma autoparks',

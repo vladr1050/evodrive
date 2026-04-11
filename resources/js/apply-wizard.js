@@ -1,6 +1,8 @@
-document.addEventListener('DOMContentLoaded', function () {
+function bootApplyWizard() {
     const form = document.getElementById('apply-form');
-    if (!form) return;
+    if (!form) {
+        return;
+    }
 
     const FLOW_WORK = ['phone', 'path', 'qual', 'latvian', 'shifts', 'details', 'ready'];
     const FLOW_RENT = ['phone', 'path', 'qual', 'details', 'ready'];
@@ -31,18 +33,31 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    const phoneInput = document.querySelector('[name="phone"]');
+    const nextBtn = document.getElementById('next-btn');
+    const phoneErrorEl = document.getElementById('apply-phone-error');
+
+    function clearPhoneError() {
+        phoneErrorEl?.classList.add('hidden');
+    }
+
+    function showPhoneError() {
+        phoneErrorEl?.classList.remove('hidden');
+    }
+
+    /** Never use disabled on this button — it blocks taps before JS can re-enable. Only soften visually; validate on click. */
     function checkPhoneContinue() {
-        const phoneInput = document.querySelector('[name="phone"]');
-        const nb = document.getElementById('next-btn');
-        if (!phoneInput || !nb) {
+        if (!phoneInput || !nextBtn) {
             return;
         }
         const invalid = countLocalPhoneDigits(phoneInput.value) < 8;
-        nb.disabled = invalid;
-        nb.setAttribute('aria-disabled', invalid ? 'true' : 'false');
+        nextBtn.classList.toggle('opacity-60', invalid);
+        nextBtn.setAttribute('aria-disabled', invalid ? 'true' : 'false');
+        if (!invalid) {
+            clearPhoneError();
+        }
     }
 
-    /** iOS Safari often fills tel fields after load without input/change; retry a few times. */
     function schedulePhoneAutofillRecheck() {
         [0, 50, 150, 400, 1000, 2500, 5000].forEach((ms) => setTimeout(checkPhoneContinue, ms));
     }
@@ -82,8 +97,23 @@ document.addEventListener('DOMContentLoaded', function () {
         prevBtn.addEventListener('click', () => showFlowStep(flowIndex - 1));
     }
 
-    const nextBtn = document.getElementById('next-btn');
-    if (nextBtn) nextBtn.addEventListener('click', () => showFlowStep(1));
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            const pi = document.querySelector('[name="phone"]');
+            const digits = countLocalPhoneDigits(pi?.value || '');
+            if (digits < 8) {
+                showPhoneError();
+                pi?.focus();
+                pi?.classList.add('ring-2', 'ring-red-400', 'border-red-400');
+                window.setTimeout(() => {
+                    pi?.classList.remove('ring-2', 'ring-red-400', 'border-red-400');
+                }, 2000);
+                return;
+            }
+            clearPhoneError();
+            showFlowStep(1);
+        });
+    }
 
     document.querySelectorAll('[data-goto]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -211,7 +241,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const submitBtn = document.getElementById('submit-btn');
     if (submitBtn) submitBtn.addEventListener('click', () => form.submit());
 
-    const phoneInput = document.querySelector('[name="phone"]');
     if (phoneInput) {
         const recheckSoon = () => requestAnimationFrame(checkPhoneContinue);
         phoneInput.addEventListener('input', checkPhoneContinue);
@@ -241,4 +270,10 @@ document.addEventListener('DOMContentLoaded', function () {
     checkPhoneContinue();
     checkQualContinue();
     checkDetailsContinue();
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootApplyWizard, { once: true });
+} else {
+    bootApplyWizard();
+}

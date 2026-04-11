@@ -27,6 +27,7 @@ return [
     'close' => 'Close and exit',
     'step_phone_title' => 'Your Phone',
     'step_phone_sub' => 'We\'ll use this to coordinate your start.',
+    'phone_too_short' => 'Enter at least 8 digits (local number after +371), then tap Next again.',
     'step_path_title' => 'Select Path',
     'step_path_sub' => 'How would you like to cooperate?',
     'path_company_fleet' => 'Company Fleet',
