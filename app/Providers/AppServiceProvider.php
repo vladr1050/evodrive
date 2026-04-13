@@ -11,6 +11,7 @@ use App\Services\NessSmsProvider;
 use App\Services\TelegramNotifier;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -36,10 +37,14 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(ShiftCancelled::class, SendShiftCancellationTelegramNotification::class);
 
+        // Root-relative URLs so JS/CSS always match the page host (www vs apex). Absolute URLs
+        // from asset() ignore URL::forceRootUrl() when ASSET_URL / asset root is set in .env.
+        Vite::createAssetPathsUsing(fn (string $path) => '/'.ltrim($path, '/'));
+
         View::composer('*', function ($view) {
             $locale = app()->getLocale();
             $utm = array_filter(request()->only(['utm_source', 'utm_campaign', 'utm_medium', 'utm_content', 'utm_term']));
-            $view->with('applyUrl', route('apply.show', ['locale' => $locale]) . (empty($utm) ? '' : '?' . http_build_query($utm)));
+            $view->with('applyUrl', route('apply.show', ['locale' => $locale]).(empty($utm) ? '' : '?'.http_build_query($utm)));
         });
     }
 }

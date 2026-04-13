@@ -26,6 +26,21 @@ class ApplyFlowTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_apply_vite_scripts_use_root_relative_paths_not_config_app_url(): void
+    {
+        config(['app.url' => 'https://evodrive.lv']);
+
+        $response = $this->call('GET', '/en/apply', server: [
+            'HTTP_HOST' => 'www.example.test',
+            'HTTPS' => 'on',
+            'SERVER_PORT' => '443',
+        ]);
+
+        $response->assertOk();
+        $response->assertSee('src="/build/', false);
+        $response->assertDontSee('https://evodrive.lv/build/', false);
+    }
+
     public function test_valid_apply_creates_lead_with_expected_fields(): void
     {
         $this->get('/en/apply');
