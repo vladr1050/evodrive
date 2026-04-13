@@ -57,4 +57,5 @@ return [
     'shift_late_night' => 'Vēlās vakara / nakts maiņas',
     'shift_mixed' => 'Jauktas maiņas dažādos laikos',
     'email_placeholder' => 'E-pasts',
+    'js_load_hint' => 'Ja forma nereaģē, atsvaidziniet lapu vai mēģiniet citu pārlūku. Ja problēma paliek, rakstiet uz support@evodrive.lv.',
 ];

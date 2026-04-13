@@ -57,4 +57,5 @@ return [
     'shift_late_night' => 'Late evening / night shifts',
     'shift_mixed' => 'Mixed shifts at different times',
     'email_placeholder' => 'Email',
+    'js_load_hint' => 'If the form does not respond, refresh the page or try another browser. If it still fails, write to support@evodrive.lv.',
 ];

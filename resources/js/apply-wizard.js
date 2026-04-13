@@ -1,3 +1,5 @@
+window.__evodriveApplyWizard = true;
+
 function bootApplyWizard() {
     const form = document.getElementById('apply-form');
     if (!form) {

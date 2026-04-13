@@ -1,7 +1,10 @@
-document.addEventListener('DOMContentLoaded', () => {
+/**
+ * FAQ tabs + search only. Accordion uses native <details> in the Blade template
+ * so Q/A still expands if this file fails to load (CDN/cache/adblock).
+ */
+function bootFaqPage() {
     const tabs = document.querySelectorAll('.faq-tab');
     const items = document.querySelectorAll('.faq-item');
-    const triggers = document.querySelectorAll('.faq-trigger');
     const searchInput = document.querySelector('#faq-search');
     const pageEl = document.getElementById('faq-page');
 
@@ -9,24 +12,33 @@ document.addEventListener('DOMContentLoaded', () => {
     let searchQuery = '';
 
     const filterFAQ = () => {
-        items.forEach(item => {
+        items.forEach((item) => {
             const categoryMatch = item.dataset.category === currentCategory;
-            const triggerSpan = item.querySelector('.faq-trigger span');
-            const questionText = triggerSpan ? triggerSpan.textContent.toLowerCase() : '';
+            const questionEl = item.querySelector('.faq-question');
+            const questionText = questionEl ? questionEl.textContent.toLowerCase() : '';
             const searchMatch = !searchQuery || questionText.includes(searchQuery.toLowerCase());
 
+            // Tailwind .hidden uses display:none !important — toggle class, not inline style.
             if (categoryMatch && searchMatch) {
-                item.style.display = 'block';
+                item.classList.remove('hidden');
             } else {
-                item.style.display = 'none';
+                item.classList.add('hidden');
             }
         });
     };
 
-    // Tab Switching
-    tabs.forEach(tab => {
+    function closeAllDetails() {
+        items.forEach((item) => {
+            const det = item.querySelector('details');
+            if (det) {
+                det.open = false;
+            }
+        });
+    }
+
+    tabs.forEach((tab) => {
         tab.addEventListener('click', () => {
-            tabs.forEach(t => {
+            tabs.forEach((t) => {
                 t.classList.remove('active', 'bg-slate-900', 'text-white', 'border-slate-900');
                 t.classList.add('bg-white', 'text-slate-500', 'border-slate-200');
             });
@@ -36,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             currentCategory = tab.dataset.category;
             filterFAQ();
-            closeAllAccordions();
+            closeAllDetails();
 
             if (window.history.replaceState) {
                 window.history.replaceState(null, '', '#' + currentCategory);
@@ -44,76 +56,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Search Filtering
     searchInput?.addEventListener('input', (e) => {
         searchQuery = e.target.value || '';
         filterFAQ();
-    });
-
-    function closeAccordionItem(item) {
-        item.classList.remove('faq-open', 'border-brand-600/20', 'shadow-xl', 'shadow-brand-600/5', 'ring-1', 'ring-brand-600/5');
-        item.classList.add('border-slate-100', 'hover:border-slate-200');
-        const content = item.querySelector('.faq-content');
-        if (content) {
-            content.style.maxHeight = '0px';
-        }
-        const chevron = item.querySelector('.faq-chevron');
-        if (chevron) {
-            chevron.classList.remove('bg-brand-600', 'text-white', 'rotate-180', 'shadow-md', 'shadow-brand-600/30');
-            chevron.classList.add('bg-slate-50', 'text-slate-300');
-        }
-        const question = item.querySelector('.faq-question');
-        if (question) {
-            question.classList.remove('text-slate-900');
-            question.classList.add('text-slate-600');
-        }
-    }
-
-    function closeAllAccordions() {
-        items.forEach((item) => closeAccordionItem(item));
-    }
-
-    // Accordion: close only other items when opening (avoids scrollHeight = 0 in some browsers after zeroing the same panel).
-    triggers.forEach((trigger) => {
-        trigger.addEventListener('click', () => {
-            const item = trigger.closest('.faq-item');
-            const content = item.querySelector('.faq-content');
-            const chevron = item.querySelector('.faq-chevron');
-            const question = item.querySelector('.faq-question');
-            const isOpen = item.classList.contains('faq-open');
-
-            if (isOpen) {
-                closeAccordionItem(item);
-                return;
-            }
-
-            items.forEach((other) => {
-                if (other !== item) {
-                    closeAccordionItem(other);
-                }
-            });
-
-            if (!content || !chevron) {
-                return;
-            }
-
-            item.classList.add('faq-open');
-            item.classList.remove('border-slate-100', 'hover:border-slate-200');
-            item.classList.add('border-brand-600/20', 'shadow-xl', 'shadow-brand-600/5', 'ring-1', 'ring-brand-600/5');
-
-            const expand = () => {
-                content.style.maxHeight = content.scrollHeight + 'px';
-            };
-            expand();
-            requestAnimationFrame(expand);
-
-            chevron.classList.remove('bg-slate-50', 'text-slate-300');
-            chevron.classList.add('bg-brand-600', 'text-white', 'rotate-180', 'shadow-md', 'shadow-brand-600/30');
-            if (question) {
-                question.classList.remove('text-slate-600');
-                question.classList.add('text-slate-900');
-            }
-        });
     });
 
     filterFAQ();
@@ -123,4 +68,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const tab = document.querySelector('.faq-tab[data-category="' + hash + '"]');
         if (tab) tab.click();
     }
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootFaqPage, { once: true });
+} else {
+    bootFaqPage();
+}

@@ -12,7 +12,14 @@
     $defaultSlug = $categories->contains('slug', 'general') ? 'general' : ($categories->first()?->slug ?? 'general');
 @endphp
 <style>
-.faq-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-in-out; }
+/* Native <details>: answers work even when faq.js fails to load (adblock, stale CDN chunk, etc.) */
+.faq-details > summary { list-style: none; }
+.faq-details > summary::-webkit-details-marker { display: none; }
+.faq-details { border: 1px solid rgb(241 245 249); border-radius: 1rem; background: #fff; transition: border-color 0.2s, box-shadow 0.2s; }
+.faq-details[open] { border-color: rgba(37, 99, 235, 0.25); box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.06), 0 8px 10px -6px rgba(37, 99, 235, 0.06); }
+.faq-details .faq-chevron { transition: transform 0.2s ease, background-color 0.2s, color 0.2s; }
+.faq-details[open] .faq-chevron { transform: rotate(180deg); background-color: #2563eb; color: #fff; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.25); }
+.faq-details[open] .faq-question { color: #0f172a; }
 .faq-answer :where(p) { margin-top: 0.5rem; margin-bottom: 0.5rem; }
 .faq-answer :where(p:first-child) { margin-top: 0; }
 .faq-answer :where(p:last-child) { margin-bottom: 0; }
@@ -72,22 +79,23 @@
                         $a = $item->getTranslatedAnswer();
                     @endphp
                     @if($q && $a)
-                        <div class="faq-item bg-white border border-slate-100 rounded-2xl transition-all duration-300 overflow-hidden hover:border-slate-200"
-                            data-category="{{ $cat->slug }}">
-                            <button type="button" class="faq-trigger w-full px-6 py-5 text-left flex items-center justify-between gap-4 group">
-                                <span class="faq-question text-base font-bold transition-colors text-slate-600 group-hover:text-slate-900">{{ $q }}</span>
-                                <div class="faq-chevron flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all bg-slate-50 text-slate-300 group-hover:text-slate-400">
-                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                                </div>
-                            </button>
-                            <div class="faq-content overflow-hidden transition-all duration-300 ease-in-out max-h-0">
-                                <div class="px-6 pt-2 pb-6 text-sm leading-relaxed font-medium text-slate-500">
-                                    <div class="h-px w-full bg-slate-50 mb-4"></div>
+                        <div
+                            class="faq-item transition-all duration-300 {{ $cat->slug !== $defaultSlug ? 'hidden' : '' }}"
+                            data-category="{{ $cat->slug }}"
+                        >
+                            <details class="faq-details hover:border-slate-200">
+                                <summary class="flex w-full cursor-pointer items-center justify-between gap-4 px-6 py-5 text-left">
+                                    <span class="faq-question text-base font-bold text-slate-600">{{ $q }}</span>
+                                    <span class="faq-chevron flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-300" aria-hidden="true">
+                                        <svg class="h-[18px] w-[18px]" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                    </span>
+                                </summary>
+                                <div class="border-t border-slate-50 px-6 pb-6 pt-2 text-sm font-medium leading-relaxed text-slate-500">
                                     <div class="faq-answer">
                                         {!! str($a)->sanitizeHtml() !!}
                                     </div>
                                 </div>
-                            </div>
+                            </details>
                         </div>
                     @endif
                 @endforeach

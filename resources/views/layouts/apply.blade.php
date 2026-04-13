@@ -18,7 +18,21 @@
     <style>body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }</style>
 </head>
 <body class="bg-white text-slate-900 min-h-screen flex flex-col">
+    <p id="apply-js-missing-hint" class="hidden max-w-xl mx-auto px-4 py-3 text-center text-sm text-amber-800 bg-amber-50 border-b border-amber-200" role="status">
+        {{ __('apply.js_load_hint') }}
+    </p>
     @yield('content')
     @stack('scripts')
+    <script>
+        (function () {
+            var hint = document.getElementById('apply-js-missing-hint');
+            if (!hint) return;
+            window.setTimeout(function () {
+                if (!window.__evodriveApplyWizard) {
+                    hint.classList.remove('hidden');
+                }
+            }, 6000);
+        })();
+    </script>
 </body>
 </html>
