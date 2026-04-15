@@ -23,6 +23,10 @@ class RenterResource extends Resource
 
     protected static ?string $navigationLabel = 'Renters';
 
+    protected static ?string $modelLabel = 'Renter';
+
+    protected static ?string $pluralModelLabel = 'Renters';
+
     protected static ?int $navigationSort = 2;
 
     public static function canAccess(): bool
@@ -34,42 +38,42 @@ class RenterResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Klienta profils')
+                Forms\Components\Section::make('Client profile')
                     ->schema([
                         Forms\Components\TextInput::make('name_or_company')
-                            ->label('Vārds / uzņēmums')
+                            ->label('Name / company')
                             ->required()
                             ->maxLength(255),
                         Forms\Components\TextInput::make('personal_code_or_reg_number')
-                            ->label('Personas kods / reģ.nr.')
+                            ->label('Personal ID / reg. no.')
                             ->maxLength(100),
                         Forms\Components\TextInput::make('client_identifier')
-                            ->label('ID')
+                            ->label('Client ID')
                             ->maxLength(100),
                         Forms\Components\TextInput::make('licence')
-                            ->label('Licence')
+                            ->label('License')
                             ->maxLength(100),
                         Forms\Components\Toggle::make('is_active')
-                            ->label('Aktīvs')
+                            ->label('Active')
                             ->default(true)
                             ->inline(false),
                         Forms\Components\TextInput::make('phone')
-                            ->label('Telefons')
+                            ->label('Phone')
                             ->tel()
                             ->maxLength(50),
                         Forms\Components\TextInput::make('email')
-                            ->label('E-pasts')
+                            ->label('Email')
                             ->email()
                             ->maxLength(255),
                     ])
                     ->columns(2),
-                Forms\Components\Section::make('Līgums')
+                Forms\Components\Section::make('Contract')
                     ->schema([
                         Forms\Components\DatePicker::make('contract_signed_at')
-                            ->label('Parakstīts')
+                            ->label('Signed on')
                             ->native(false),
                         Forms\Components\DatePicker::make('contract_ends_at')
-                            ->label('Beidzies')
+                            ->label('Ends on')
                             ->native(false),
                     ])
                     ->columns(2),
@@ -99,43 +103,43 @@ class RenterResource extends Resource
                             })
                             ->dehydrated(false),
                     ]),
-                Forms\Components\Section::make('Maksājumu grafiks — kopsavilkums')
+                Forms\Components\Section::make('Payment schedule — summary')
                     ->schema([
                         Forms\Components\TextInput::make('total_debt')
-                            ->label('Kopējais parāds')
+                            ->label('Total debt')
                             ->numeric()
                             ->prefix('€')
                             ->nullable(),
                         Forms\Components\DatePicker::make('next_payment_at')
-                            ->label('Nākamais maksājums')
+                            ->label('Next payment')
                             ->native(false),
                         Forms\Components\TextInput::make('overdue_days')
-                            ->label('Kavējuma dienas')
+                            ->label('Days overdue')
                             ->numeric()
                             ->minValue(0)
                             ->maxValue(32767)
                             ->nullable(),
                     ])
                     ->columns(3),
-                Forms\Components\Section::make('Maksājumu grafiks')
+                Forms\Components\Section::make('Payment schedule')
                     ->schema([
                         Forms\Components\Repeater::make('paymentScheduleItems')
                             ->relationship()
                             ->schema([
                                 Forms\Components\DatePicker::make('payment_date')
-                                    ->label('Datums')
+                                    ->label('Date')
                                     ->required()
                                     ->native(false),
                                 Forms\Components\TextInput::make('amount')
-                                    ->label('Summa')
+                                    ->label('Amount')
                                     ->numeric()
                                     ->required()
                                     ->prefix('€'),
                                 Forms\Components\Toggle::make('is_paid')
-                                    ->label('Samaksāts')
+                                    ->label('Paid')
                                     ->default(false),
                                 Forms\Components\Toggle::make('is_overdue')
-                                    ->label('Kavēts')
+                                    ->label('Overdue')
                                     ->default(false),
                             ])
                             ->columns(4)
@@ -158,21 +162,21 @@ class RenterResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name_or_company')
-                    ->label('Vārds / uzņēmums')
+                    ->label('Name / company')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('client_identifier')
-                    ->label('ID')
+                    ->label('Client ID')
                     ->searchable()
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('phone')
-                    ->label('Telefons')
+                    ->label('Phone')
                     ->searchable(),
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label('Aktīvs')
+                    ->label('Active')
                     ->boolean(),
                 Tables\Columns\TextColumn::make('contract_ends_at')
-                    ->label('Līgums līdz')
+                    ->label('Contract until')
                     ->date()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('vehicle_regs')
@@ -191,7 +195,7 @@ class RenterResource extends Resource
             ->defaultSort('name_or_company')
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')
-                    ->label('Aktīvs'),
+                    ->label('Active'),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
