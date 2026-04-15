@@ -3,9 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class AdminAccessTest extends TestCase
@@ -65,6 +65,7 @@ class AdminAccessTest extends TestCase
         if ($allowsRedirect && $response->status() === 302) {
             $location = $response->headers->get('Location') ?? '';
             $this->assertStringNotContainsString('login', $location, "Unexpected redirect to login for: {$path}");
+
             return;
         }
         $response->assertOk("Failed for path: {$path}");
@@ -82,6 +83,8 @@ class AdminAccessTest extends TestCase
             'admin_shift_policies' => ['/admin/shift-policies', true], // Redirects to edit when single policy
             'admin_leads' => ['/admin/leads', false],
             'admin_rental_vehicles' => ['/admin/rental-vehicles', false],
+            'admin_renters' => ['/admin/renters', false],
+            'admin_rented_fleet_vehicles' => ['/admin/rented-fleet-vehicles', false],
             'admin_pages' => ['/admin/pages', false],
             'admin_faq_categories' => ['/admin/faq-categories', false],
             'admin_translations' => ['/admin/translations', false],
