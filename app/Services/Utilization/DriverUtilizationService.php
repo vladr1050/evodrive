@@ -7,6 +7,7 @@ use App\Models\Driver;
 use App\Models\Shift;
 use App\Models\ShiftPolicy;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -48,9 +49,7 @@ class DriverUtilizationService
             $isBooked = $status === ShiftStatus::Booked;
             $isCompleted = $status === ShiftStatus::Completed;
             $stationName = $shift->station?->name ?? '—';
-            $vehicleLabel = $shift->vehicle
-                ? trim($shift->vehicle->brand . ' ' . $shift->vehicle->model) . ' (' . ($shift->vehicle->registration_number ?? '—') . ')'
-                : '—';
+            $vehicleLabel = $this->shiftVehicleLabel($shift);
 
             while ($day->lte($shiftEnd)) {
                 $dayStart = $day->copy()->startOfDay();
@@ -139,9 +138,7 @@ class DriverUtilizationService
                 $result[] = [
                     'shift_id' => $shift->id,
                     'station' => $shift->station?->name ?? '—',
-                    'vehicle' => $shift->vehicle
-                        ? trim($shift->vehicle->brand . ' ' . $shift->vehicle->model) . ' ' . ($shift->vehicle->registration_number ?? '')
-                        : '—',
+                    'vehicle' => $this->shiftVehicleLabel($shift),
                     'start' => $overlapStart->format('H:i'),
                     'end' => $overlapEnd->format('H:i'),
                     'duration_minutes' => $minutes,
@@ -191,7 +188,7 @@ class DriverUtilizationService
         $to = Carbon::parse($range->dateTo, $tz)->endOfDay()->setTimezone('UTC');
 
         $query = Shift::query()
-            ->with(['driver', 'vehicle', 'station'])
+            ->with(['driver', 'vehicle', 'originalVehicle', 'station'])
             ->where('starts_at', '<', $to)
             ->where('ends_at', '>', $from)
             ->orderBy('starts_at');
@@ -213,10 +210,35 @@ class DriverUtilizationService
             $query->whereIn('station_id', $filters->stationIds);
         }
         if ($filters->vehicleIds !== null && $filters->vehicleIds !== []) {
-            $query->whereIn('vehicle_id', $filters->vehicleIds);
+            $vehicleIds = array_map('intval', $filters->vehicleIds);
+            $query->where(function (Builder $q) use ($vehicleIds, $filters) {
+                $q->whereIn('vehicle_id', $vehicleIds);
+                if ($filters->attributeBookedShiftsToOriginalVehicle) {
+                    $q->orWhere(function (Builder $q2) use ($vehicleIds) {
+                        $q2->whereIn('original_vehicle_id', $vehicleIds)
+                            ->where('status', ShiftStatus::Booked);
+                    });
+                }
+            });
         }
 
         return $query->get();
+    }
+
+    private function shiftVehicleLabel(Shift $shift): string
+    {
+        $v = $shift->vehicle;
+        $current = $v
+            ? trim($v->brand.' '.$v->model).' ('.($v->registration_number ?? '—').')'
+            : '—';
+        $orig = $shift->originalVehicle;
+        if ($orig && (int) $orig->id !== (int) $shift->vehicle_id) {
+            $origLabel = trim($orig->brand.' '.$orig->model).' ('.($orig->registration_number ?? '—').')';
+
+            return $current.' (was '.$origLabel.')';
+        }
+
+        return $current;
     }
 
     private function loadDriverNames(Collection $shifts): Collection

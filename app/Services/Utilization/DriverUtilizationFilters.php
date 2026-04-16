@@ -18,9 +18,9 @@ final class DriverUtilizationFilters
         public readonly ?array $stationIds = null,
         public readonly ?array $vehicleIds = null,
         public readonly string $statusMode = self::STATUS_MODE_BOTH,
-        public readonly ?string $timezone = null
-    ) {
-    }
+        public readonly ?string $timezone = null,
+        public readonly bool $attributeBookedShiftsToOriginalVehicle = false
+    ) {}
 
     public function includeBooked(): bool
     {

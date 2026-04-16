@@ -54,6 +54,7 @@ class ShiftBookingTest extends TestCase
         $shift1 = $bookingService->bookShift($this->driver1->id, $this->station->id, $startsAt, 4);
         $this->assertSame($this->driver1->id, $shift1->driver_id);
         $this->assertSame($this->vehicle->id, $shift1->vehicle_id);
+        $this->assertSame($this->vehicle->id, $shift1->original_vehicle_id);
 
         $thrown = null;
         try {

@@ -101,6 +101,20 @@ class ShiftResource extends Resource
                             // Summary/aggregate context may pass builder without model
                         }
                     }),
+                Tables\Columns\TextColumn::make('original_vehicle_id')
+                    ->label('Originally assigned')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->formatStateUsing(function ($state, Shift $record): string {
+                        if ($state === null || (int) $state === (int) $record->vehicle_id) {
+                            return '—';
+                        }
+                        $ov = $record->originalVehicle;
+                        if (! $ov) {
+                            return '#'.(string) $state;
+                        }
+
+                        return $ov->registration_number.' – '.trim(($ov->brand ?? '').' '.($ov->model ?? ''));
+                    }),
                 Tables\Columns\TextColumn::make('station.name')
                     ->label('Station')
                     ->searchable(query: function (Builder $q, string $search) {

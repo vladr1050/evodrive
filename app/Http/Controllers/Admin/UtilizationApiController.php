@@ -36,6 +36,7 @@ class UtilizationApiController extends Controller
             'station_ids' => 'nullable|array',
             'station_ids.*' => 'integer',
             'status_mode' => 'nullable|in:completed,booked,both',
+            'attribute_booked_to_original_vehicle' => 'nullable|boolean',
         ]);
         $range = new DateRange($valid['date_from'], $valid['date_to']);
         $tz = ShiftPolicy::active()?->timezone ?? config('app.timezone', 'Europe/Riga');
@@ -43,7 +44,8 @@ class UtilizationApiController extends Controller
             ! empty($valid['vehicle_ids']) ? $valid['vehicle_ids'] : null,
             ! empty($valid['station_ids']) ? $valid['station_ids'] : null,
             $valid['status_mode'] ?? UtilizationFilters::STATUS_MODE_BOTH,
-            $tz
+            $tz,
+            (bool) ($valid['attribute_booked_to_original_vehicle'] ?? false)
         );
         $rows = $this->service->getDailyUtilization($range, $filters);
         $data = $rows->map(fn ($r) => [
@@ -70,7 +72,8 @@ class UtilizationApiController extends Controller
             return response()->json(['error' => 'Invalid date format (use Y-m-d)'], 422);
         }
         $tz = ShiftPolicy::active()?->timezone ?? config('app.timezone', 'Europe/Riga');
-        $filters = new UtilizationFilters(null, null, UtilizationFilters::STATUS_MODE_BOTH, $tz);
+        $attrOriginal = $request->boolean('attribute_booked_to_original_vehicle');
+        $filters = new UtilizationFilters(null, null, UtilizationFilters::STATUS_MODE_BOTH, $tz, $attrOriginal);
         $intervals = $this->service->getDailyIntervals($vehicleId, $date, $filters);
 
         return response()->json(['data' => $intervals]);
@@ -92,6 +95,7 @@ class UtilizationApiController extends Controller
             'station_ids' => 'nullable|array',
             'station_ids.*' => 'integer',
             'status_mode' => 'nullable|in:completed,booked,both',
+            'attribute_booked_to_original_vehicle' => 'nullable|boolean',
         ]);
         $range = new DateRange($valid['date_from'], $valid['date_to']);
         $tz = ShiftPolicy::active()?->timezone ?? config('app.timezone', 'Europe/Riga');
@@ -99,12 +103,14 @@ class UtilizationApiController extends Controller
             ! empty($valid['vehicle_ids']) ? $valid['vehicle_ids'] : null,
             ! empty($valid['station_ids']) ? $valid['station_ids'] : null,
             $valid['status_mode'] ?? UtilizationFilters::STATUS_MODE_BOTH,
-            $tz
+            $tz,
+            (bool) ($valid['attribute_booked_to_original_vehicle'] ?? false)
         );
         $shifts = $this->service->getSourcesInRange($range, $filters);
         $data = $shifts->map(fn (Shift $s) => [
             'id' => $s->id,
             'vehicle_id' => $s->vehicle_id,
+            'original_vehicle_id' => $s->original_vehicle_id,
             'station_id' => $s->station_id,
             'starts_at' => $s->starts_at->toIso8601String(),
             'ends_at' => $s->ends_at->toIso8601String(),

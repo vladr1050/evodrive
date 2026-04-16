@@ -5,12 +5,15 @@ namespace App\Services;
 use App\Enums\ShiftStatus;
 use App\Models\FleetVehicle;
 use App\Models\Shift;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 /**
  * Stats: per-day, per-vehicle hours in status Booked/Completed (out of 24h).
  * Shift 20:00–02:00 gives 4h to the first day and 2h to the next.
+ *
+ * Hours are attributed to the shift's current {@see Shift::$vehicle_id} only.
+ * For booked hours on the first-assigned vehicle after a repair swap, use
+ * {@see VehicleUtilizationService} with UtilizationFilters::$attributeBookedShiftsToOriginalVehicle.
  */
 class VehicleUtilizationStatsService
 {
@@ -92,9 +95,10 @@ class VehicleUtilizationStatsService
         if (empty($ids)) {
             return collect();
         }
+
         return FleetVehicle::whereIn('id', $ids)
             ->get()
             ->keyBy('id')
-            ->map(fn (FleetVehicle $v) => trim($v->brand . ' ' . $v->model) . ' (' . ($v->registration_number ?? '—') . ')');
+            ->map(fn (FleetVehicle $v) => trim($v->brand.' '.$v->model).' ('.($v->registration_number ?? '—').')');
     }
 }

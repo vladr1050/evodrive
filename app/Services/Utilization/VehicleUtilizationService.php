@@ -7,6 +7,7 @@ use App\Models\FleetVehicle;
 use App\Models\Shift;
 use App\Models\ShiftPolicy;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -47,6 +48,10 @@ class VehicleUtilizationService
             $status = $shift->status;
             $isBooked = $status === ShiftStatus::Booked;
             $isCompleted = $status === ShiftStatus::Completed;
+            $bucketVehicleId = $this->utilizationVehicleBucketId($shift, $isBooked, $isCompleted, $filters);
+            if ($bucketVehicleId === null) {
+                continue;
+            }
 
             while ($day->lte($shiftEnd)) {
                 $dayStart = $day->copy()->startOfDay();
@@ -57,20 +62,20 @@ class VehicleUtilizationService
                     $startMin = (int) round($dayStart->diffInMinutes($overlapStart, false));
                     $endMin = (int) round($dayStart->diffInMinutes($overlapEnd, false));
                     $dateKey = $day->format('Y-m-d');
-                    if (! isset($byDateVehicle[$dateKey][$shift->vehicle_id])) {
-                        $byDateVehicle[$dateKey][$shift->vehicle_id] = [
+                    if (! isset($byDateVehicle[$dateKey][$bucketVehicleId])) {
+                        $byDateVehicle[$dateKey][$bucketVehicleId] = [
                             'booked' => [],
                             'completed' => [],
                             'all' => [],
                         ];
                     }
                     $interval = [$startMin, $endMin];
-                    $byDateVehicle[$dateKey][$shift->vehicle_id]['all'][] = $interval;
+                    $byDateVehicle[$dateKey][$bucketVehicleId]['all'][] = $interval;
                     if ($isBooked) {
-                        $byDateVehicle[$dateKey][$shift->vehicle_id]['booked'][] = $interval;
+                        $byDateVehicle[$dateKey][$bucketVehicleId]['booked'][] = $interval;
                     }
                     if ($isCompleted) {
-                        $byDateVehicle[$dateKey][$shift->vehicle_id]['completed'][] = $interval;
+                        $byDateVehicle[$dateKey][$bucketVehicleId]['completed'][] = $interval;
                     }
                 }
                 $day->addDay();
@@ -109,7 +114,9 @@ class VehicleUtilizationService
     {
         $tz = $filters->timezone ?? $this->defaultTimezone;
         $range = new DateRange($date, $date);
-        $shifts = $this->loadShiftsInRange($range, $filters, $tz)->filter(fn (Shift $s) => $s->vehicle_id === $vehicleId);
+        $shifts = $this->loadShiftsInRange($range, $filters, $tz)->filter(
+            fn (Shift $s) => $this->shiftMatchesVehicleFilter($s, $vehicleId, $filters)
+        );
         $dayStart = Carbon::parse($date, $tz)->startOfDay();
         $dayEnd = $dayStart->copy()->endOfDay();
         $intervals = [];
@@ -143,30 +150,8 @@ class VehicleUtilizationService
     public function getSourcesInRange(DateRange $range, UtilizationFilters $filters): Collection
     {
         $tz = $filters->timezone ?? $this->defaultTimezone;
-        $from = Carbon::parse($range->dateFrom, $tz)->startOfDay()->setTimezone('UTC');
-        $to = Carbon::parse($range->dateTo, $tz)->endOfDay()->setTimezone('UTC');
 
-        $query = Shift::query()
-            ->whereIn('status', [ShiftStatus::Booked, ShiftStatus::Completed])
-            ->where('starts_at', '<', $to)
-            ->where('ends_at', '>', $from)
-            ->with(['vehicle', 'station'])
-            ->orderBy('starts_at');
-
-        if ($filters->vehicleIds !== null && $filters->vehicleIds !== []) {
-            $query->whereIn('vehicle_id', $filters->vehicleIds);
-        }
-        if ($filters->stationIds !== null && $filters->stationIds !== []) {
-            $query->whereIn('station_id', $filters->stationIds);
-        }
-        if ($filters->statusMode === UtilizationFilters::STATUS_MODE_BOOKED) {
-            $query->where('status', ShiftStatus::Booked);
-        }
-        if ($filters->statusMode === UtilizationFilters::STATUS_MODE_COMPLETED) {
-            $query->where('status', ShiftStatus::Completed);
-        }
-
-        return $query->get();
+        return $this->loadShiftsInRange($range, $filters, $tz);
     }
 
     /**
@@ -219,6 +204,7 @@ class VehicleUtilizationService
         $query = Shift::query()
             ->where('starts_at', '<', $to)
             ->where('ends_at', '>', $from)
+            ->with(['vehicle', 'originalVehicle', 'station'])
             ->orderBy('starts_at');
 
         if ($filters->includeBooked() && $filters->includeCompleted()) {
@@ -232,7 +218,16 @@ class VehicleUtilizationService
         }
 
         if ($filters->vehicleIds !== null && $filters->vehicleIds !== []) {
-            $query->whereIn('vehicle_id', $filters->vehicleIds);
+            $vehicleIds = array_map('intval', $filters->vehicleIds);
+            $query->where(function (Builder $q) use ($vehicleIds, $filters) {
+                $q->whereIn('vehicle_id', $vehicleIds);
+                if ($filters->attributeBookedShiftsToOriginalVehicle) {
+                    $q->orWhere(function (Builder $q2) use ($vehicleIds) {
+                        $q2->whereIn('original_vehicle_id', $vehicleIds)
+                            ->where('status', ShiftStatus::Booked);
+                    });
+                }
+            });
         }
         if ($filters->stationIds !== null && $filters->stationIds !== []) {
             $query->whereIn('station_id', $filters->stationIds);
@@ -243,7 +238,12 @@ class VehicleUtilizationService
 
     private function loadVehicles(Collection $shifts): Collection
     {
-        $ids = $shifts->pluck('vehicle_id')->filter()->unique()->values()->all();
+        $ids = $shifts->pluck('vehicle_id')
+            ->merge($shifts->pluck('original_vehicle_id'))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
         if (empty($ids)) {
             return collect();
         }
@@ -251,6 +251,39 @@ class VehicleUtilizationService
         return FleetVehicle::whereIn('id', $ids)
             ->get()
             ->keyBy('id')
-            ->map(fn (FleetVehicle $v) => trim($v->brand . ' ' . $v->model) . ' (' . ($v->registration_number ?? '—') . ')');
+            ->map(fn (FleetVehicle $v) => trim($v->brand.' '.$v->model).' ('.($v->registration_number ?? '—').')');
+    }
+
+    /**
+     * Vehicle row key for utilization: completed → current vehicle_id; booked → optional original.
+     */
+    private function utilizationVehicleBucketId(Shift $shift, bool $isBooked, bool $isCompleted, UtilizationFilters $filters): ?int
+    {
+        if ($isCompleted) {
+            return $shift->vehicle_id ? (int) $shift->vehicle_id : null;
+        }
+        if ($isBooked) {
+            if ($filters->attributeBookedShiftsToOriginalVehicle) {
+                return (int) ($shift->original_vehicle_id ?? $shift->vehicle_id);
+            }
+
+            return $shift->vehicle_id ? (int) $shift->vehicle_id : null;
+        }
+
+        return null;
+    }
+
+    private function shiftMatchesVehicleFilter(Shift $shift, int $vehicleId, UtilizationFilters $filters): bool
+    {
+        if ((int) $shift->vehicle_id === $vehicleId) {
+            return true;
+        }
+        if ($filters->attributeBookedShiftsToOriginalVehicle
+            && $shift->status === ShiftStatus::Booked
+            && (int) ($shift->original_vehicle_id ?? 0) === $vehicleId) {
+            return true;
+        }
+
+        return false;
     }
 }

@@ -80,6 +80,7 @@ class AdminAccessTest extends TestCase
             'admin_stations' => ['/admin/stations', false],
             'admin_fleet_vehicles' => ['/admin/fleet-vehicles', false],
             'admin_shifts' => ['/admin/shifts', false],
+            'admin_shift_vehicle_reassignment' => ['/admin/shift-vehicle-reassignment', false],
             'admin_shift_policies' => ['/admin/shift-policies', true], // Redirects to edit when single policy
             'admin_leads' => ['/admin/leads', false],
             'admin_rental_vehicles' => ['/admin/rental-vehicles', false],

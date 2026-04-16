@@ -36,6 +36,7 @@ class DriverUtilizationApiController extends Controller
             'vehicle_ids' => 'nullable|array',
             'vehicle_ids.*' => 'integer',
             'status_mode' => 'nullable|in:completed,booked,both',
+            'attribute_booked_to_original_vehicle' => 'nullable|boolean',
         ]);
         $range = new DateRange($valid['date_from'], $valid['date_to']);
         $tz = ShiftPolicy::active()?->timezone ?? config('app.timezone', 'Europe/Riga');
@@ -44,7 +45,8 @@ class DriverUtilizationApiController extends Controller
             ! empty($valid['station_ids']) ? $valid['station_ids'] : null,
             ! empty($valid['vehicle_ids']) ? $valid['vehicle_ids'] : null,
             $valid['status_mode'] ?? DriverUtilizationFilters::STATUS_MODE_BOTH,
-            $tz
+            $tz,
+            (bool) ($valid['attribute_booked_to_original_vehicle'] ?? false)
         );
         $rows = $this->service->getDailyDriverUtilization($range, $filters);
         $data = $rows->map(fn ($r) => [
@@ -72,7 +74,8 @@ class DriverUtilizationApiController extends Controller
             return response()->json(['error' => 'Invalid date format (use Y-m-d)'], 422);
         }
         $tz = ShiftPolicy::active()?->timezone ?? config('app.timezone', 'Europe/Riga');
-        $filters = new DriverUtilizationFilters(null, null, null, DriverUtilizationFilters::STATUS_MODE_BOTH, $tz);
+        $attrOriginal = $request->boolean('attribute_booked_to_original_vehicle');
+        $filters = new DriverUtilizationFilters(null, null, null, DriverUtilizationFilters::STATUS_MODE_BOTH, $tz, $attrOriginal);
         $breakdown = $this->service->getDriverDayBreakdown($driverId, $date, $filters);
 
         return response()->json(['data' => $breakdown]);

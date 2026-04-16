@@ -31,6 +31,13 @@
                     </select>
                 </div>
             </div>
+            <div class="mt-4">
+                <label class="inline-flex items-center gap-2 text-sm">
+                    <input type="checkbox" wire:model.live="attributeBookedToOriginalVehicle" class="rounded border-gray-300 dark:border-gray-600">
+                    <span>Attribute booked hours to first-assigned vehicle (original_vehicle_id)</span>
+                </label>
+                <p class="text-xs text-gray-500 mt-1">Completed hours always use the current vehicle. Use after repair swaps to see planned load on the truck the slot was opened for.</p>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Vehicles</label>

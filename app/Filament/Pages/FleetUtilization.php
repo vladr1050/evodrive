@@ -40,6 +40,12 @@ class FleetUtilization extends Page
 
     public string $statusMode = UtilizationFilters::STATUS_MODE_BOTH;
 
+    /**
+     * When true, booked (planned) minutes are attributed to original_vehicle_id instead of current vehicle_id
+     * after a reassignment. Completed minutes always use current vehicle_id.
+     */
+    public bool $attributeBookedToOriginalVehicle = false;
+
     public bool $showIntervalModal = false;
 
     public ?int $intervalModalVehicleId = null;
@@ -61,6 +67,7 @@ class FleetUtilization extends Page
     public static function canAccess(): bool
     {
         $user = auth()->user();
+
         return $user === null || $user->canAccessResource('statistics');
     }
 
@@ -72,7 +79,8 @@ class FleetUtilization extends Page
             $this->vehicleIds ?: null,
             $this->stationIds ?: null,
             $this->statusMode,
-            $tz
+            $tz,
+            $this->attributeBookedToOriginalVehicle
         );
         $service = app(VehicleUtilizationService::class);
         $rows = $service->getDailyUtilization($range, $filters);
@@ -87,7 +95,7 @@ class FleetUtilization extends Page
         if ($this->showIntervalModal && $this->intervalModalVehicleId && $this->intervalModalDate) {
             $intervalDetail = $service->getDailyIntervals($this->intervalModalVehicleId, $this->intervalModalDate, $filters);
             $v = FleetVehicle::find($this->intervalModalVehicleId);
-            $intervalModalVehicleName = $v ? ($v->registration_number . ' ' . $v->brand . ' ' . $v->model) : '';
+            $intervalModalVehicleName = $v ? ($v->registration_number.' '.$v->brand.' '.$v->model) : '';
         }
 
         return [
@@ -120,6 +128,7 @@ class FleetUtilization extends Page
     protected function getVehicleList(Collection $rows): Collection
     {
         $byVehicle = $rows->unique('vehicle_id')->sortBy('vehicle_name')->values();
+
         return $byVehicle->map(fn ($r) => (object) ['id' => $r->vehicle_id, 'name' => $r->vehicle_name])->values();
     }
 
@@ -134,6 +143,7 @@ class FleetUtilization extends Page
                 'total_minutes' => $r->total_minutes,
             ];
         }
+
         return $map;
     }
 
@@ -186,7 +196,13 @@ class FleetUtilization extends Page
     {
         $range = new DateRange($this->dateFrom, $this->dateTo);
         $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
-        $filters = new UtilizationFilters($this->vehicleIds ?: null, $this->stationIds ?: null, $this->statusMode, $tz);
+        $filters = new UtilizationFilters(
+            $this->vehicleIds ?: null,
+            $this->stationIds ?: null,
+            $this->statusMode,
+            $tz,
+            $this->attributeBookedToOriginalVehicle
+        );
         $rows = app(VehicleUtilizationService::class)->getDailyUtilization($range, $filters);
 
         return response()->streamDownload(function () use ($rows) {
@@ -203,7 +219,7 @@ class FleetUtilization extends Page
                 ]);
             }
             fclose($out);
-        }, 'fleet-utilization-' . $this->dateFrom . '-to-' . $this->dateTo . '.csv', [
+        }, 'fleet-utilization-'.$this->dateFrom.'-to-'.$this->dateTo.'.csv', [
             'Content-Type' => 'text/csv',
         ]);
     }

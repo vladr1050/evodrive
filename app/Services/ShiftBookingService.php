@@ -47,6 +47,7 @@ class ShiftBookingService
             $shift = Shift::create([
                 'driver_id' => $driverId,
                 'vehicle_id' => $vehicleId,
+                'original_vehicle_id' => $vehicleId,
                 'station_id' => $stationId,
                 'starts_at' => $startsAtUtc,
                 'ends_at' => $endsAtUtc,
