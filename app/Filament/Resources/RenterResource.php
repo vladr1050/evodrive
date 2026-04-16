@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\RenterResource\Pages;
+use App\Filament\Resources\RenterResource\RelationManagers\ContractDocumentsRelationManager;
 use App\Models\RentedFleetVehicle;
 use App\Models\Renter;
 use Filament\Forms;
@@ -68,6 +69,7 @@ class RenterResource extends Resource
                     ])
                     ->columns(2),
                 Forms\Components\Section::make('Contract')
+                    ->description('Upload contract files in the “Contract documents” tab below (after the renter is saved).')
                     ->schema([
                         Forms\Components\DatePicker::make('contract_signed_at')
                             ->label('Signed on')
@@ -205,6 +207,13 @@ class RenterResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            ContractDocumentsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

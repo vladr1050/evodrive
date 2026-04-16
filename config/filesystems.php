@@ -38,6 +38,16 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Private contract files (not web-exposed). Downloads go through authenticated controller.
+         */
+        'renter_contracts' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/renter-contracts'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

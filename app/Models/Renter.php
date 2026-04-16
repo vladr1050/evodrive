@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Renter extends Model
 {
+    /** @use HasFactory<\Database\Factories\RenterFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'name_or_company',
         'personal_code_or_reg_number',
@@ -43,5 +47,10 @@ class Renter extends Model
     public function paymentScheduleItems(): HasMany
     {
         return $this->hasMany(RenterPaymentScheduleItem::class);
+    }
+
+    public function contractDocuments(): HasMany
+    {
+        return $this->hasMany(RenterContractDocument::class);
     }
 }

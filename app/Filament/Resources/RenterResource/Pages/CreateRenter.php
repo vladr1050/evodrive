@@ -23,4 +23,9 @@ class CreateRenter extends CreateRecord
     {
         $this->syncRenterRentedFleetVehicles($this->record);
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('edit', ['record' => $this->record]);
+    }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DriverUtilizationApiController;
+use App\Http\Controllers\Admin\RenterContractDocumentDownloadController;
 use App\Http\Controllers\Admin\UtilizationApiController;
 use App\Http\Controllers\ApplyController;
 use App\Http\Controllers\DriverPortalController;
@@ -65,20 +66,22 @@ Route::get('/sitemap.xml', function () {
     $xml = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">';
     foreach ($locales as $loc) {
         foreach ($paths as $p) {
-            $url = $base . '/' . $loc . ($p ? '/' . $p : '');
-            $xml .= '<url><loc>' . htmlspecialchars($url) . '</loc><lastmod>' . $lastmod . '</lastmod><priority>' . ($p === '' ? '1.0' : '0.8') . '</priority><xhtml:link rel="alternate" hreflang="' . $loc . '" href="' . htmlspecialchars($url) . '"/></url>';
+            $url = $base.'/'.$loc.($p ? '/'.$p : '');
+            $xml .= '<url><loc>'.htmlspecialchars($url).'</loc><lastmod>'.$lastmod.'</lastmod><priority>'.($p === '' ? '1.0' : '0.8').'</priority><xhtml:link rel="alternate" hreflang="'.$loc.'" href="'.htmlspecialchars($url).'"/></url>';
         }
         foreach ($rentIds as $id) {
-            $url = $base . '/' . $loc . '/rent/' . $id;
-            $xml .= '<url><loc>' . htmlspecialchars($url) . '</loc><lastmod>' . $lastmod . '</lastmod><priority>0.7</priority><xhtml:link rel="alternate" hreflang="' . $loc . '" href="' . htmlspecialchars($url) . '"/></url>';
+            $url = $base.'/'.$loc.'/rent/'.$id;
+            $xml .= '<url><loc>'.htmlspecialchars($url).'</loc><lastmod>'.$lastmod.'</lastmod><priority>0.7</priority><xhtml:link rel="alternate" hreflang="'.$loc.'" href="'.htmlspecialchars($url).'"/></url>';
         }
     }
     $xml .= '</urlset>';
+
     return response($xml)->header('Content-Type', 'application/xml');
 });
 
 Route::get('/robots.txt', function () {
     $sitemap = url('/sitemap.xml');
+
     return response("User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: {$sitemap}\n")->header('Content-Type', 'text/plain');
 });
 
@@ -102,3 +105,9 @@ Route::middleware(['auth'])->prefix('api/admin/driver-utilization')->group(funct
     Route::get('/', [DriverUtilizationApiController::class, 'daily'])->name('api.admin.driver_utilization.daily');
     Route::get('{driverId}/{date}', [DriverUtilizationApiController::class, 'dayBreakdown'])->name('api.admin.driver_utilization.day_breakdown');
 });
+
+// Private renter contract downloads (auth + Rental permission; not a public file URL)
+Route::middleware(['web', 'auth', 'throttle:120,1'])->get(
+    '/secure-downloads/renter-contracts/{renterContractDocument}',
+    RenterContractDocumentDownloadController::class
+)->name('admin.renter-contract-documents.download');
