@@ -2,29 +2,31 @@
 
 namespace App\Services;
 
-use App\Contracts\SmsProviderInterface;
 use App\Enums\ShiftStatus;
 use App\Models\CarCommand;
-use App\Models\Driver;
+use App\Models\FleetVehicle;
 use App\Models\Shift;
+use App\Services\CarControl\CarActionCommandResolver;
+use App\Services\CarControl\CarControlTransportRouter;
+use App\Services\CarControl\CarDeviceCommandResult;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Car control via SMS: access window, rate limit, idempotency, command execution.
+ * Car control: access window, rate limit, idempotency, command execution.
+ * Delivery uses {@see CarControlTransportRouter} (SMS / GPRS / AUTO) without changing action → payload mapping.
  */
 class CarControlService
 {
     public function __construct(
-        protected SmsProviderInterface $smsProvider
-    ) {
-    }
+        protected CarActionCommandResolver $commandResolver,
+        protected CarControlTransportRouter $transportRouter,
+    ) {}
 
     /**
      * Get current car control context for driver (shift + vehicle) or reason why access denied.
      *
-     * @return array{allowed: true, shift: Shift, vehicle: \App\Models\FleetVehicle}|array{allowed: false, reason: string}
+     * @return array{allowed: true, shift: Shift, vehicle: FleetVehicle}|array{allowed: false, reason: string}
      */
     public function getDriverCarControlContext(int $driverId, ?Carbon $now = null): array
     {
@@ -71,7 +73,18 @@ class CarControlService
         if (! $vehicle) {
             return ['allowed' => false, 'reason' => 'no_shift'];
         }
-        if (empty(trim((string) $vehicle->sim))) {
+
+        $transportMode = $this->transportMode();
+        $hasSim = filled(trim((string) ($vehicle->sim ?? '')));
+        $hasImei = filled(trim((string) ($vehicle->imei ?? '')));
+
+        if ($transportMode === 'sms' && ! $hasSim) {
+            return ['allowed' => false, 'reason' => 'car_not_configured'];
+        }
+        if ($transportMode === 'gprs' && ! $hasImei) {
+            return ['allowed' => false, 'reason' => 'car_not_configured'];
+        }
+        if ($transportMode === 'auto' && ! $hasSim && ! $hasImei) {
             return ['allowed' => false, 'reason' => 'car_not_configured'];
         }
 
@@ -110,7 +123,7 @@ class CarControlService
     }
 
     /**
-     * Execute car control action. Validates context, rate limit, idempotency; creates CarCommand and sends SMS.
+     * Execute car control action. Validates context, rate limit, idempotency; creates CarCommand and delivers payloads.
      *
      * @return array{ok: bool, message: string, command?: CarCommand}
      */
@@ -124,9 +137,23 @@ class CarControlService
 
         $shift = $context['shift'];
         $vehicle = $context['vehicle'];
-        $phone = preg_replace('/\D/', '', $vehicle->sim);
-        if ($phone === '') {
+        $transportMode = $this->transportMode();
+        $phone = preg_replace('/\D/', '', (string) $vehicle->sim);
+        $imei = trim((string) ($vehicle->imei ?? ''));
+
+        if ($transportMode === 'sms' && $phone === '') {
             return ['ok' => false, 'message' => 'Car SIM (phone) not configured.'];
+        }
+        if ($transportMode === 'gprs') {
+            if ($imei === '') {
+                return ['ok' => false, 'message' => 'Vehicle IMEI not configured for GPRS control.'];
+            }
+            if (! filled(config('car_control.gprs.internal_base_url'))) {
+                return ['ok' => false, 'message' => 'GPRS control is not configured on the server.'];
+            }
+        }
+        if ($transportMode === 'auto' && ! $this->transportRouter->canAutoAttempt($vehicle)) {
+            return ['ok' => false, 'message' => 'Vehicle cannot be reached: add SIM for SMS fallback, or IMEI with online GPRS.'];
         }
 
         if (! $this->canExecuteCommand($driverId, $vehicle->id)) {
@@ -138,74 +165,98 @@ class CarControlService
             return ['ok' => false, 'message' => 'Command is in progress…', 'command' => $inProgress];
         }
 
-        $payloads = $this->getPayloadsForAction($action);
+        $payloads = $this->commandResolver->resolve($action);
         if ($payloads === []) {
             return ['ok' => false, 'message' => 'Unknown action.'];
         }
+
+        $smsTo = $vehicle->sim ?: ($imei !== '' ? 'imei:'.$imei : '-');
 
         $command = CarCommand::create([
             'driver_id' => $driverId,
             'shift_id' => $shift->id,
             'vehicle_id' => $vehicle->id,
             'action' => $action,
-            'sms_to' => $vehicle->sim,
+            'sms_to' => $smsTo,
             'sms_payloads' => $payloads,
             'status' => CarCommand::STATUS_QUEUED,
         ]);
 
-        $delaySeconds = config('car_control.pair_sms_delay_seconds', 3);
-        $messageIds = [];
-        foreach ($payloads as $i => $text) {
-            if ($i > 0 && $delaySeconds > 0) {
-                sleep($delaySeconds);
-            }
-            $result = $this->smsProvider->send($phone, $text);
-            if (isset($result['message_id'])) {
-                $messageIds[] = $result['message_id'];
-            }
-            if (($result['status'] ?? '') === 'failed') {
-                $command->update([
-                    'status' => CarCommand::STATUS_FAILED,
-                    'error_message' => $result['error'] ?? 'Send failed',
-                    'provider_message_ids' => $messageIds,
-                ]);
-                Log::channel('stack')->warning('CarControlService: SMS send failed', [
-                    'command_id' => $command->id,
-                    'error' => $result['error'] ?? null,
-                ]);
+        $delivery = $this->transportRouter->deliverSequential($transportMode, $vehicle, $payloads);
 
-                $err = $result['error'] ?? '';
-                $userMessage = match (true) {
-                    $err === 'SMS provider not configured' => 'Car control is temporarily unavailable. Please contact support.',
-                    $err === 'InvalidSender' => 'SMS sender ID is not set up for this account. Please contact support.',
-                    default => 'SMS failed: ' . ($err ?: 'Unknown error'),
-                };
-                return ['ok' => false, 'message' => $userMessage, 'command' => $command];
-            }
+        if (! $delivery['ok']) {
+            /** @var CarDeviceCommandResult $last */
+            $last = $delivery['last_result'] ?? null;
+            $errorText = $last instanceof CarDeviceCommandResult
+                ? ($last->error ?? 'Command failed')
+                : 'Command failed';
+
+            $command->update([
+                'status' => CarCommand::STATUS_FAILED,
+                'error_message' => $errorText,
+                'provider_message_ids' => $delivery['meta']['provider_refs'] ?? [],
+                'transport_meta' => $delivery['meta'],
+            ]);
+
+            Log::channel('stack')->warning('CarControlService: command delivery failed', [
+                'command_id' => $command->id,
+                'transport_mode' => $transportMode,
+                'failure_code' => $last instanceof CarDeviceCommandResult ? $last->failureCode : null,
+            ]);
+
+            return [
+                'ok' => false,
+                'message' => $this->deliveryFailureUserMessage($last, $transportMode),
+                'command' => $command,
+            ];
         }
 
         $command->update([
             'status' => CarCommand::STATUS_SENT,
-            'provider_message_ids' => $messageIds,
+            'provider_message_ids' => $delivery['meta']['provider_refs'] ?? [],
+            'transport_meta' => $delivery['meta'],
         ]);
 
         return ['ok' => true, 'message' => $this->actionSuccessMessage($action), 'command' => $command];
     }
 
-    private function getPayloadsForAction(string $action): array
+    private function transportMode(): string
     {
-        $open = config('car_control.commands.open_car', 'youto youto lvcanopenalldoors');
-        $close = config('car_control.commands.close_car', 'youto youto lvcanclosealldoors');
-        $unlock = config('car_control.commands.unlock_engine', 'youto youto setdigout 00 0 0');
-        $lock = config('car_control.commands.lock_engine', 'youto youto setdigout 10 0 0');
+        $mode = strtolower((string) config('car_control.default_transport', 'sms'));
 
-        return match ($action) {
-            CarCommand::ACTION_START_SHIFT => [$unlock, $open],
-            CarCommand::ACTION_OPEN_CAR => [$open],
-            CarCommand::ACTION_CLOSE_CAR => [$close],
-            CarCommand::ACTION_END_SHIFT => [$lock, $close],
-            default => [],
-        };
+        return in_array($mode, ['sms', 'gprs', 'auto'], true) ? $mode : 'sms';
+    }
+
+    private function deliveryFailureUserMessage(?CarDeviceCommandResult $last, string $transportMode): string
+    {
+        if (! $last instanceof CarDeviceCommandResult) {
+            return 'Command failed.';
+        }
+
+        if ($last->transport === 'sms') {
+            $err = (string) ($last->error ?? '');
+            if ($err === 'SMS provider not configured') {
+                return 'Car control is temporarily unavailable. Please contact support.';
+            }
+            if ($err === 'InvalidSender') {
+                return 'SMS sender ID is not set up for this account. Please contact support.';
+            }
+            if ($last->failureCode === 'sms_number_missing') {
+                return 'Car SIM (phone) not configured for SMS.';
+            }
+
+            return $err !== '' ? 'SMS failed: '.$err : 'SMS failed.';
+        }
+
+        if ($last->transport === 'gprs') {
+            return match ($last->failureCode) {
+                'timeout', 'device_offline' => 'Vehicle did not respond in time. Try again or use SMS if available.',
+                'gateway_not_configured', 'gateway_unreachable' => 'Car control service is temporarily unavailable.',
+                default => 'Remote command failed: '.($last->error ?: $last->failureCode ?: 'unknown'),
+            };
+        }
+
+        return $last->error ?: 'Command failed.';
     }
 
     private function reasonToMessage(string $reason): string
@@ -214,7 +265,7 @@ class CarControlService
             'too_early' => 'More than 45 minutes until shift start.',
             'too_late' => 'Shift ended, control window closed.',
             'no_shift' => 'No shift found.',
-            'car_not_configured' => 'Vehicle not configured (no SIM / number).',
+            'car_not_configured' => 'Vehicle not configured for remote control (SIM and/or IMEI).',
             default => 'No active shift.',
         };
     }

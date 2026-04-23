@@ -2,6 +2,26 @@
 
 return [
     /*
+    | Global control channel: sms (legacy), gprs (Teltonika gateway), auto (GPRS then SMS on fallback).
+    */
+    'default_transport' => strtolower((string) env('CAR_CONTROL_TRANSPORT', 'sms')),
+
+    /*
+    | Teltonika gateway (HTTP API on internal network; TCP Codec12 is implemented in
+    | ./teltonika-gateway — see teltonika-gateway/README.md).
+    | Devices must use this host:port as FMC "Server 2" only; EvoDrive does not use Server 1.
+    */
+    'gprs' => [
+        'internal_base_url' => rtrim((string) env('CAR_CONTROL_GPRS_INTERNAL_BASE_URL', ''), '/'),
+        'internal_token' => env('CAR_CONTROL_GPRS_INTERNAL_TOKEN'),
+        'commands_path' => ltrim((string) env('CAR_CONTROL_GPRS_COMMANDS_PATH', 'commands'), '/'),
+        'device_status_path' => (string) env('CAR_CONTROL_GPRS_DEVICE_STATUS_PATH', 'devices/{imei}/status'),
+        'command_timeout_seconds' => (int) env('CAR_CONTROL_GPRS_COMMAND_TIMEOUT', 30),
+        'device_status_timeout_seconds' => (int) env('CAR_CONTROL_GPRS_DEVICE_STATUS_TIMEOUT', 5),
+        'pair_command_delay_seconds' => (int) env('CAR_CONTROL_PAIR_GPRS_DELAY_SECONDS', 0),
+    ],
+
+    /*
     | Access window: from start_at - window_minutes until end_at + window_minutes
     */
     'window_minutes' => (int) env('CAR_CONTROL_WINDOW_MINUTES', 45),
