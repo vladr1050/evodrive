@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-const maxDataFieldBytes = 16 << 20 // 16 MiB safety cap
+const maxDataFieldBytes = 512 << 10 // 512 KiB — Teltonika AVL packets are typically small; avoids huge ReadFull + stream corruption.
 
 // ReadFrame reads one Teltonika TCP AVL frame and normalizes it to:
 // 4-byte preamble (zeros) + 4-byte big-endian data length + payload (+ optional Codec12 CRC trailer).
