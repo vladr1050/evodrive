@@ -8,20 +8,31 @@ import (
 
 const maxDataFieldBytes = 16 << 20 // 16 MiB safety cap
 
-// ReadFrame reads one Teltonika TCP frame: 4-byte preamble, 4-byte big-endian data length, `length` bytes payload.
-// Preamble must be four zero bytes (Codec8 / Codec12 over TCP).
+// ReadFrame reads one Teltonika TCP AVL frame and normalizes it to:
+// 4-byte preamble (zeros) + 4-byte big-endian data length + payload (+ optional Codec12 CRC trailer).
+//
+// Teltonika documents a 4-zero preamble before the length field; some firmware (e.g. certain FMB/FMC
+// builds or duplicate-server links) sends **only** length + payload with no leading zeros. Both are supported.
 func ReadFrame(r io.Reader) ([]byte, error) {
-	var pre [4]byte
-	if _, err := io.ReadFull(r, pre[:]); err != nil {
+	var first [4]byte
+	if _, err := io.ReadFull(r, first[:]); err != nil {
 		return nil, err
 	}
-	if pre != [4]byte{0, 0, 0, 0} {
-		return nil, fmt.Errorf("invalid preamble %v", pre[:])
-	}
+
+	var preamble [4]byte
 	var dataLen uint32
-	if err := binary.Read(r, binary.BigEndian, &dataLen); err != nil {
-		return nil, err
+
+	if first == [4]byte{0, 0, 0, 0} {
+		preamble = first
+		if err := binary.Read(r, binary.BigEndian, &dataLen); err != nil {
+			return nil, err
+		}
+	} else {
+		// No leading zero preamble: first 4 bytes are the data-field length (big-endian).
+		preamble = [4]byte{0, 0, 0, 0}
+		dataLen = binary.BigEndian.Uint32(first[:])
 	}
+
 	if dataLen == 0 || dataLen > maxDataFieldBytes {
 		return nil, fmt.Errorf("invalid data length %d", dataLen)
 	}
@@ -38,7 +49,7 @@ func ReadFrame(r io.Reader) ([]byte, error) {
 		payload = append(payload, crcTrailer[:]...)
 	}
 	out := make([]byte, 8+len(payload))
-	copy(out[0:4], pre[:])
+	copy(out[0:4], preamble[:])
 	binary.BigEndian.PutUint32(out[4:8], dataLen)
 	copy(out[8:], payload)
 	return out, nil

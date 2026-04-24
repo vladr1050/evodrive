@@ -66,6 +66,7 @@ CAR_CONTROL_GPRS_INTERNAL_TOKEN=same-as-GATEWAY_HTTP_TOKEN
 
 ## Limits (MVP)
 
+- TCP AVL framing: supports both **4-byte zero preamble + length** and **length-first** (no leading zeros), as seen on some FMB/FMC firmwares.
 - One TCP session per IMEI; new connection replaces the old one.
 - At most **one Codec12 command in flight** per session (matches fleet spec).
 - Codec8 ACK uses **Number of Data 1** as accepted count (sufficient for typical single-batch packets; extend if you see multi-batch issues).
