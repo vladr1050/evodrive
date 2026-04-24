@@ -19,11 +19,10 @@ type Session struct {
 
 	manager *Manager
 
-	// connIoMu serializes all reads and all writes on the TCP socket. Without this,
-	// a Codec12 command write can land in the middle of a blocked ReadFull(payload),
-	// corrupting framing and causing command timeouts / unknown codec 0x00.
-	connIoMu sync.Mutex
-	cmdMu    sync.Mutex
+	// writeMu serializes Codec8 ACK and Codec12 command writes (same host→device direction).
+	// Reads use the Conn without this lock; TCP full-duplex keeps device→server bytes separate.
+	writeMu sync.Mutex
+	cmdMu   sync.Mutex
 
 	lastSeen atomic.Int64 // unix nano
 
@@ -56,19 +55,16 @@ func (s *Session) Run() {
 
 	for {
 		_ = s.Conn.SetReadDeadline(time.Now().Add(12 * time.Hour))
-		s.connIoMu.Lock()
 		frame, err := teltonika.ReadFrame(s.Conn)
 		if err != nil {
-			s.connIoMu.Unlock()
 			if err != io.EOF {
 				log.Printf("imei=%s read frame: %v", s.IMEI, err)
 			}
 			return
 		}
+		s.touch()
 		payload := teltonika.Payload(frame)
 		if len(payload) == 0 {
-			s.connIoMu.Unlock()
-			s.touch()
 			continue
 		}
 		switch payload[0] {
@@ -76,17 +72,17 @@ func (s *Session) Run() {
 			n := teltonika.Codec8AckCount(payload)
 			var ack [4]byte
 			binary.BigEndian.PutUint32(ack[:], n)
-			if _, werr := s.Conn.Write(ack[:]); werr != nil {
-				s.connIoMu.Unlock()
+			s.writeMu.Lock()
+			_, werr := s.Conn.Write(ack[:])
+			s.writeMu.Unlock()
+			if werr != nil {
 				log.Printf("imei=%s ack: %v", s.IMEI, werr)
 				return
 			}
 		case teltonika.Codec12:
 			txt, err := teltonika.Codec12ResponsePayload(payload)
 			if err != nil {
-				s.connIoMu.Unlock()
 				log.Printf("imei=%s codec12 parse: %v", s.IMEI, err)
-				s.touch()
 				continue
 			}
 			s.respChMu.Lock()
@@ -101,8 +97,6 @@ func (s *Session) Run() {
 		default:
 			log.Printf("imei=%s unknown codec %02x len=%d", s.IMEI, payload[0], len(payload))
 		}
-		s.connIoMu.Unlock()
-		s.touch()
 	}
 }
 
@@ -127,9 +121,9 @@ func (s *Session) SendCodec12Command(command string, timeout time.Duration) (res
 	if err != nil {
 		return "", err
 	}
-	s.connIoMu.Lock()
+	s.writeMu.Lock()
 	_, werr := s.Conn.Write(pkt)
-	s.connIoMu.Unlock()
+	s.writeMu.Unlock()
 	if werr != nil {
 		return "", werr
 	}
