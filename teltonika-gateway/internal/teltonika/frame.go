@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 )
 
 const maxDataFieldBytes = 512 << 10 // 512 KiB — Teltonika AVL packets are typically small; avoids huge ReadFull + stream corruption.
@@ -40,13 +41,30 @@ func ReadFrame(r io.Reader) ([]byte, error) {
 	if _, err := io.ReadFull(r, payload); err != nil {
 		return nil, err
 	}
-	// Codec12: data length excludes trailing 4-byte CRC (same framing as outbound commands).
-	if len(payload) > 0 && payload[0] == Codec12 {
-		var crcTrailer [4]byte
-		if _, err := io.ReadFull(r, crcTrailer[:]); err != nil {
+	// Codec8 / Codec8 Extended (TCP): after the data field, Teltonika sends a 4-byte CRC-16
+	// value (same CRC16Teltonika as Codec12; upper 16 bits zero). Must be consumed or every
+	// following frame (including Codec12 command responses) will be misaligned.
+	if len(payload) > 0 && (payload[0] == Codec8 || payload[0] == Codec8E) {
+		var avlCRC [4]byte
+		if _, err := io.ReadFull(r, avlCRC[:]); err != nil {
 			return nil, err
 		}
-		payload = append(payload, crcTrailer[:]...)
+	}
+	// Codec12: Teltonika docs use data length = bytes from Codec ID through quantity 2, with
+	// a separate 4-byte CRC after that — same as our outbound EncodeCodec12Command. Some
+	// firmware instead includes that CRC inside the declared data length. Only read a CRC
+	// trailer when the payload alone does not already parse as a full Codec12 message.
+	if len(payload) > 0 && payload[0] == Codec12 {
+		_, err := Codec12ResponsePayload(payload)
+		if err != nil && !strings.Contains(err.Error(), "unexpected codec12 message") {
+			// Likely CRC is still on the wire (doc framing); avoid reading +4 when we already
+			// have a well-formed non-response Codec12 (e.g. type 0x05), which would desync.
+			var crcTrailer [4]byte
+			if _, err := io.ReadFull(r, crcTrailer[:]); err != nil {
+				return nil, err
+			}
+			payload = append(payload, crcTrailer[:]...)
+		}
 	}
 	out := make([]byte, 8+len(payload))
 	copy(out[0:4], preamble[:])

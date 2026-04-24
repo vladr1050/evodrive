@@ -7,6 +7,43 @@ import (
 	"testing"
 )
 
+func TestReadFrame_codec12CRCIncludedInDataLength(t *testing.T) {
+	// Some firmware sets data-field length to inner+CRC (entire Codec12 block in one chunk).
+	resp := []byte("OK")
+	innerLen := 1 + 1 + 1 + 4 + len(resp) + 1
+	inner := make([]byte, 0, innerLen)
+	inner = append(inner, codec12ID, codec12ResponseQty, codec12TypeResponse)
+	var sz [4]byte
+	binary.BigEndian.PutUint32(sz[:], uint32(len(resp)))
+	inner = append(inner, sz[:]...)
+	inner = append(inner, resp...)
+	inner = append(inner, codec12ResponseQty)
+	crc := CRC16Teltonika(inner)
+	var crcB [4]byte
+	binary.BigEndian.PutUint32(crcB[:], uint32(crc))
+	full := append(inner, crcB[:]...)
+
+	var wire bytes.Buffer
+	_, _ = wire.Write([]byte{0, 0, 0, 0})
+	_ = binary.Write(&wire, binary.BigEndian, uint32(len(full)))
+	_, _ = wire.Write(full)
+
+	frame, err := ReadFrame(&wire)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txt, err := Codec12ResponsePayload(Payload(frame))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if txt != "OK" {
+		t.Fatalf("got %q", txt)
+	}
+	if _, err := wire.ReadByte(); err != io.EOF {
+		t.Fatalf("expected EOF (no extra CRC read), got %v", err)
+	}
+}
+
 func TestReadFrame_codec12AppendsCRCtrailer(t *testing.T) {
 	// Minimal Codec12 response: inner (codec..qty2) then CRC; dataLen = len(inner) only.
 	resp := []byte("OK")
@@ -46,9 +83,12 @@ func TestReadFrame_noPreambleLengthFirst(t *testing.T) {
 	// Some devices send: [4-byte BE length][payload] without leading 00 00 00 00.
 	pl := []byte{Codec8, 1, 0xAB, 0xCD}
 	dataLen := uint32(len(pl))
+	var crcB [4]byte
+	binary.BigEndian.PutUint32(crcB[:], uint32(CRC16Teltonika(pl)))
 	var wire bytes.Buffer
 	_ = binary.Write(&wire, binary.BigEndian, dataLen)
 	_, _ = wire.Write(pl)
+	_, _ = wire.Write(crcB[:])
 
 	frame, err := ReadFrame(&wire)
 	if err != nil {
@@ -66,13 +106,16 @@ func TestReadFrame_noPreambleLengthFirst(t *testing.T) {
 	}
 }
 
-func TestReadFrame_codec8NoExtraTrailer(t *testing.T) {
-	// Fake Codec8: preamble + len=4 + payload 4 bytes (codec + count + fake crc16)
+func TestReadFrame_codec8ConsumesTCPTrailerCRC(t *testing.T) {
+	// Codec8 TCP: data field then 4-byte CRC (Teltonika wiki); payload returned excludes CRC.
 	pl := []byte{Codec8, 2, 0xAB, 0xCD}
+	var crcB [4]byte
+	binary.BigEndian.PutUint32(crcB[:], uint32(CRC16Teltonika(pl)))
 	var wire bytes.Buffer
 	_, _ = wire.Write([]byte{0, 0, 0, 0})
 	_ = binary.Write(&wire, binary.BigEndian, uint32(len(pl)))
 	_, _ = wire.Write(pl)
+	_, _ = wire.Write(crcB[:])
 
 	frame, err := ReadFrame(&wire)
 	if err != nil {
