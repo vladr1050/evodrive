@@ -89,7 +89,11 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 		h := r.Header.Get("Authorization")
 		const p = "Bearer "
 		if !strings.HasPrefix(h, p) || strings.TrimSpace(h[len(p):]) != s.Token {
-			log.Printf("gateway http unauthorized remote=%s path=%s", r.RemoteAddr, r.URL.Path)
+			logPrefix := "gateway http"
+			if strings.HasSuffix(r.URL.Path, "commands") {
+				logPrefix = "codec12 http"
+			}
+			log.Printf("%s unauthorized remote=%s path=%s", logPrefix, r.RemoteAddr, r.URL.Path)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"ok":false,"error":"unauthorized"}`))
