@@ -68,7 +68,7 @@ func (s *Session) Run() {
 			continue
 		}
 		switch payload[0] {
-		case teltonika.Codec8, teltonika.Codec8E:
+		case teltonika.Codec8, teltonika.Codec8E, teltonika.Codec16:
 			n := teltonika.Codec8AckCount(payload)
 			var ack [4]byte
 			binary.BigEndian.PutUint32(ack[:], n)

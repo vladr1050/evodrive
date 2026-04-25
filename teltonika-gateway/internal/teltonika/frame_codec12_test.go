@@ -106,6 +106,32 @@ func TestReadFrame_noPreambleLengthFirst(t *testing.T) {
 	}
 }
 
+func TestReadFrame_codec16ConsumesTCPTrailerCRC(t *testing.T) {
+	// Codec16 uses the same TCP AVL envelope as Codec8 (Teltonika wiki).
+	pl := []byte{Codec16, 1, 0x11, 0x22, 0x33, 0x44}
+	var crcB [4]byte
+	binary.BigEndian.PutUint32(crcB[:], uint32(CRC16Teltonika(pl)))
+	var wire bytes.Buffer
+	_, _ = wire.Write([]byte{0, 0, 0, 0})
+	_ = binary.Write(&wire, binary.BigEndian, uint32(len(pl)))
+	_, _ = wire.Write(pl)
+	_, _ = wire.Write(crcB[:])
+
+	frame, err := ReadFrame(&wire)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(Payload(frame)) != len(pl) {
+		t.Fatalf("len %d want %d", len(Payload(frame)), len(pl))
+	}
+	if Payload(frame)[0] != Codec16 {
+		t.Fatalf("codec %02x", Payload(frame)[0])
+	}
+	if _, err := wire.ReadByte(); err != io.EOF {
+		t.Fatalf("expected EOF, got %v", err)
+	}
+}
+
 func TestReadFrame_codec8ConsumesTCPTrailerCRC(t *testing.T) {
 	// Codec8 TCP: data field then 4-byte CRC (Teltonika wiki); payload returned excludes CRC.
 	pl := []byte{Codec8, 2, 0xAB, 0xCD}

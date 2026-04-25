@@ -41,10 +41,11 @@ func ReadFrame(r io.Reader) ([]byte, error) {
 	if _, err := io.ReadFull(r, payload); err != nil {
 		return nil, err
 	}
-	// Codec8 / Codec8 Extended (TCP): after the data field, Teltonika sends a 4-byte CRC-16
-	// value (same CRC16Teltonika as Codec12; upper 16 bits zero). Must be consumed or every
-	// following frame (including Codec12 command responses) will be misaligned.
-	if len(payload) > 0 && (payload[0] == Codec8 || payload[0] == Codec8E) {
+	// Codec8 / Codec8 Extended / Codec16 (TCP): after the data field, Teltonika sends a 4-byte
+	// CRC-16 value (same CRC16Teltonika as Codec12; upper 16 bits zero). Must be consumed or
+	// every following frame (including Codec12 command responses) will be misaligned.
+	// Codec16 (0x10) uses the same TCP AVL envelope as Codec8 (wiki: Codec 16 / TCP).
+	if len(payload) > 0 && (payload[0] == Codec8 || payload[0] == Codec8E || payload[0] == Codec16) {
 		var avlCRC [4]byte
 		if _, err := io.ReadFull(r, avlCRC[:]); err != nil {
 			return nil, err
@@ -83,9 +84,10 @@ func Payload(frame []byte) []byte {
 
 // Codec8FirstByte / Codec12FirstByte identify common codecs.
 const (
-	Codec8  = 0x08
-	Codec8E = 0x8E
-	Codec12 = 0x0C
+	Codec8   = 0x08
+	Codec8E  = 0x8E
+	Codec16  = 0x10
+	Codec12  = 0x0C
 )
 
 // Codec8AckCount returns Number of Data 1 (naive single-batch assumption).
