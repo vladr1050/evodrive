@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +28,58 @@ type commandReq struct {
 	TimeoutSeconds int    `json:"timeout_seconds"`
 }
 
+func gatewayLogCommandBody() bool {
+	v := strings.TrimSpace(strings.ToLower(getenv("GATEWAY_LOG_COMMANDS", "1")))
+	return v != "0" && v != "false" && v != "off"
+}
+
+func gatewayLogMaxCommandChars() int {
+	const def = 512
+	v := strings.TrimSpace(os.Getenv("GATEWAY_LOG_MAX_COMMAND_CHARS"))
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return def
+	}
+	return n
+}
+
+func gatewayLogMaxResponseChars() int {
+	const def = 1024
+	v := strings.TrimSpace(os.Getenv("GATEWAY_LOG_MAX_RESPONSE_CHARS"))
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return def
+	}
+	return n
+}
+
+func formatCommandAuditFragment(cmd string) string {
+	if !gatewayLogCommandBody() {
+		return fmt.Sprintf("cmd_bytes=%d redacted=1", len(cmd))
+	}
+	max := gatewayLogMaxCommandChars()
+	show := cmd
+	trunc := "truncated=0"
+	if len(show) > max {
+		show = show[:max]
+		trunc = "truncated=1"
+	}
+	return fmt.Sprintf("cmd_bytes=%d cmd=%q %s", len(cmd), show, trunc)
+}
+
+func truncateLogString(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "…"
+}
+
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if s.Token == "" {
@@ -35,6 +89,7 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 		h := r.Header.Get("Authorization")
 		const p = "Bearer "
 		if !strings.HasPrefix(h, p) || strings.TrimSpace(h[len(p):]) != s.Token {
+			log.Printf("gateway http unauthorized remote=%s path=%s", r.RemoteAddr, r.URL.Path)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"ok":false,"error":"unauthorized"}`))
@@ -75,8 +130,12 @@ func (s *Server) commands(w http.ResponseWriter, r *http.Request) {
 		timeout = 120 * time.Second
 	}
 
+	audit := formatCommandAuditFragment(body.Command)
+	log.Printf("codec12 http request remote=%s imei=%s timeout=%s %s", r.RemoteAddr, body.IMEI, timeout, audit)
+
 	sess := s.Mgr.Get(body.IMEI)
 	if sess == nil {
+		log.Printf("codec12 http result imei=%s ok=false failure_code=device_offline %s", body.IMEI, audit)
 		writeJSON(w, http.StatusNotFound, map[string]any{"ok": false, "failure_code": "device_offline", "error": "device not connected"})
 		return
 	}
@@ -84,12 +143,22 @@ func (s *Server) commands(w http.ResponseWriter, r *http.Request) {
 	resp, err := sess.SendCodec12Command(body.Command, timeout)
 	if err != nil {
 		if errors.Is(err, gateway.ErrCommandTimeout) {
+			log.Printf("codec12 http result imei=%s ok=false failure_code=timeout err=%v %s", body.IMEI, err, audit)
 			writeJSON(w, http.StatusRequestTimeout, map[string]any{"ok": false, "failure_code": "timeout", "error": err.Error()})
 			return
 		}
+		log.Printf("codec12 http result imei=%s ok=false failure_code=connection_lost err=%v %s", body.IMEI, err, audit)
 		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "failure_code": "connection_lost", "error": err.Error()})
 		return
 	}
+	maxResp := gatewayLogMaxResponseChars()
+	respTrunc := "response_truncated=0"
+	respLog := resp
+	if len(respLog) > maxResp {
+		respLog = truncateLogString(resp, maxResp)
+		respTrunc = "response_truncated=1"
+	}
+	log.Printf("codec12 http result imei=%s ok=true response_bytes=%d %s response=%q %s", body.IMEI, len(resp), respTrunc, respLog, audit)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "response": resp})
 }
 

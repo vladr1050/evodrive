@@ -23,6 +23,9 @@ TCP listener for Teltonika FMC devices (IMEI handshake, Codec8 AVL ACK, Codec12 
 | `GATEWAY_HTTP_ADDR` | `:8080` | HTTP bind address |
 | `GATEWAY_HTTP_TOKEN` | _(empty)_ | If set, require `Authorization: Bearer <token>` on HTTP |
 | `GATEWAY_ONLINE_TTL_SECONDS` | `90` | Device considered online if last AVL/Codec12 frame within TTL |
+| `GATEWAY_LOG_COMMANDS` | `1` | If `0`/`false`/`off`, log only `cmd_bytes` (no command text) on `POST /commands` |
+| `GATEWAY_LOG_MAX_COMMAND_CHARS` | `512` | Max command characters logged (rest truncated) |
+| `GATEWAY_LOG_MAX_RESPONSE_CHARS` | `1024` | Max device response characters logged |
 
 ## HTTP API (matches Laravel `config/car_control.php` → `gprs`)
 
@@ -31,7 +34,7 @@ TCP listener for Teltonika FMC devices (IMEI handshake, Codec8 AVL ACK, Codec12 
 ```json
 {
   "imei": "123456789012345",
-  "command": "youto youto lvcanopenalldoors",
+  "command": "lvcanopenalldoors",
   "timeout_seconds": 30
 }
 ```
