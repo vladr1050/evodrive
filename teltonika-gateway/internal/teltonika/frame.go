@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"strings"
 )
 
 const maxDataFieldBytes = 512 << 10 // 512 KiB — Teltonika AVL packets are typically small; avoids huge ReadFull + stream corruption.
@@ -41,37 +40,31 @@ func ReadFrame(r io.Reader) ([]byte, error) {
 	if _, err := io.ReadFull(r, payload); err != nil {
 		return nil, err
 	}
-	// Codec8 / Codec8 Extended / Codec16 (TCP): after the data field, Teltonika sends a 4-byte
-	// CRC-16 value (same CRC16Teltonika as Codec12; upper 16 bits zero). Must be consumed or
-	// every following frame (including Codec12 command responses) will be misaligned.
-	// Codec16 (0x10) uses the same TCP AVL envelope as Codec8 (wiki: Codec 16 / TCP).
-	if len(payload) > 0 && (payload[0] == Codec8 || payload[0] == Codec8E || payload[0] == Codec16) {
-		// Some firmware includes trailing CRC inside dataLen (similar to observed Codec12 variants).
-		// If payload already has a valid embedded CRC trailer, normalize by stripping it and avoid
-		// reading +4 from the stream (which would desync and produce bogus lengths like 0xFECAFE00).
-		if hasEmbeddedCRC(payload) {
-			payload = payload[:len(payload)-4]
-		} else {
-			var avlCRC [4]byte
-			if _, err := io.ReadFull(r, avlCRC[:]); err != nil {
-				return nil, err
+	if len(payload) > 0 {
+		codec := payload[0]
+		if codecHasTCPCRCTrailer(codec) {
+			embedded := hasEmbeddedCRC(payload)
+			switch codec {
+			case Codec12:
+				// Codec12 parser expects CRC to be present in payload.
+				if !embedded {
+					var trailer [4]byte
+					if _, err := io.ReadFull(r, trailer[:]); err != nil {
+						return nil, err
+					}
+					payload = append(payload, trailer[:]...)
+				}
+			default:
+				// AVL codecs (8/8E/10) and command codecs (13/14): keep payload normalized without CRC.
+				if embedded {
+					payload = payload[:len(payload)-4]
+				} else {
+					var trailer [4]byte
+					if _, err := io.ReadFull(r, trailer[:]); err != nil {
+						return nil, err
+					}
+				}
 			}
-		}
-	}
-	// Codec12: Teltonika docs use data length = bytes from Codec ID through quantity 2, with
-	// a separate 4-byte CRC after that — same as our outbound EncodeCodec12Command. Some
-	// firmware instead includes that CRC inside the declared data length. Only read a CRC
-	// trailer when the payload alone does not already parse as a full Codec12 message.
-	if len(payload) > 0 && payload[0] == Codec12 {
-		_, err := Codec12ResponsePayload(payload)
-		if err != nil && !strings.Contains(err.Error(), "unexpected codec12 message") {
-			// Likely CRC is still on the wire (doc framing); avoid reading +4 when we already
-			// have a well-formed non-response Codec12 (e.g. type 0x05), which would desync.
-			var crcTrailer [4]byte
-			if _, err := io.ReadFull(r, crcTrailer[:]); err != nil {
-				return nil, err
-			}
-			payload = append(payload, crcTrailer[:]...)
 		}
 	}
 	out := make([]byte, 8+len(payload))
@@ -95,6 +88,8 @@ const (
 	Codec8E  = 0x8E
 	Codec16  = 0x10
 	Codec12  = 0x0C
+	Codec13  = 0x0D
+	Codec14  = 0x0E
 )
 
 // Codec8AckCount returns Number of Data 1 (naive single-batch assumption).
@@ -112,4 +107,13 @@ func hasEmbeddedCRC(payload []byte) bool {
 	inner := payload[:len(payload)-4]
 	crcWant := binary.BigEndian.Uint32(payload[len(payload)-4:])
 	return uint32(CRC16Teltonika(inner)) == crcWant
+}
+
+func codecHasTCPCRCTrailer(codec byte) bool {
+	switch codec {
+	case Codec8, Codec8E, Codec16, Codec12, Codec13, Codec14:
+		return true
+	default:
+		return false
+	}
 }
