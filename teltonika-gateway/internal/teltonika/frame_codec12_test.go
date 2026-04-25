@@ -157,3 +157,30 @@ func TestReadFrame_codec8ConsumesTCPTrailerCRC(t *testing.T) {
 		t.Fatalf("expected EOF, got %v", err)
 	}
 }
+
+func TestReadFrame_codec8CRCIncludedInDataLength(t *testing.T) {
+	// Variant: dataLen already includes trailing CRC bytes.
+	pl := []byte{Codec8, 2, 0xAB, 0xCD}
+	var crcB [4]byte
+	binary.BigEndian.PutUint32(crcB[:], uint32(CRC16Teltonika(pl)))
+	full := append(append([]byte{}, pl...), crcB[:]...)
+
+	var wire bytes.Buffer
+	_, _ = wire.Write([]byte{0, 0, 0, 0})
+	_ = binary.Write(&wire, binary.BigEndian, uint32(len(full)))
+	_, _ = wire.Write(full)
+
+	frame, err := ReadFrame(&wire)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(Payload(frame)) != len(pl) {
+		t.Fatalf("len %d want %d", len(Payload(frame)), len(pl))
+	}
+	if !bytes.Equal(Payload(frame), pl) {
+		t.Fatal("payload mismatch")
+	}
+	if _, err := wire.ReadByte(); err != io.EOF {
+		t.Fatalf("expected EOF (no extra trailer read), got %v", err)
+	}
+}

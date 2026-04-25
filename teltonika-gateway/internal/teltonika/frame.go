@@ -46,9 +46,16 @@ func ReadFrame(r io.Reader) ([]byte, error) {
 	// every following frame (including Codec12 command responses) will be misaligned.
 	// Codec16 (0x10) uses the same TCP AVL envelope as Codec8 (wiki: Codec 16 / TCP).
 	if len(payload) > 0 && (payload[0] == Codec8 || payload[0] == Codec8E || payload[0] == Codec16) {
-		var avlCRC [4]byte
-		if _, err := io.ReadFull(r, avlCRC[:]); err != nil {
-			return nil, err
+		// Some firmware includes trailing CRC inside dataLen (similar to observed Codec12 variants).
+		// If payload already has a valid embedded CRC trailer, normalize by stripping it and avoid
+		// reading +4 from the stream (which would desync and produce bogus lengths like 0xFECAFE00).
+		if hasEmbeddedCRC(payload) {
+			payload = payload[:len(payload)-4]
+		} else {
+			var avlCRC [4]byte
+			if _, err := io.ReadFull(r, avlCRC[:]); err != nil {
+				return nil, err
+			}
 		}
 	}
 	// Codec12: Teltonika docs use data length = bytes from Codec ID through quantity 2, with
@@ -96,4 +103,13 @@ func Codec8AckCount(payload []byte) uint32 {
 		return 0
 	}
 	return uint32(payload[1])
+}
+
+func hasEmbeddedCRC(payload []byte) bool {
+	if len(payload) < 6 { // codec + at least one byte + 4-byte CRC trailer
+		return false
+	}
+	inner := payload[:len(payload)-4]
+	crcWant := binary.BigEndian.Uint32(payload[len(payload)-4:])
+	return uint32(CRC16Teltonika(inner)) == crcWant
 }
