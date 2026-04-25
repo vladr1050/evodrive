@@ -1,6 +1,7 @@
 package teltonika
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"io"
@@ -28,7 +29,7 @@ func TestReadFrame_codec12CRCIncludedInDataLength(t *testing.T) {
 	_ = binary.Write(&wire, binary.BigEndian, uint32(len(full)))
 	_, _ = wire.Write(full)
 
-	frame, err := ReadFrame(&wire)
+	frame, err := ReadFrame(bufio.NewReader(&wire))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +66,7 @@ func TestReadFrame_codec12AppendsCRCtrailer(t *testing.T) {
 	_, _ = wire.Write(inner)
 	_, _ = wire.Write(crcB[:])
 
-	frame, err := ReadFrame(&wire)
+	frame, err := ReadFrame(bufio.NewReader(&wire))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +91,7 @@ func TestReadFrame_noPreambleLengthFirst(t *testing.T) {
 	_, _ = wire.Write(pl)
 	_, _ = wire.Write(crcB[:])
 
-	frame, err := ReadFrame(&wire)
+	frame, err := ReadFrame(bufio.NewReader(&wire))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +118,7 @@ func TestReadFrame_codec16ConsumesTCPTrailerCRC(t *testing.T) {
 	_, _ = wire.Write(pl)
 	_, _ = wire.Write(crcB[:])
 
-	frame, err := ReadFrame(&wire)
+	frame, err := ReadFrame(bufio.NewReader(&wire))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +144,7 @@ func TestReadFrame_codec8ConsumesTCPTrailerCRC(t *testing.T) {
 	_, _ = wire.Write(pl)
 	_, _ = wire.Write(crcB[:])
 
-	frame, err := ReadFrame(&wire)
+	frame, err := ReadFrame(bufio.NewReader(&wire))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +171,7 @@ func TestReadFrame_codec8CRCIncludedInDataLength(t *testing.T) {
 	_ = binary.Write(&wire, binary.BigEndian, uint32(len(full)))
 	_, _ = wire.Write(full)
 
-	frame, err := ReadFrame(&wire)
+	frame, err := ReadFrame(bufio.NewReader(&wire))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +198,7 @@ func TestReadFrame_codec13ConsumesTCPTrailerCRC(t *testing.T) {
 	_, _ = wire.Write(pl)
 	_, _ = wire.Write(crcB[:])
 
-	frame, err := ReadFrame(&wire)
+	frame, err := ReadFrame(bufio.NewReader(&wire))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,5 +207,29 @@ func TestReadFrame_codec13ConsumesTCPTrailerCRC(t *testing.T) {
 	}
 	if _, err := wire.ReadByte(); err != io.EOF {
 		t.Fatalf("expected EOF (trailer consumed), got %v", err)
+	}
+}
+
+func TestReadFrame_resyncOneGarbageByteBeforePreamble(t *testing.T) {
+	pl := []byte{Codec8, 1, 0xAB, 0xCD}
+	var crcB [4]byte
+	binary.BigEndian.PutUint32(crcB[:], uint32(CRC16Teltonika(pl)))
+
+	var wire bytes.Buffer
+	_ = wire.WriteByte(0xFF) // misalignment
+	_, _ = wire.Write([]byte{0, 0, 0, 0})
+	_ = binary.Write(&wire, binary.BigEndian, uint32(len(pl)))
+	_, _ = wire.Write(pl)
+	_, _ = wire.Write(crcB[:])
+
+	frame, err := ReadFrame(bufio.NewReader(&wire))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(Payload(frame), pl) {
+		t.Fatalf("payload %x want %x", Payload(frame), pl)
+	}
+	if _, err := wire.ReadByte(); err != io.EOF {
+		t.Fatalf("expected EOF, got %v", err)
 	}
 }

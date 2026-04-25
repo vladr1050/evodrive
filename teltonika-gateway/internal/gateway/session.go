@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bufio"
 	"encoding/binary"
 	"io"
 	"log"
@@ -53,9 +54,10 @@ func (s *Session) Run() {
 	defer s.manager.Remove(s)
 	defer func() { _ = s.Conn.Close() }()
 
+	br := bufio.NewReader(s.Conn)
 	for {
 		_ = s.Conn.SetReadDeadline(time.Now().Add(12 * time.Hour))
-		frame, err := teltonika.ReadFrame(s.Conn)
+		frame, err := teltonika.ReadFrame(br)
 		if err != nil {
 			if err != io.EOF {
 				log.Printf("imei=%s read frame: %v", s.IMEI, err)
