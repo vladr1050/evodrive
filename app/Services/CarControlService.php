@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Car control: access window, rate limit, idempotency, command execution.
- * Delivery uses {@see CarControlTransportRouter} (SMS / GPRS / AUTO) without changing action → payload mapping.
+     * Delivery uses {@see CarControlTransportRouter} (SMS / GPRS / AUTO). Stored payloads are bare device
+     * commands; SMS prepends `car_control.sms.command_prefix` in {@see \App\Services\CarControl\SmsCarDeviceTransport}.
  */
 class CarControlService
 {

@@ -31,6 +31,18 @@ class CarControlAccessAndPayloadsTest extends TestCase
     /** @var array<int, array{to: string, text: string}> */
     protected array $smsLog = [];
 
+    /** SMS body as sent on the wire (bare command + optional `car_control.sms.command_prefix`). */
+    private function expectedSmsBody(string $bareCommand): string
+    {
+        $bareCommand = trim($bareCommand);
+        $prefix = trim((string) config('car_control.sms.command_prefix', 'youto youto'));
+        if ($prefix === '') {
+            return $bareCommand;
+        }
+
+        return $bareCommand === '' ? $prefix : $prefix.' '.$bareCommand;
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -163,10 +175,10 @@ class CarControlAccessAndPayloadsTest extends TestCase
 
         $this->assertTrue($result['ok']);
         $this->assertCount(2, $this->smsLog);
-        $unlock = config('car_control.commands.unlock_engine', 'youto youto setdigout 00 0 0');
-        $open = config('car_control.commands.open_car', 'youto youto lvcanopenalldoors');
-        $this->assertSame($unlock, $this->smsLog[0]['text']);
-        $this->assertSame($open, $this->smsLog[1]['text']);
+        $unlock = config('car_control.commands.unlock_engine');
+        $open = config('car_control.commands.open_car');
+        $this->assertSame($this->expectedSmsBody($unlock), $this->smsLog[0]['text']);
+        $this->assertSame($this->expectedSmsBody($open), $this->smsLog[1]['text']);
         $this->assertSame('37120000001', $this->smsLog[0]['to']);
         $this->assertSame('37120000001', $this->smsLog[1]['to']);
     }
@@ -188,8 +200,8 @@ class CarControlAccessAndPayloadsTest extends TestCase
 
         $this->assertTrue($result['ok']);
         $this->assertCount(1, $this->smsLog);
-        $open = config('car_control.commands.open_car', 'youto youto lvcanopenalldoors');
-        $this->assertSame($open, $this->smsLog[0]['text']);
+        $open = config('car_control.commands.open_car');
+        $this->assertSame($this->expectedSmsBody($open), $this->smsLog[0]['text']);
     }
 
     public function test_close_car_sends_one_sms(): void
@@ -209,8 +221,8 @@ class CarControlAccessAndPayloadsTest extends TestCase
 
         $this->assertTrue($result['ok']);
         $this->assertCount(1, $this->smsLog);
-        $close = config('car_control.commands.close_car', 'youto youto lvcanclosealldoors');
-        $this->assertSame($close, $this->smsLog[0]['text']);
+        $close = config('car_control.commands.close_car');
+        $this->assertSame($this->expectedSmsBody($close), $this->smsLog[0]['text']);
     }
 
     public function test_end_shift_sends_two_sms_in_order_lock_then_close(): void
@@ -230,10 +242,10 @@ class CarControlAccessAndPayloadsTest extends TestCase
 
         $this->assertTrue($result['ok']);
         $this->assertCount(2, $this->smsLog);
-        $lock = config('car_control.commands.lock_engine', 'youto youto setdigout 10 0 0');
-        $close = config('car_control.commands.close_car', 'youto youto lvcanclosealldoors');
-        $this->assertSame($lock, $this->smsLog[0]['text']);
-        $this->assertSame($close, $this->smsLog[1]['text']);
+        $lock = config('car_control.commands.lock_engine');
+        $close = config('car_control.commands.close_car');
+        $this->assertSame($this->expectedSmsBody($lock), $this->smsLog[0]['text']);
+        $this->assertSame($this->expectedSmsBody($close), $this->smsLog[1]['text']);
     }
 
     public function test_rate_limit_blocks_second_command_within_driver_window(): void
@@ -277,7 +289,7 @@ class CarControlAccessAndPayloadsTest extends TestCase
             'vehicle_id' => $this->vehicle->id,
             'action' => CarCommand::ACTION_OPEN_CAR,
             'sms_to' => $this->vehicle->sim,
-            'sms_payloads' => ['youto youto lvcanopenalldoors'],
+            'sms_payloads' => [config('car_control.commands.open_car')],
             'status' => CarCommand::STATUS_QUEUED,
         ]);
         $service = app(CarControlService::class);
@@ -287,6 +299,28 @@ class CarControlAccessAndPayloadsTest extends TestCase
         $this->assertFalse($result['ok']);
         $this->assertStringContainsString('in progress', $result['message']);
         $this->assertCount(0, $this->smsLog);
+    }
+
+    public function test_sms_sends_bare_command_when_sms_prefix_empty(): void
+    {
+        config(['car_control.sms.command_prefix' => '']);
+        $now = Carbon::parse('2026-03-10 10:00:00');
+        Shift::factory()->create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => $now->copy()->addMinutes(30),
+            'ends_at' => $now->copy()->addHours(4),
+            'status' => ShiftStatus::Booked,
+        ]);
+        $this->app->forgetInstance(CarControlService::class);
+        $service = app(CarControlService::class);
+
+        $result = $service->executeAction($this->driver->id, CarCommand::ACTION_OPEN_CAR, $now);
+
+        $this->assertTrue($result['ok']);
+        $this->assertCount(1, $this->smsLog);
+        $this->assertSame(config('car_control.commands.open_car'), $this->smsLog[0]['text']);
     }
 
     public function test_open_car_uses_gprs_gateway_when_transport_is_gprs(): void

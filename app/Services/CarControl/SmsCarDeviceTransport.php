@@ -23,7 +23,7 @@ final class SmsCarDeviceTransport implements CarDeviceCommandTransportInterface
             );
         }
 
-        $result = $this->smsProvider->send($phone, $request->commandText);
+        $result = $this->smsProvider->send($phone, $this->smsBodyForDeviceCommand($request->commandText));
         $refs = [];
         if (isset($result['message_id'])) {
             $refs[] = (string) $result['message_id'];
@@ -44,5 +44,19 @@ final class SmsCarDeviceTransport implements CarDeviceCommandTransportInterface
             transport: 'sms',
             providerRefs: $refs,
         );
+    }
+
+    /**
+     * SMS uses Teltonika SMS login/password prefix; GPRS sends {@see $bareCommand} unchanged.
+     */
+    private function smsBodyForDeviceCommand(string $bareCommand): string
+    {
+        $bareCommand = trim($bareCommand);
+        $prefix = trim((string) config('car_control.sms.command_prefix', 'youto youto'));
+        if ($prefix === '') {
+            return $bareCommand;
+        }
+
+        return $bareCommand === '' ? $prefix : $prefix.' '.$bareCommand;
     }
 }

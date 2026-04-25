@@ -38,12 +38,21 @@ return [
     'pair_sms_delay_seconds' => (int) env('CAR_CONTROL_PAIR_SMS_DELAY_SECONDS', 3),
 
     /*
-    | SMS command texts sent to vehicle phone (device-specific)
+    | Bare device command strings (Codec12 / device payload). SMS adds car_control.sms.command_prefix.
+    | Override per action: CAR_CONTROL_COMMAND_* (preferred) or legacy CAR_CONTROL_SMS_* for the bare part.
     */
     'commands' => [
-        'open_car' => env('CAR_CONTROL_SMS_OPEN', 'youto youto lvcanopenalldoors'),
-        'close_car' => env('CAR_CONTROL_SMS_CLOSE', 'youto youto lvcanclosealldoors'),
-        'unlock_engine' => env('CAR_CONTROL_SMS_UNLOCK_ENGINE', 'youto youto setdigout 00 0 0'),
-        'lock_engine' => env('CAR_CONTROL_SMS_LOCK_ENGINE', 'youto youto setdigout 10 0 0'),
+        'open_car' => env('CAR_CONTROL_COMMAND_OPEN', env('CAR_CONTROL_SMS_OPEN', 'lvcanopenalldoors')),
+        'close_car' => env('CAR_CONTROL_COMMAND_CLOSE', env('CAR_CONTROL_SMS_CLOSE', 'lvcanclosealldoors')),
+        'unlock_engine' => env('CAR_CONTROL_COMMAND_UNLOCK_ENGINE', env('CAR_CONTROL_SMS_UNLOCK_ENGINE', 'setdigout 00 0 0')),
+        'lock_engine' => env('CAR_CONTROL_COMMAND_LOCK_ENGINE', env('CAR_CONTROL_SMS_LOCK_ENGINE', 'setdigout 10 0 0')),
+    ],
+
+    /*
+    | SMS only: prepended to each bare command (GPRS Codec12 is sent without this prefix).
+    | Set CAR_CONTROL_SMS_PREFIX= to disable.
+    */
+    'sms' => [
+        'command_prefix' => trim((string) env('CAR_CONTROL_SMS_PREFIX', 'youto youto')),
     ],
 ];
