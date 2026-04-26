@@ -66,6 +66,9 @@ final class DriverFleetInsightsService
         $medianWorked = $this->median($workedList);
         $medianBookedRange = $this->median($bookedRangeList);
         $medianFuture = $this->median($futureList);
+        $bandReferenceWorked = $medianWorked > 0.01
+            ? $medianWorked
+            : $this->medianOfPositiveValues($workedList);
 
         $rows = collect();
         foreach ($fleetDriverIds as $id) {
@@ -82,7 +85,7 @@ final class DriverFleetInsightsService
             $isNovice = $this->isNovice($firstAt, $hasCompleted);
 
             $vsMedian = round($workedH - $medianWorked, 1);
-            $band = $this->medianBand($workedH, $medianWorked);
+            $band = $this->medianBand($workedH, $bandReferenceWorked);
 
             $workedC = $this->componentWorkedVsMedian($workedH, $medianWorked);
             $forwardC = $this->componentForwardVsMedian($futureH, $medianFuture);
@@ -122,6 +125,8 @@ final class DriverFleetInsightsService
         return (object) [
             'rows' => $rows,
             'median_worked_hours' => round($medianWorked, 1),
+            'median_band_reference_worked_hours' => round($bandReferenceWorked, 1),
+            'median_band_uses_positive_worked_subset' => $medianWorked <= 0.01 && $bandReferenceWorked > 0.01,
             'median_booked_in_range_hours' => round($medianBookedRange, 1),
             'median_future_booked_hours' => round($medianFuture, 1),
             'day_count' => $dayCount,
@@ -339,13 +344,16 @@ final class DriverFleetInsightsService
         return $firstShiftAt === null;
     }
 
-    private function medianBand(float $worked, float $median): string
+    /**
+     * @param  float  $referenceMedian  median worked for the fleet, or when that is 0 — median among drivers with worked &gt; 0 (see build).
+     */
+    private function medianBand(float $worked, float $referenceMedian): string
     {
-        if ($median <= 0.01) {
-            return $worked > 0.01 ? 'above_median' : 'at_median';
+        if ($referenceMedian <= 0.01) {
+            return 'at_median';
         }
-        $low = $median * 0.85;
-        $high = $median * 1.15;
+        $low = $referenceMedian * 0.85;
+        $high = $referenceMedian * 1.15;
         if ($worked < $low) {
             return 'below_median';
         }
@@ -354,6 +362,19 @@ final class DriverFleetInsightsService
         }
 
         return 'at_median';
+    }
+
+    /**
+     * @param  list<float|int>  $values
+     */
+    private function medianOfPositiveValues(array $values): float
+    {
+        $positive = array_values(array_filter(
+            $values,
+            static fn ($v) => is_numeric($v) && (float) $v > 0.00001
+        ));
+
+        return $this->median($positive);
     }
 
     private function componentWorkedVsMedian(float $workedH, float $medianH): int

@@ -77,8 +77,12 @@
             <x-filament::section>
                 <x-slot name="heading">Fleet overview — worked / planned / future / activity</x-slot>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mb-3 max-w-4xl">
-                    All drivers in scope are listed (including 0 h in range). <strong>Median worked</strong> (completed hours in range): {{ $fleetInsights->median_worked_hours }} h —
-                    compare each row to this line (±15% = “at median”). <strong>Future booked</strong>: next {{ $fleetInsights->future_horizon_days }} days from today.
+                    All drivers in scope are listed (including 0 h in range). <strong>Median worked</strong> (completed hours in range, whole fleet): {{ $fleetInsights->median_worked_hours }} h.
+                    <strong>vs med.</strong> = this driver’s worked hours minus that fleet median (can be negative). <strong>Band</strong> = where worked hours sit vs a <em>reference</em>: normally the same median, with a band of ±15% (“at median” inside the band).
+                    @if(!empty($fleetInsights->median_band_uses_positive_worked_subset))
+                        Because the fleet median worked is 0, <strong>Band</strong> uses the median among drivers with worked &gt; 0 ({{ $fleetInsights->median_band_reference_worked_hours }} h) so “below median” is meaningful for low hours.
+                    @endif
+                    <strong>Future booked</strong>: next {{ $fleetInsights->future_horizon_days }} days from today.
                     <strong>Activity score</strong> (0–100): 45% worked vs median + 35% future booked vs median + 20% reliability (cancellations vs volume). Score is hidden for drivers with <strong>no completed shifts</strong> in history (filters apply), so new hires are not ranked until they complete work.
                     <strong>Table order:</strong> novices first (by name), then the rest by score highest first.
                 </p>
