@@ -45,7 +45,7 @@ class ShiftResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $q) => $q->with(['cancelledByUser', 'cancelledByDriver']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['cancelledByUser', 'cancelledByDriver']))
             ->columns([
                 Tables\Columns\TextColumn::make('starts_at')
                     ->dateTime()
