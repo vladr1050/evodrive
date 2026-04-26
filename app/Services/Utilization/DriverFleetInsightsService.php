@@ -24,8 +24,6 @@ final class DriverFleetInsightsService
      *   median_worked_hours: float,
      *   median_past_completed_hours: float,
      *   median_future_booked_in_window_hours: float,
-     *   median_band_reference_worked_hours: float,
-     *   median_band_uses_positive_worked_subset: bool,
      *   median_booked_in_range_hours: float,
      *   median_future_booked_hours: float,
      *   range_includes_future_calendar_days: bool,
@@ -89,9 +87,6 @@ final class DriverFleetInsightsService
         $medianRollingFutureBooked = $this->median($rollingFutureList);
         $medianPastCompleted = $this->median($pastCompletedList);
         $medianFutureBookedInWindow = $this->median($futureWindowBookedList);
-        $bandReferenceWorked = $medianWorked > 0.01
-            ? $medianWorked
-            : $this->medianOfPositiveValues($workedList);
 
         $rows = collect();
         foreach ($fleetDriverIds as $id) {
@@ -110,8 +105,8 @@ final class DriverFleetInsightsService
             $hasCompleted = in_array($id, $completedEver, true);
             $isNovice = $this->isNovice($firstAt, $hasCompleted);
 
-            $vsMedian = round($workedH - $medianWorked, 1);
-            $band = $this->medianBand($workedH, $bandReferenceWorked);
+            $combinedHours = ($t['worked'] + $t['booked']) / 60.0;
+            $avgCompletedBookedPerDay = round($combinedHours / $dayCount, 1);
 
             $pastC = $this->componentWorkedVsMedian($pastCompletedH, $medianPastCompleted);
             if ($rangeHasFutureCalendarDay) {
@@ -146,8 +141,7 @@ final class DriverFleetInsightsService
                 'first_shift_at' => $firstAt,
                 'has_completed_history' => $hasCompleted,
                 'is_novice' => $isNovice,
-                'vs_median_worked' => $vsMedian,
-                'median_band' => $band,
+                'avg_completed_booked_hours_per_day' => $avgCompletedBookedPerDay,
                 'activity_score' => $activityScore,
                 'score_past_completed_component' => $isNovice ? null : $pastC,
                 'score_future_load_component' => $isNovice ? null : $futureC,
@@ -167,8 +161,6 @@ final class DriverFleetInsightsService
             'median_worked_hours' => round($medianWorked, 1),
             'median_past_completed_hours' => round($medianPastCompleted, 1),
             'median_future_booked_in_window_hours' => round($medianFutureBookedInWindow, 1),
-            'median_band_reference_worked_hours' => round($bandReferenceWorked, 1),
-            'median_band_uses_positive_worked_subset' => $medianWorked <= 0.01 && $bandReferenceWorked > 0.01,
             'median_booked_in_range_hours' => round($medianBookedRange, 1),
             'median_future_booked_hours' => round($medianRollingFutureBooked, 1),
             'range_includes_future_calendar_days' => $rangeHasFutureCalendarDay,
@@ -435,39 +427,6 @@ final class DriverFleetInsightsService
         }
 
         return $firstShiftAt === null;
-    }
-
-    /**
-     * @param  float  $referenceMedian  median worked for the fleet, or when that is 0 — median among drivers with worked &gt; 0 (see build).
-     */
-    private function medianBand(float $worked, float $referenceMedian): string
-    {
-        if ($referenceMedian <= 0.01) {
-            return 'at_median';
-        }
-        $low = $referenceMedian * 0.85;
-        $high = $referenceMedian * 1.15;
-        if ($worked < $low) {
-            return 'below_median';
-        }
-        if ($worked > $high) {
-            return 'above_median';
-        }
-
-        return 'at_median';
-    }
-
-    /**
-     * @param  list<float|int>  $values
-     */
-    private function medianOfPositiveValues(array $values): float
-    {
-        $positive = array_values(array_filter(
-            $values,
-            static fn ($v) => is_numeric($v) && (float) $v > 0.00001
-        ));
-
-        return $this->median($positive);
     }
 
     private function componentWorkedVsMedian(float $workedH, float $medianH): int

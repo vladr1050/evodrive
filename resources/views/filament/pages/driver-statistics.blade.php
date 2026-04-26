@@ -78,11 +78,7 @@
                 <x-slot name="heading">Fleet overview — worked / planned / future / activity</x-slot>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mb-3 max-w-4xl">
                     All drivers in scope are listed (including 0 h in range). <strong>Median worked</strong> (completed in range, whole fleet): {{ $fleetInsights->median_worked_hours }} h; <strong>median past (≤ today)</strong> for score: {{ $fleetInsights->median_past_completed_hours }} h.
-                    <strong>vs med.</strong> = worked in range minus fleet median worked. <strong>Band</strong> = worked vs reference median ±15%
-                    @if(!empty($fleetInsights->median_band_uses_positive_worked_subset))
-                        (here ref. {{ $fleetInsights->median_band_reference_worked_hours }} h when fleet median is 0)
-                    @endif
-                    .
+                    <strong>Avg h/day</strong> = (worked + booked hours in the selected range) ÷ {{ $fleetInsights->day_count }} calendar day(s) in that range.
                     <strong>Activity score</strong> (0–100): {{ round(($fleetInsights->activity_weight_past ?? 0.35) * 100) }}% past completed (days ≤ today in range) vs fleet median,
                     {{ round(($fleetInsights->activity_weight_future ?? 0.35) * 100) }}% future load — booked on today + future days inside the filter @if(!empty($fleetInsights->range_includes_future_calendar_days)) vs median in that window @else (filter has no future days → next {{ $fleetInsights->future_horizon_days }} days from today vs fleet median) @endif,
                     {{ round(($fleetInsights->activity_weight_reliability ?? 0.3) * 100) }}% reliability (cancellations vs booked+worked in range). Weights: <code class="text-xs">config/statistics.php</code>.
@@ -100,22 +96,14 @@
                                 <th class="p-2 text-right" title="Booked on today + days after today within the filter (score ‘future’ when the range has future days).">Ahead in range (h)</th>
                                 <th class="p-2 text-right" title="Booked from today for the next N days (rolling; used for score when the filter has no future calendar days).">Next {{ $fleetInsights->future_horizon_days }}d (h)</th>
                                 <th class="p-2 text-right">Cancelled (h)</th>
-                                <th class="p-2 text-right" title="Distinct calendar days in the selected date range with any booked or completed time. Denominator = number of days in that range.">Days w/ shift</th>
-                                <th class="p-2 text-right">vs med.</th>
-                                <th class="p-2">Band</th>
+                                <th class="p-2 text-right" title="Distinct calendar days in the selected date range with any booked or completed time. Denominator for Avg h/day is the full range length ({{ $fleetInsights->day_count }} days), not this count.">Days w/ shift</th>
+                                <th class="p-2 text-right" title="(Worked + booked hours in range) ÷ {{ $fleetInsights->day_count }} days in the selected date range.">Avg h/day</th>
                                 <th class="p-2 text-right">Score</th>
                                 <th class="p-2">Note</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($fleetInsights->rows as $fr)
-                                @php
-                                    $bandClass = match ($fr->median_band) {
-                                        'below_median' => 'text-red-600 dark:text-red-400',
-                                        'above_median' => 'text-green-600 dark:text-green-400',
-                                        default => 'text-gray-600 dark:text-gray-400',
-                                    };
-                                @endphp
                                 <tr class="border-b border-gray-200 dark:border-gray-700 {{ $fr->is_novice ? 'opacity-90' : '' }}">
                                     <td class="p-2 font-medium">{{ $fr->driver_name }}</td>
                                     <td class="p-2 text-right">{{ number_format($fr->worked_hours, 1) }}</td>
@@ -125,10 +113,7 @@
                                     <td class="p-2 text-right">{{ number_format($fr->future_booked_hours, 1) }}</td>
                                     <td class="p-2 text-right">{{ number_format($fr->cancelled_hours, 1) }}</td>
                                     <td class="p-2 text-right">{{ $fr->shift_days_in_range }} / {{ $fleetInsights->day_count }}</td>
-                                    <td class="p-2 text-right {{ $fr->vs_median_worked < 0 ? 'text-red-600 dark:text-red-400' : ($fr->vs_median_worked > 0 ? 'text-green-600 dark:text-green-400' : '') }}">
-                                        {{ $fr->vs_median_worked >= 0 ? '+' : '' }}{{ number_format($fr->vs_median_worked, 1) }}
-                                    </td>
-                                    <td class="p-2 {{ $bandClass }}">{{ str_replace('_', ' ', $fr->median_band) }}</td>
+                                    <td class="p-2 text-right">{{ number_format($fr->avg_completed_booked_hours_per_day, 1) }}</td>
                                     <td class="p-2 text-right font-semibold" title="{{ $fr->is_novice ? '' : 'Past '.$fr->score_past_completed_component.' · Future '.$fr->score_future_load_component.' · Reliability '.$fr->score_reliability_component }}">
                                         @if($fr->is_novice)
                                             <span class="text-gray-400">—</span>
@@ -148,6 +133,11 @@
                         </tbody>
                     </table>
                 </div>
+                <p class="mt-3 text-sm text-gray-600 dark:text-gray-400">
+                    <span class="font-semibold text-gray-900 dark:text-gray-100">Total</span>:
+                    {{ number_format($fleetInsights->rows->count()) }}
+                    {{ $fleetInsights->rows->count() === 1 ? 'driver' : 'drivers' }} in this table.
+                </p>
             </x-filament::section>
         @elseif(isset($fleetInsights))
             <x-filament::section>
