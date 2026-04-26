@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Enums\DriverStatus;
 use App\Enums\ShiftStatus;
 use App\Models\Driver;
 use App\Models\FleetVehicle;
@@ -74,5 +75,16 @@ class DriverFleetInsightsServiceTest extends TestCase
         );
 
         Carbon::setTestNow();
+    }
+
+    public function test_default_fleet_driver_ids_respects_status_filter(): void
+    {
+        $active = Driver::factory()->create(['status' => DriverStatus::Active]);
+        $inactive = Driver::factory()->create(['status' => DriverStatus::Inactive]);
+
+        $ids = app(DriverFleetInsightsService::class)->defaultFleetDriverIds([DriverStatus::Active]);
+
+        $this->assertContains($active->id, $ids);
+        $this->assertNotContains($inactive->id, $ids);
     }
 }

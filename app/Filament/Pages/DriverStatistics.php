@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\DriverStatus;
 use App\Enums\ShiftStatus;
 use App\Models\Driver;
 use App\Models\FleetVehicle;
@@ -15,6 +16,7 @@ use App\Services\Utilization\DriverUtilizationService;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -49,6 +51,13 @@ class DriverStatistics extends Page
 
     public string $statusMode = DriverUtilizationFilters::STATUS_MODE_BOTH;
 
+    /**
+     * Filter roster / heatmap / export by driver account status. Empty = all statuses.
+     *
+     * @var list<string>
+     */
+    public array $driverStatuses = [];
+
     public bool $showBreakdownModal = false;
 
     public ?int $breakdownDriverId = null;
@@ -77,7 +86,7 @@ class DriverStatistics extends Page
     protected function getViewData(): array
     {
         $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
-        $driversSelect = Driver::orderBy('name')->get(['id', 'name']);
+        $driversSelect = $this->driversQueryForFilters()->get(['id', 'name']);
         $effectiveDriverIds = $this->effectiveDriverIdsForShiftQuery($driversSelect);
         $fleetDriverIds = $this->fleetDriverIdsForRoster();
 
@@ -134,7 +143,47 @@ class DriverStatistics extends Page
             'breakdownDetail' => $breakdownDetail,
             'breakdownDriverName' => $breakdownDriverName,
             'statisticsTimezone' => $tz,
+            'driverStatusCases' => DriverStatus::cases(),
         ];
+    }
+
+    /**
+     * @return Builder<\App\Models\Driver>
+     */
+    protected function driversQueryForFilters(): Builder
+    {
+        $query = Driver::query()->orderBy('name');
+        $statuses = $this->driverStatusFilter();
+        if ($statuses !== null) {
+            $query->whereIn('status', $statuses);
+        }
+
+        return $query;
+    }
+
+    /**
+     * @return list<DriverStatus>|null null = include every account status
+     */
+    protected function driverStatusFilter(): ?array
+    {
+        if ($this->driverStatuses === []) {
+            return null;
+        }
+        $out = [];
+        foreach ($this->driverStatuses as $s) {
+            $e = DriverStatus::tryFrom((string) $s);
+            if ($e !== null) {
+                $out[] = $e;
+            }
+        }
+        if ($out === []) {
+            return null;
+        }
+        if (count($out) === count(DriverStatus::cases())) {
+            return null;
+        }
+
+        return $out;
     }
 
     /**
@@ -149,7 +198,16 @@ class DriverStatistics extends Page
             return $driversSelect->pluck('id')->map(fn ($id) => (int) $id)->all();
         }
 
-        return $this->driverIds !== [] ? array_map('intval', $this->driverIds) : null;
+        if ($this->driverIds !== []) {
+            return $this->filterDriverIdsByStatusFilter(array_map('intval', $this->driverIds));
+        }
+
+        $statuses = $this->driverStatusFilter();
+        if ($statuses === null) {
+            return null;
+        }
+
+        return app(DriverFleetInsightsService::class)->defaultFleetDriverIds($statuses);
     }
 
     /**
@@ -159,11 +217,32 @@ class DriverStatistics extends Page
      */
     protected function fleetDriverIdsForRoster(): array
     {
+        $statuses = $this->driverStatusFilter();
         if ($this->selectAllDrivers || $this->driverIds === []) {
-            return app(DriverFleetInsightsService::class)->defaultFleetDriverIds();
+            return app(DriverFleetInsightsService::class)->defaultFleetDriverIds($statuses);
         }
 
-        return array_values(array_unique(array_map('intval', $this->driverIds)));
+        return $this->filterDriverIdsByStatusFilter(
+            array_values(array_unique(array_map('intval', $this->driverIds)))
+        );
+    }
+
+    /**
+     * @param  array<int>  $driverIds
+     * @return array<int>
+     */
+    protected function filterDriverIdsByStatusFilter(array $driverIds): array
+    {
+        if ($driverIds === []) {
+            return [];
+        }
+        $query = Driver::query()->whereIn('id', $driverIds)->orderBy('name');
+        $statuses = $this->driverStatusFilter();
+        if ($statuses !== null) {
+            $query->whereIn('status', $statuses);
+        }
+
+        return $query->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
     /**
@@ -403,11 +482,23 @@ class DriverStatistics extends Page
         if (! $value) {
             return;
         }
-        $this->driverIds = Driver::orderBy('name')->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $this->driverIds = $this->driversQueryForFilters()->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
     public function updatedDriverIds(): void
     {
+        if ($this->driverIds === []) {
+            $this->selectAllDrivers = false;
+        }
+    }
+
+    public function updatedDriverStatuses(): void
+    {
+        if ($this->driverIds === []) {
+            return;
+        }
+        $allowed = $this->driversQueryForFilters()->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $this->driverIds = array_values(array_intersect(array_map('intval', $this->driverIds), $allowed));
         if ($this->driverIds === []) {
             $this->selectAllDrivers = false;
         }
@@ -444,7 +535,7 @@ class DriverStatistics extends Page
     {
         $range = new DateRange($this->dateFrom, $this->dateTo);
         $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
-        $driversSelect = Driver::orderBy('name')->get(['id', 'name']);
+        $driversSelect = $this->driversQueryForFilters()->get(['id', 'name']);
         $effectiveDriverIds = $this->effectiveDriverIdsForShiftQuery($driversSelect);
         $filters = new DriverUtilizationFilters(
             $effectiveDriverIds,

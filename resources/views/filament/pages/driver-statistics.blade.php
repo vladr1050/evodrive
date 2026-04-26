@@ -23,13 +23,22 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1">Status</label>
+                    <label class="block text-sm font-medium mb-1">Shift data (in range)</label>
                     <select wire:model.live="statusMode" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800">
                         <option value="both">Completed + Booked</option>
                         <option value="completed">Completed only</option>
                         <option value="booked">Booked only</option>
                     </select>
                 </div>
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm font-medium mb-1">Driver account status (who is listed)</label>
+                <select wire:model.live="driverStatuses" multiple class="w-full max-w-xl rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800" size="3">
+                    @foreach($driverStatusCases ?? [] as $st)
+                        <option value="{{ $st->value }}">{{ \Illuminate\Support\Str::headline($st->value) }}</option>
+                    @endforeach
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Leave empty for all. Applies to roster, heatmap, totals, and export.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                 <div>

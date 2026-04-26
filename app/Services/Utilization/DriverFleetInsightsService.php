@@ -2,6 +2,7 @@
 
 namespace App\Services\Utilization;
 
+use App\Enums\DriverStatus;
 use App\Enums\ShiftStatus;
 use App\Models\Driver;
 use App\Models\Shift;
@@ -129,17 +130,19 @@ final class DriverFleetInsightsService
     }
 
     /**
-     * Active drivers for fleet roster when the UI means “all drivers”.
+     * Driver ids for fleet roster / heatmap when the UI means “all drivers” in scope.
      *
+     * @param  list<DriverStatus>|null  $statuses  null = any status; non-empty = only these
      * @return array<int>
      */
-    public function defaultFleetDriverIds(): array
+    public function defaultFleetDriverIds(?array $statuses = null): array
     {
-        return Driver::query()
-            ->orderBy('name')
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        $query = Driver::query()->orderBy('name');
+        if ($statuses !== null && $statuses !== []) {
+            $query->whereIn('status', $statuses);
+        }
+
+        return $query->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
     /**
