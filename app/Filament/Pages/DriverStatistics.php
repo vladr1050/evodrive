@@ -115,7 +115,7 @@ class DriverStatistics extends Page
             $filters,
             $fleetDriverIds,
             $tz,
-            30,
+            null,
         );
 
         $breakdownDetail = [];

@@ -22,8 +22,16 @@ final class DriverFleetInsightsService
      * @return object{
      *   rows: Collection<int, object>,
      *   median_worked_hours: float,
+     *   median_past_completed_hours: float,
+     *   median_future_booked_in_window_hours: float,
+     *   median_band_reference_worked_hours: float,
+     *   median_band_uses_positive_worked_subset: bool,
      *   median_booked_in_range_hours: float,
      *   median_future_booked_hours: float,
+     *   range_includes_future_calendar_days: bool,
+     *   activity_weight_past: float,
+     *   activity_weight_future: float,
+     *   activity_weight_reliability: float,
      *   day_count: int,
      *   future_horizon_days: int
      * }
@@ -34,16 +42,24 @@ final class DriverFleetInsightsService
         DriverUtilizationFilters $filters,
         array $fleetDriverIds,
         string $tz,
-        int $futureHorizonDays = 30,
+        ?int $futureHorizonDays = null,
     ): object {
         $fleetDriverIds = array_values(array_unique(array_map('intval', $fleetDriverIds)));
         $dayCount = max(1, count($range->dateKeys()));
 
+        $activityCfg = config('statistics.driver_fleet_activity', []);
+        $anchorDays = $futureHorizonDays ?? max(1, (int) ($activityCfg['rolling_booked_anchor_days'] ?? 30));
+        [$weightPast, $weightFuture, $weightReliability] = $this->normalizeActivityWeights($activityCfg);
+
+        $todayKey = Carbon::now($tz)->format('Y-m-d');
+        $rangeHasFutureCalendarDay = strcmp((string) $range->dateTo, $todayKey) > 0;
+
         $totalsFromRows = $this->aggregateTotalsFromDailyRows($dailyUtilizationRows);
+        $pastFutureFromRows = $this->aggregatePastFutureFromDailyRows($dailyUtilizationRows, $todayKey);
         $shiftDays = $this->distinctShiftDaysFromDailyRows($dailyUtilizationRows);
 
         $cancelledByDriver = $this->cancelledHoursByDriver($range, $filters, $tz, $fleetDriverIds);
-        $futureBookedByDriver = $this->futureBookedHoursByDriver($filters, $tz, $fleetDriverIds, $futureHorizonDays);
+        $futureBookedByDriver = $this->futureBookedHoursByDriver($filters, $tz, $fleetDriverIds, $anchorDays);
         $firstShiftByDriver = $this->firstShiftStartedAtByDriver($fleetDriverIds, $filters);
         $completedEver = $this->driversWithCompletedShift($fleetDriverIds, $filters);
 
@@ -55,17 +71,24 @@ final class DriverFleetInsightsService
 
         $workedList = [];
         $bookedRangeList = [];
-        $futureList = [];
+        $rollingFutureList = [];
+        $pastCompletedList = [];
+        $futureWindowBookedList = [];
         foreach ($fleetDriverIds as $id) {
             $t = $totalsFromRows[$id] ?? ['worked' => 0, 'booked' => 0, 'total' => 0];
+            $pf = $pastFutureFromRows[$id] ?? ['past_completed' => 0, 'future_booked_window' => 0];
             $workedList[] = round($t['worked'] / 60, 4);
             $bookedRangeList[] = round($t['booked'] / 60, 4);
-            $futureList[] = round(($futureBookedByDriver[$id] ?? 0) / 60, 4);
+            $rollingFutureList[] = round(($futureBookedByDriver[$id] ?? 0) / 60, 4);
+            $pastCompletedList[] = round($pf['past_completed'] / 60, 4);
+            $futureWindowBookedList[] = round($pf['future_booked_window'] / 60, 4);
         }
 
         $medianWorked = $this->median($workedList);
         $medianBookedRange = $this->median($bookedRangeList);
-        $medianFuture = $this->median($futureList);
+        $medianRollingFutureBooked = $this->median($rollingFutureList);
+        $medianPastCompleted = $this->median($pastCompletedList);
+        $medianFutureBookedInWindow = $this->median($futureWindowBookedList);
         $bandReferenceWorked = $medianWorked > 0.01
             ? $medianWorked
             : $this->medianOfPositiveValues($workedList);
@@ -73,11 +96,14 @@ final class DriverFleetInsightsService
         $rows = collect();
         foreach ($fleetDriverIds as $id) {
             $t = $totalsFromRows[$id] ?? ['worked' => 0, 'booked' => 0, 'total' => 0];
+            $pf = $pastFutureFromRows[$id] ?? ['past_completed' => 0, 'future_booked_window' => 0];
             $workedH = round($t['worked'] / 60, 1);
             $bookedH = round($t['booked'] / 60, 1);
             $totalH = round($t['total'] / 60, 1);
-            $futureMinutes = (int) ($futureBookedByDriver[$id] ?? 0);
-            $futureH = round($futureMinutes / 60, 1);
+            $pastCompletedH = round($pf['past_completed'] / 60, 1);
+            $futureBookedInRangeH = round($pf['future_booked_window'] / 60, 1);
+            $rollingFutureMinutes = (int) ($futureBookedByDriver[$id] ?? 0);
+            $rollingFutureH = round($rollingFutureMinutes / 60, 1);
             $cancelMinutes = (int) ($cancelledByDriver[$id] ?? 0);
             $cancelH = round($cancelMinutes / 60, 1);
             $firstAt = $firstShiftByDriver[$id] ?? null;
@@ -87,21 +113,34 @@ final class DriverFleetInsightsService
             $vsMedian = round($workedH - $medianWorked, 1);
             $band = $this->medianBand($workedH, $bandReferenceWorked);
 
-            $workedC = $this->componentWorkedVsMedian($workedH, $medianWorked);
-            $forwardC = $this->componentForwardVsMedian($futureH, $medianFuture);
+            $pastC = $this->componentWorkedVsMedian($pastCompletedH, $medianPastCompleted);
+            if ($rangeHasFutureCalendarDay) {
+                $futureLoadH = $futureBookedInRangeH;
+                $medianFutureLoad = $medianFutureBookedInWindow;
+            } else {
+                $futureLoadH = $rollingFutureH;
+                $medianFutureLoad = $medianRollingFutureBooked;
+            }
+            $futureC = $this->componentForwardVsMedian($futureLoadH, $medianFutureLoad);
             $reliabilityC = $this->componentReliability($cancelMinutes, $t['worked'] + $t['booked']);
 
             $activityScore = $isNovice
                 ? null
-                : (int) round(0.45 * $workedC + 0.35 * $forwardC + 0.2 * $reliabilityC);
+                : (int) round(
+                    $weightPast * $pastC
+                    + $weightFuture * $futureC
+                    + $weightReliability * $reliabilityC
+                );
 
             $rows->push((object) [
                 'driver_id' => $id,
                 'driver_name' => (string) $names->get($id, '—'),
                 'worked_hours' => $workedH,
+                'past_completed_hours' => $pastCompletedH,
                 'booked_hours' => $bookedH,
+                'future_booked_in_range_hours' => $futureBookedInRangeH,
                 'total_hours' => $totalH,
-                'future_booked_hours' => $futureH,
+                'future_booked_hours' => $rollingFutureH,
                 'cancelled_hours' => $cancelH,
                 'shift_days_in_range' => (int) ($shiftDays[$id] ?? 0),
                 'first_shift_at' => $firstAt,
@@ -110,9 +149,10 @@ final class DriverFleetInsightsService
                 'vs_median_worked' => $vsMedian,
                 'median_band' => $band,
                 'activity_score' => $activityScore,
-                'score_worked_component' => $isNovice ? null : $workedC,
-                'score_forward_component' => $isNovice ? null : $forwardC,
+                'score_past_completed_component' => $isNovice ? null : $pastC,
+                'score_future_load_component' => $isNovice ? null : $futureC,
                 'score_reliability_component' => $isNovice ? null : $reliabilityC,
+                'future_score_uses_window_in_range' => $rangeHasFutureCalendarDay,
             ]);
         }
 
@@ -125,13 +165,66 @@ final class DriverFleetInsightsService
         return (object) [
             'rows' => $rows,
             'median_worked_hours' => round($medianWorked, 1),
+            'median_past_completed_hours' => round($medianPastCompleted, 1),
+            'median_future_booked_in_window_hours' => round($medianFutureBookedInWindow, 1),
             'median_band_reference_worked_hours' => round($bandReferenceWorked, 1),
             'median_band_uses_positive_worked_subset' => $medianWorked <= 0.01 && $bandReferenceWorked > 0.01,
             'median_booked_in_range_hours' => round($medianBookedRange, 1),
-            'median_future_booked_hours' => round($medianFuture, 1),
+            'median_future_booked_hours' => round($medianRollingFutureBooked, 1),
+            'range_includes_future_calendar_days' => $rangeHasFutureCalendarDay,
+            'activity_weight_past' => $weightPast,
+            'activity_weight_future' => $weightFuture,
+            'activity_weight_reliability' => $weightReliability,
             'day_count' => $dayCount,
-            'future_horizon_days' => $futureHorizonDays,
+            'future_horizon_days' => $anchorDays,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $activityCfg  statistics.driver_fleet_activity
+     * @return array{0: float, 1: float, 2: float} past, future, reliability weights summing to 1
+     */
+    private function normalizeActivityWeights(array $activityCfg): array
+    {
+        $wPast = max(0.0, (float) ($activityCfg['weight_past_completed'] ?? 0.35));
+        $wFut = max(0.0, (float) ($activityCfg['weight_future_load'] ?? 0.35));
+        $wRel = max(0.0, (float) ($activityCfg['weight_reliability'] ?? 0.30));
+        $sum = $wPast + $wFut + $wRel;
+
+        return $sum > 0.0
+            ? [$wPast / $sum, $wFut / $sum, $wRel / $sum]
+            : [1 / 3, 1 / 3, 1 / 3];
+    }
+
+    /**
+     * Split daily utilization by calendar day in $tz vs “today”.
+     *
+     *  - past_completed: worked_minutes on days &lt; today, plus worked_minutes on today
+     *  - future_booked_window: planned_minutes on days &gt; today within the rows, plus planned_minutes on today
+     *
+     * @param  Collection<int, object{date: string, driver_id: int, worked_minutes: int, planned_minutes: int}>  $dailyUtilizationRows
+     * @return array<int, array{past_completed: int, future_booked_window: int}>
+     */
+    private function aggregatePastFutureFromDailyRows(Collection $dailyUtilizationRows, string $todayKey): array
+    {
+        $by = [];
+        foreach ($dailyUtilizationRows as $r) {
+            $id = (int) $r->driver_id;
+            $date = (string) $r->date;
+            if (! isset($by[$id])) {
+                $by[$id] = ['past_completed' => 0, 'future_booked_window' => 0];
+            }
+            if ($date < $todayKey) {
+                $by[$id]['past_completed'] += (int) $r->worked_minutes;
+            } elseif ($date > $todayKey) {
+                $by[$id]['future_booked_window'] += (int) $r->planned_minutes;
+            } else {
+                $by[$id]['past_completed'] += (int) $r->worked_minutes;
+                $by[$id]['future_booked_window'] += (int) $r->planned_minutes;
+            }
+        }
+
+        return $by;
     }
 
     /**

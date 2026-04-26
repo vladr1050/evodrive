@@ -77,23 +77,28 @@
             <x-filament::section>
                 <x-slot name="heading">Fleet overview — worked / planned / future / activity</x-slot>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mb-3 max-w-4xl">
-                    All drivers in scope are listed (including 0 h in range). <strong>Median worked</strong> (completed hours in range, whole fleet): {{ $fleetInsights->median_worked_hours }} h.
-                    <strong>vs med.</strong> = this driver’s worked hours minus that fleet median (can be negative). <strong>Band</strong> = where worked hours sit vs a <em>reference</em>: normally the same median, with a band of ±15% (“at median” inside the band).
+                    All drivers in scope are listed (including 0 h in range). <strong>Median worked</strong> (completed in range, whole fleet): {{ $fleetInsights->median_worked_hours }} h; <strong>median past (≤ today)</strong> for score: {{ $fleetInsights->median_past_completed_hours }} h.
+                    <strong>vs med.</strong> = worked in range minus fleet median worked. <strong>Band</strong> = worked vs reference median ±15%
                     @if(!empty($fleetInsights->median_band_uses_positive_worked_subset))
-                        Because the fleet median worked is 0, <strong>Band</strong> uses the median among drivers with worked &gt; 0 ({{ $fleetInsights->median_band_reference_worked_hours }} h) so “below median” is meaningful for low hours.
+                        (here ref. {{ $fleetInsights->median_band_reference_worked_hours }} h when fleet median is 0)
                     @endif
-                    <strong>Future booked</strong>: next {{ $fleetInsights->future_horizon_days }} days from today.
-                    <strong>Activity score</strong> (0–100): 45% worked vs median + 35% future booked vs median + 20% reliability (cancellations vs volume). Score is hidden for drivers with <strong>no completed shifts</strong> in history (filters apply), so new hires are not ranked until they complete work.
-                    <strong>Table order:</strong> novices first (by name), then the rest by score highest first.
+                    .
+                    <strong>Activity score</strong> (0–100): {{ round(($fleetInsights->activity_weight_past ?? 0.35) * 100) }}% past completed (days ≤ today in range) vs fleet median,
+                    {{ round(($fleetInsights->activity_weight_future ?? 0.35) * 100) }}% future load — booked on today + future days inside the filter @if(!empty($fleetInsights->range_includes_future_calendar_days)) vs median in that window @else (filter has no future days → next {{ $fleetInsights->future_horizon_days }} days from today vs fleet median) @endif,
+                    {{ round(($fleetInsights->activity_weight_reliability ?? 0.3) * 100) }}% reliability (cancellations vs booked+worked in range). Weights: <code class="text-xs">config/statistics.php</code>.
+                    Score hidden for drivers with <strong>no completed shifts</strong> in history (filters apply).
+                    <strong>Table order:</strong> novices first (by name), then highest score.
                 </p>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead class="text-left border-b">
                             <tr>
                                 <th class="p-2">Driver</th>
-                                <th class="p-2 text-right">Worked (h)</th>
-                                <th class="p-2 text-right">Booked in range (h)</th>
-                                <th class="p-2 text-right">Future booked (h)</th>
+                                <th class="p-2 text-right" title="Completed hours in the full selected date range.">Worked (h)</th>
+                                <th class="p-2 text-right" title="Completed on days ≤ today within the range (score ‘past’).">Past ≤today (h)</th>
+                                <th class="p-2 text-right" title="Booked (planned) minutes summed for the full range.">Booked range (h)</th>
+                                <th class="p-2 text-right" title="Booked on today + days after today within the filter (score ‘future’ when the range has future days).">Ahead in range (h)</th>
+                                <th class="p-2 text-right" title="Booked from today for the next N days (rolling; used for score when the filter has no future calendar days).">Next {{ $fleetInsights->future_horizon_days }}d (h)</th>
                                 <th class="p-2 text-right">Cancelled (h)</th>
                                 <th class="p-2 text-right" title="Distinct calendar days in the selected date range with any booked or completed time. Denominator = number of days in that range.">Days w/ shift</th>
                                 <th class="p-2 text-right">vs med.</th>
@@ -114,7 +119,9 @@
                                 <tr class="border-b border-gray-200 dark:border-gray-700 {{ $fr->is_novice ? 'opacity-90' : '' }}">
                                     <td class="p-2 font-medium">{{ $fr->driver_name }}</td>
                                     <td class="p-2 text-right">{{ number_format($fr->worked_hours, 1) }}</td>
+                                    <td class="p-2 text-right">{{ number_format($fr->past_completed_hours, 1) }}</td>
                                     <td class="p-2 text-right">{{ number_format($fr->booked_hours, 1) }}</td>
+                                    <td class="p-2 text-right">{{ number_format($fr->future_booked_in_range_hours, 1) }}</td>
                                     <td class="p-2 text-right">{{ number_format($fr->future_booked_hours, 1) }}</td>
                                     <td class="p-2 text-right">{{ number_format($fr->cancelled_hours, 1) }}</td>
                                     <td class="p-2 text-right">{{ $fr->shift_days_in_range }} / {{ $fleetInsights->day_count }}</td>
@@ -122,7 +129,7 @@
                                         {{ $fr->vs_median_worked >= 0 ? '+' : '' }}{{ number_format($fr->vs_median_worked, 1) }}
                                     </td>
                                     <td class="p-2 {{ $bandClass }}">{{ str_replace('_', ' ', $fr->median_band) }}</td>
-                                    <td class="p-2 text-right font-semibold" title="{{ $fr->is_novice ? '' : 'Worked '.$fr->score_worked_component.' · Forward '.$fr->score_forward_component.' · Reliability '.$fr->score_reliability_component }}">
+                                    <td class="p-2 text-right font-semibold" title="{{ $fr->is_novice ? '' : 'Past '.$fr->score_past_completed_component.' · Future '.$fr->score_future_load_component.' · Reliability '.$fr->score_reliability_component }}">
                                         @if($fr->is_novice)
                                             <span class="text-gray-400">—</span>
                                         @else
