@@ -67,6 +67,12 @@ class DriverFleetInsightsServiceTest extends TestCase
         $this->assertSame('at_median', $byId[$dMid->id]->median_band);
         $this->assertSame('below_median', $byId[$dZero->id]->median_band);
 
+        $this->assertSame(
+            [$dZero->id, $dHigh->id, $dMid->id],
+            $insights->rows->pluck('driver_id')->all(),
+            'Novices first, then highest activity score before lower score'
+        );
+
         Carbon::setTestNow();
     }
 }

@@ -71,6 +71,7 @@
                     All drivers in scope are listed (including 0 h in range). <strong>Median worked</strong> (completed hours in range): {{ $fleetInsights->median_worked_hours }} h —
                     compare each row to this line (±15% = “at median”). <strong>Future booked</strong>: next {{ $fleetInsights->future_horizon_days }} days from today.
                     <strong>Activity score</strong> (0–100): 45% worked vs median + 35% future booked vs median + 20% reliability (cancellations vs volume). Score is hidden for drivers with <strong>no completed shifts</strong> in history (filters apply), so new hires are not ranked until they complete work.
+                    <strong>Table order:</strong> novices first (by name), then the rest by score highest first.
                 </p>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">

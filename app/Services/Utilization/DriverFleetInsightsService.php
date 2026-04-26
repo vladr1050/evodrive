@@ -112,11 +112,11 @@ final class DriverFleetInsightsService
             ]);
         }
 
-        $rows = $rows->sortBy(fn ($r) => [
-            $r->is_novice ? 1 : 0,
-            $r->activity_score ?? 999,
-            $r->driver_name,
-        ])->values();
+        // Novices first; then everyone else by activity score descending (highest at top), name tie-break.
+        $rows = $rows->sortBy(fn ($r) => $r->is_novice
+            ? [0, $r->driver_name]
+            : [1, -($r->activity_score ?? 0), $r->driver_name]
+        )->values();
 
         return (object) [
             'rows' => $rows,
