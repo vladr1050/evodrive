@@ -10,6 +10,7 @@ use App\Models\FleetVehicle;
 use App\Models\Shift;
 use App\Models\ShiftPolicy;
 use App\Models\Station;
+use App\Models\User;
 use App\Services\TelegramNotifier;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,8 +24,11 @@ class ShiftCancellationTelegramNotificationTest extends TestCase
     use RefreshDatabase;
 
     protected ShiftPolicy $policy;
+
     protected Station $station;
+
     protected FleetVehicle $vehicle;
+
     protected Driver $driver;
 
     protected function setUp(): void
@@ -72,11 +76,49 @@ class ShiftCancellationTelegramNotificationTest extends TestCase
 
         Http::assertSent(function ($request) {
             $body = $request->data();
+
             return str_contains($request->url(), 'sendMessage')
                 && ($body['chat_id'] ?? '') !== ''
                 && str_contains($body['text'] ?? '', 'Central Station')
                 && str_contains($body['text'] ?? '', '123 Main St')
-                && str_contains($body['text'] ?? '', 'Slot freed:');
+                && str_contains($body['text'] ?? '', 'Slot freed:')
+                && str_contains($body['text'] ?? '', 'Cancelled by:')
+                && str_contains($body['text'] ?? '', '(driver)');
+        });
+    }
+
+    public function test_telegram_message_includes_staff_name_when_cancelled_by_user(): void
+    {
+        Http::fake([
+            'api.telegram.org/*' => Http::response(['ok' => true], 200),
+        ]);
+
+        $staff = User::factory()->create(['name' => 'Alex Ops']);
+        $startsAt = Carbon::tomorrow()->setTime(10, 0);
+        $endsAt = $startsAt->copy()->addHours(4);
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'status' => ShiftStatus::Cancelled,
+            'cancelled_at' => now(),
+            'cancelled_by_driver_id' => null,
+            'cancelled_by_user_id' => $staff->id,
+            'cancel_reason' => 'cancelled_by_staff',
+            'cancellation_notified_at' => null,
+        ]);
+
+        $job = new SendShiftCancellationTelegramNotificationJob($shift);
+        $job->handle(TelegramNotifier::fromConfig());
+
+        Http::assertSent(function ($request) {
+            $body = $request->data();
+
+            return str_contains($request->url(), 'sendMessage')
+                && str_contains($body['text'] ?? '', 'Alex Ops')
+                && str_contains($body['text'] ?? '', '(staff)');
         });
     }
 

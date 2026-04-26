@@ -33,6 +33,7 @@ class Shift extends Model
         'cancelled_at',
         'cancel_reason',
         'cancelled_by_driver_id',
+        'cancelled_by_user_id',
         'cancellation_notified_at',
     ];
 
@@ -69,10 +70,16 @@ class Shift extends Model
         return $this->belongsTo(Station::class);
     }
 
-    /** Driver who cancelled this shift (when status is Cancelled). */
+    /** Driver who self-cancelled (portal); null when cancelled by staff. */
     public function cancelledByDriver(): BelongsTo
     {
         return $this->belongsTo(Driver::class, 'cancelled_by_driver_id');
+    }
+
+    /** Filament user who cancelled the shift (admin/manager). */
+    public function cancelledByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by_user_id');
     }
 
     public function durationHours(): float

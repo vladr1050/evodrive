@@ -7,8 +7,7 @@ use App\Jobs\SendShiftCancellationTelegramNotificationJob;
 
 /**
  * Schedules the debounced Telegram notification job (3-minute delay)
- * when a driver cancels a shift. Runs synchronously so the job is
- * pushed with delay immediately.
+ * after a shift is cancelled (driver portal or staff in Filament).
  */
 class SendShiftCancellationTelegramNotification
 {

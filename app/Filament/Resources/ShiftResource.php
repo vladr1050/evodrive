@@ -3,13 +3,13 @@
 namespace App\Filament\Resources;
 
 use App\Enums\ShiftStatus;
-use App\Events\ShiftCancelled;
 use App\Filament\Resources\ShiftResource\Pages;
 use App\Helpers\Latvian;
 use App\Models\Shift;
-use App\Models\ShiftEvent;
 use App\Models\ShiftPolicy;
 use App\Models\Station;
+use App\Models\User;
+use App\Services\ShiftCancellationService;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -20,7 +20,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 
 class ShiftResource extends Resource
@@ -46,6 +45,7 @@ class ShiftResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $q) => $q->with(['cancelledByUser', 'cancelledByDriver']))
             ->columns([
                 Tables\Columns\TextColumn::make('starts_at')
                     ->dateTime()
@@ -153,6 +153,31 @@ class ShiftResource extends Resource
                     ->dateTime()
                     ->timezone(fn () => ShiftPolicy::active()?->timezone ?: 'Europe/Riga')
                     ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('cancelled_at')
+                    ->label('Cancelled at')
+                    ->dateTime()
+                    ->timezone(fn () => ShiftPolicy::active()?->timezone ?: 'Europe/Riga')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('cancellation_actor')
+                    ->label('Cancelled by')
+                    ->formatStateUsing(function ($_, Shift $record): string {
+                        if ($record->status !== ShiftStatus::Cancelled) {
+                            return '—';
+                        }
+                        if ($record->cancelled_by_user_id) {
+                            $name = $record->cancelledByUser?->name;
+
+                            return filled($name) ? 'Manager: '.$name : 'Manager';
+                        }
+                        if ($record->cancelled_by_driver_id) {
+                            $name = $record->cancelledByDriver?->name;
+
+                            return filled($name) ? 'Driver: '.$name : 'Driver';
+                        }
+
+                        return '—';
+                    }),
             ])
             ->defaultSort('starts_at', 'desc')
             ->filters([
@@ -226,15 +251,11 @@ class ShiftResource extends Resource
                     ->modalHeading('Cancel this shift?')
                     ->visible(fn (Shift $record) => $record->status === ShiftStatus::Booked && $record->starts_at->isFuture())
                     ->action(function (Shift $record): void {
-                        $record->update([
-                            'status' => ShiftStatus::Cancelled,
-                            'cancelled_at' => now(),
-                        ]);
-                        $shift = $record->fresh(['driver']);
-                        ShiftEvent::logCancelled($shift, 'admin', (int) auth()->id());
-                        if ($shift->driver) {
-                            Event::dispatch(new ShiftCancelled($shift, $shift->driver));
+                        $user = auth()->user();
+                        if (! $user instanceof User) {
+                            return;
                         }
+                        app(ShiftCancellationService::class)->cancelByStaff($record, $user);
                         \Filament\Notifications\Notification::make()
                             ->title('Shift cancelled')
                             ->success()

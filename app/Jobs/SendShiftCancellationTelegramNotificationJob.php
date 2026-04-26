@@ -4,8 +4,8 @@ namespace App\Jobs;
 
 use App\Enums\ShiftStatus;
 use App\Models\Shift;
-use App\Services\TelegramNotifier;
 use App\Models\ShiftPolicy;
+use App\Services\TelegramNotifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,24 +36,28 @@ class SendShiftCancellationTelegramNotificationJob implements ShouldQueue
 
     public function handle(TelegramNotifier $notifier): void
     {
-        $shift = $this->shift->fresh(['station']);
-        if (!$shift) {
+        $shift = $this->shift->fresh(['station', 'cancelledByUser', 'cancelledByDriver']);
+        if (! $shift) {
             Log::channel('stack')->warning('SendShiftCancellationTelegramNotificationJob: shift no longer exists', ['shift_id' => $this->shift->id]);
+
             return;
         }
 
         if ($shift->status !== ShiftStatus::Cancelled) {
             Log::channel('stack')->info('SendShiftCancellationTelegramNotificationJob: shift no longer cancelled, skipping', ['shift_id' => $shift->id]);
+
             return;
         }
 
         if ($shift->cancellation_notified_at !== null) {
             Log::channel('stack')->info('SendShiftCancellationTelegramNotificationJob: already notified, skipping', ['shift_id' => $shift->id]);
+
             return;
         }
 
         if ($this->replacementShiftExists($shift)) {
             Log::channel('stack')->info('SendShiftCancellationTelegramNotificationJob: replacement shift exists, skipping', ['shift_id' => $shift->id]);
+
             return;
         }
 
@@ -64,6 +68,7 @@ class SendShiftCancellationTelegramNotificationJob implements ShouldQueue
                 'shift_id' => $shift->id,
                 'driver_id' => $shift->driver_id,
             ]);
+
             return;
         }
 
@@ -73,7 +78,11 @@ class SendShiftCancellationTelegramNotificationJob implements ShouldQueue
         $stationName = $shift->station?->name ?? '—';
         $stationAddress = $shift->station?->address ?? '';
         $text = "Station: {$stationName} — {$stationAddress}\n";
-        $text .= 'Slot freed: ' . $starts->format('Y-m-d H:i') . '-' . $ends->format('H:i');
+        $text .= 'Slot freed: '.$starts->format('Y-m-d H:i').'-'.$ends->format('H:i');
+        $who = $this->cancellationActorLine($shift);
+        if ($who !== '') {
+            $text .= "\n".$who;
+        }
 
         $sent = $notifier->sendToShiftsChat($text);
         if ($sent) {
@@ -116,5 +125,17 @@ class SendShiftCancellationTelegramNotificationJob implements ShouldQueue
             ->count();
 
         return $count >= $maxPerDriver;
+    }
+
+    private function cancellationActorLine(Shift $shift): string
+    {
+        if ($shift->cancelled_by_user_id && $shift->cancelledByUser) {
+            return 'Cancelled by: '.$shift->cancelledByUser->name.' (staff)';
+        }
+        if ($shift->cancelled_by_driver_id && $shift->cancelledByDriver) {
+            return 'Cancelled by: '.$shift->cancelledByDriver->name.' (driver)';
+        }
+
+        return '';
     }
 }

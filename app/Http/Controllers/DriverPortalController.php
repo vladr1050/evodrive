@@ -494,7 +494,7 @@ class DriverPortalController extends Controller
                 'reason_code' => 'SHIFT_IN_PAST',
             ], 422);
         }
-        app(ShiftCancellationService::class)->cancelShift($shift, $driver, 'cancelled_by_driver');
+        app(ShiftCancellationService::class)->cancelByDriver($shift, $driver, 'cancelled_by_driver');
 
         return response()->json(['success' => true]);
     }

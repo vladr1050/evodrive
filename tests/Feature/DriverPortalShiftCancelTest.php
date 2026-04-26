@@ -19,9 +19,13 @@ class DriverPortalShiftCancelTest extends TestCase
     use RefreshDatabase;
 
     protected ShiftPolicy $policy;
+
     protected Station $station;
+
     protected FleetVehicle $vehicle;
+
     protected Driver $driver1;
+
     protected Driver $driver2;
 
     protected function setUp(): void
@@ -67,6 +71,7 @@ class DriverPortalShiftCancelTest extends TestCase
         $this->assertNotNull($shift->cancelled_at);
         $this->assertSame('cancelled_by_driver', $shift->cancel_reason);
         $this->assertSame((int) $this->driver1->id, (int) $shift->cancelled_by_driver_id);
+        $this->assertNull($shift->cancelled_by_user_id);
     }
 
     public function test_cancelling_shift_schedules_delayed_telegram_notification_job(): void
@@ -86,9 +91,9 @@ class DriverPortalShiftCancelTest extends TestCase
         $this->actingAs($this->driver1, 'driver');
         $this->get(route('driverportal.shifts', ['locale' => 'en']));
         $this->postJson(route('driverportal.shifts.cancel', [
-                'locale' => 'en',
-                'shift' => $shift->id,
-            ]), ['_token' => csrf_token()])
+            'locale' => 'en',
+            'shift' => $shift->id,
+        ]), ['_token' => csrf_token()])
             ->assertOk()
             ->assertJson(['success' => true]);
 
@@ -100,6 +105,7 @@ class DriverPortalShiftCancelTest extends TestCase
             if ($job->delay instanceof \DateTimeInterface) {
                 return $job->delay->getTimestamp() > time();
             }
+
             return (int) $job->delay >= 60;
         });
     }
