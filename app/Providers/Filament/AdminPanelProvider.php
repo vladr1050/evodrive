@@ -33,8 +33,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 NavigationGroup::make()
-                    ->label('Statistics')
-                    ->icon('heroicon-o-chart-pie'),
+                    ->label('Statistics'),
                 NavigationGroup::make()->label('Fleet Management'),
                 NavigationGroup::make()->label('Rental'),
                 NavigationGroup::make()->label('Leads'),
