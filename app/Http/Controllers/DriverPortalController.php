@@ -150,6 +150,14 @@ class DriverPortalController extends Controller
             $isMine = (int) $s->driver_id === (int) $driverId;
             $cancellable = $isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz);
             $editable = $isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->gt($nowInTz) && $editService->canEditShift($s);
+            $extensionDurations = ($isMine && $s->status === ShiftStatus::Booked && $startsAtInTz->lte($nowInTz) && $endsAtInTz->gt($nowInTz))
+                ? $editService->allowedExtensionDurationsHours($s, $nowInTz)
+                : [];
+            $extendable = $isMine && $s->status === ShiftStatus::Booked && $extensionDurations !== [];
+            $nextAfter = $editService->nextBookedShiftOnVehicleAfter($s);
+            $nextVehicleBookedDisplay = $nextAfter
+                ? $nextAfter->starts_at->copy()->setTimezone($tz)->format('Y-m-d H:i')
+                : null;
             $vehicle = $s->vehicle;
             $vehicleLabel = $vehicle?->label ?? '-';
             $isTesla = $vehicle && (stripos((string) $vehicle->brand, 'Tesla') !== false || stripos((string) $vehicle->model, 'Tesla') !== false);
@@ -170,6 +178,9 @@ class DriverPortalController extends Controller
                 'is_mine' => $isMine,
                 'cancellable' => $cancellable,
                 'editable' => $editable,
+                'extendable' => $extendable,
+                'allowed_extension_durations' => $extensionDurations,
+                'next_vehicle_booked_display' => $nextVehicleBookedDisplay,
             ];
         };
         $shiftsBaseQuery = Shift::whereIn('status', [ShiftStatus::Booked, ShiftStatus::Completed])
@@ -421,6 +432,7 @@ class DriverPortalController extends Controller
             'date' => 'required|date_format:Y-m-d',
             'start_time' => 'required|date_format:H:i',
             'duration_hours' => 'required|numeric|min:1',
+            'extend_ongoing' => 'sometimes|boolean',
         ]);
         $driver = Auth::guard('driver')->user();
         if ((int) $shift->driver_id !== (int) $driver->id) {
@@ -439,16 +451,31 @@ class DriverPortalController extends Controller
                     'reason_code' => 'DATE_OUTSIDE_PLANNING_WINDOW',
                 ], 422);
             }
-            $startsAt = Carbon::parse($request->input('date').' '.$request->input('start_time'), $tz);
-            if ($startsAt->lte($nowInTz)) {
-                return response()->json([
-                    'success' => false,
-                    'error' => __('portal.shift_start_must_be_future'),
-                    'reason_code' => 'SHIFT_IN_PAST',
-                ], 422);
+            $editService = app(ShiftEditService::class);
+            if ($request->boolean('extend_ongoing')) {
+                $expectedStart = $shift->starts_at->copy()->setTimezone($tz);
+                if ($request->input('date') !== $expectedStart->format('Y-m-d')
+                    || $request->input('start_time') !== $expectedStart->format('H:i')) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => __('portal.extend_shift_start_mismatch'),
+                        'reason_code' => 'EXTEND_START_MISMATCH',
+                    ], 422);
+                }
+                $durationInt = (int) round((float) $request->input('duration_hours'));
+                $updated = $editService->extendOngoingShift($shift, $durationInt, $nowInTz);
+            } else {
+                $startsAt = Carbon::parse($request->input('date').' '.$request->input('start_time'), $tz);
+                if ($startsAt->lte($nowInTz)) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => __('portal.shift_start_must_be_future'),
+                        'reason_code' => 'SHIFT_IN_PAST',
+                    ], 422);
+                }
+                $durationHours = (float) $request->input('duration_hours');
+                $updated = $editService->updateShift($shift, $startsAt, $durationHours);
             }
-            $durationHours = (float) $request->input('duration_hours');
-            $updated = app(ShiftEditService::class)->updateShift($shift, $startsAt, $durationHours);
 
             return response()->json([
                 'success' => true,

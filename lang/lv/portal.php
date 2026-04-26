@@ -98,6 +98,11 @@ return [
 
     'edit_shift' => 'Rediģēt',
     'edit_shift_save' => 'Saglabāt',
+    'extend_shift_title' => 'Pagarināt pašreizējo maiņu',
+    'extend_shift_hint_next' => 'Nākamā rezervācija uz šo transportlīdzekli sākas :time. Starp maiņām jāievēro uzlādes pauze saskaņā ar flotes noteikumiem.',
+    'extend_shift_hint_no_next' => 'Pēc jūsu maiņas uz šo transportlīdzekli nav citu rezervāciju; varat pagarināt atļauto ilgumu ietvaros.',
+    'extend_shift_duration_help' => 'Izvēlieties jauno kopējo maiņas ilgumu (no sākotnējā sākuma laika).',
+    'extend_shift_start_mismatch' => 'Sākuma datums vai laiks neatbilst maiņai. Aizveriet formu un atveriet no maiņas kartītes.',
 
     'cancel_shift' => 'Atcelt',
     'cancel_shift_confirm_title' => 'Atcelt šo maiņu?',

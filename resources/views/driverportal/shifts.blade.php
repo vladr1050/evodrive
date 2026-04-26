@@ -333,7 +333,7 @@
             <button type="button" data-testid="shift-edit-modal-close" onclick="document.getElementById('edit-shift-modal').classList.add('hidden')" class="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-900 transition-colors" aria-label="Close">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
             </button>
-            <h3 class="text-2xl font-bold text-slate-900 mb-6">{{ __('portal.edit_shift') }}</h3>
+            <h3 id="edit-shift-modal-title" class="text-2xl font-bold text-slate-900 mb-6">{{ __('portal.edit_shift') }}</h3>
             <div class="space-y-6">
                 <div>
                     <label for="edit-shift-date" class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">{{ __('portal.date') }}</label>
@@ -354,6 +354,10 @@
                             @foreach($allowedDurations as $d)<option value="{{ $d }}">{{ $d }}h</option>@endforeach
                         </select>
                     </div>
+                </div>
+                <div id="edit-shift-extend-banner" class="hidden rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-2">
+                    <p id="edit-shift-extend-hint-primary" class="text-sm font-medium text-slate-700"></p>
+                    <p id="edit-shift-extend-hint-secondary" class="text-xs text-slate-500"></p>
                 </div>
                 <div id="edit-shift-error" class="hidden p-4 rounded-xl text-sm font-medium bg-red-50 text-red-600"></div>
                 <div class="flex gap-3">
@@ -378,6 +382,12 @@
         const stationNames = @json($stations->pluck('name', 'id'));
         const stationAddresses = @json($stations->pluck('address', 'id'));
         const reasonLabels = @json($copyReasonLabels);
+        const portalAllowedDurations = @json($allowedDurations);
+        const editShiftModalTitleEdit = @json(__('portal.edit_shift'));
+        const editShiftModalTitleExtend = @json(__('portal.extend_shift_title'));
+        const extendHintNextTpl = @json(__('portal.extend_shift_hint_next'));
+        const extendHintNoNext = @json(__('portal.extend_shift_hint_no_next'));
+        const extendDurationHelp = @json(__('portal.extend_shift_duration_help'));
 
         function updateStartTimeOptions() {
             var modal = document.getElementById('create-modal');
@@ -589,6 +599,18 @@
         }
         document.getElementById('edit-shift-date')?.addEventListener('change', updateEditStartTimeOptions);
 
+        function setEditDurationOptions(hoursList) {
+            var sel = document.getElementById('edit-shift-duration');
+            if (!sel) return;
+            sel.innerHTML = '';
+            (hoursList || []).forEach(function(h) {
+                var o = document.createElement('option');
+                o.value = String(h);
+                o.textContent = h + 'h';
+                sel.appendChild(o);
+            });
+        }
+
         document.addEventListener('click', function(e) {
             var btn = e.target.closest('.shifts-grid-edit-btn');
             if (!btn) return;
@@ -598,16 +620,61 @@
             var date = btn.getAttribute('data-edit-date') || minDate;
             var start = btn.getAttribute('data-edit-start') || '08:00';
             var duration = btn.getAttribute('data-edit-duration') || '8';
+            var extendOngoing = btn.getAttribute('data-extend-ongoing') === '1';
+            var extensionDurations = [];
+            try {
+                extensionDurations = JSON.parse(btn.getAttribute('data-extension-durations') || '[]') || [];
+            } catch (err) {
+                extensionDurations = [];
+            }
+            var nextBooked = null;
+            try {
+                nextBooked = JSON.parse(btn.getAttribute('data-next-booked') || 'null');
+            } catch (err2) {
+                nextBooked = null;
+            }
             if (!url) return;
+            var modalTitle = document.getElementById('edit-shift-modal-title');
+            var dateEl = document.getElementById('edit-shift-date');
+            var startEl = document.getElementById('edit-shift-start');
+            var durationEl = document.getElementById('edit-shift-duration');
+            var extendBanner = document.getElementById('edit-shift-extend-banner');
+            var hintPrimary = document.getElementById('edit-shift-extend-hint-primary');
+            var hintSecondary = document.getElementById('edit-shift-extend-hint-secondary');
             document.getElementById('edit-shift-modal').classList.remove('hidden');
-            document.getElementById('edit-shift-date').value = date;
-            document.getElementById('edit-shift-date').min = minDate;
-            document.getElementById('edit-shift-date').max = maxDate;
-            document.getElementById('edit-shift-start').value = start;
-            document.getElementById('edit-shift-duration').value = String(duration);
-            updateEditStartTimeOptions();
+            dateEl.value = date;
+            dateEl.min = minDate;
+            dateEl.max = maxDate;
+            startEl.value = start;
             document.getElementById('edit-shift-error').classList.add('hidden');
             document.getElementById('edit-shift-save-btn').dataset.editUrl = url;
+            document.getElementById('edit-shift-save-btn').dataset.extendOngoing = extendOngoing ? '1' : '0';
+            if (extendOngoing) {
+                if (modalTitle) modalTitle.textContent = editShiftModalTitleExtend;
+                dateEl.disabled = true;
+                startEl.disabled = true;
+                setEditDurationOptions(extensionDurations);
+                if (durationEl.options.length) {
+                    durationEl.value = durationEl.options[0].value;
+                }
+                extendBanner.classList.remove('hidden');
+                if (nextBooked) {
+                    hintPrimary.textContent = extendHintNextTpl.replace(':time', String(nextBooked));
+                } else {
+                    hintPrimary.textContent = extendHintNoNext;
+                }
+                hintSecondary.textContent = extendDurationHelp;
+            } else {
+                if (modalTitle) modalTitle.textContent = editShiftModalTitleEdit;
+                dateEl.disabled = false;
+                startEl.disabled = false;
+                setEditDurationOptions(portalAllowedDurations);
+                durationEl.value = String(duration);
+                updateEditStartTimeOptions();
+                extendBanner.classList.add('hidden');
+                hintPrimary.textContent = '';
+                hintSecondary.textContent = '';
+            }
         });
         document.getElementById('edit-shift-modal-cancel')?.addEventListener('click', function() {
             document.getElementById('edit-shift-modal').classList.add('hidden');
@@ -619,12 +686,16 @@
             var startEl = document.getElementById('edit-shift-start');
             var durationEl = document.getElementById('edit-shift-duration');
             var errEl = document.getElementById('edit-shift-error');
+            var extendOngoing = this.dataset.extendOngoing === '1';
             var payload = {
                 date: dateEl.value,
                 start_time: startEl.value,
                 duration_hours: parseInt(durationEl.value, 10),
                 _token: csrf
             };
+            if (extendOngoing) {
+                payload.extend_ongoing = true;
+            }
             if (dateEl.value < minDate || dateEl.value > maxDate) {
                 errEl.textContent = '{{ __("portal.shift_date_outside_planning_window") }}';
                 errEl.classList.remove('hidden');

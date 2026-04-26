@@ -100,6 +100,11 @@ return [
     // Edit shift
     'edit_shift' => 'Edit',
     'edit_shift_save' => 'Save changes',
+    'extend_shift_title' => 'Extend current shift',
+    'extend_shift_hint_next' => 'The next booking on this vehicle starts at :time. Leave enough time for charging between shifts (per fleet policy).',
+    'extend_shift_hint_no_next' => 'There is no other booking on this vehicle after your shift; you can extend within the allowed durations.',
+    'extend_shift_duration_help' => 'Choose the new total length of this shift (from the original start time).',
+    'extend_shift_start_mismatch' => 'Start date or time does not match this shift. Close the form and open it again from the shift card.',
 
     // Cancel shift
     'cancel_shift' => 'Cancel',

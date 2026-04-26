@@ -17,10 +17,20 @@ class DriverPortalShiftEditTest extends TestCase
     use RefreshDatabase;
 
     protected ShiftPolicy $policy;
+
     protected Station $station;
+
     protected FleetVehicle $vehicle;
+
     protected Driver $driver1;
+
     protected Driver $driver2;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
 
     protected function setUp(): void
     {
@@ -95,5 +105,92 @@ class DriverPortalShiftEditTest extends TestCase
         $response->assertStatus(403);
         $shift->refresh();
         $this->assertSame('08:00', $shift->starts_at->format('H:i'));
+    }
+
+    public function test_driver_can_extend_ongoing_shift(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-04-25 12:00:00', 'UTC'));
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver1->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => Carbon::parse('2026-04-25 10:00:00', 'UTC'),
+            'ends_at' => Carbon::parse('2026-04-25 14:00:00', 'UTC'),
+            'status' => ShiftStatus::Booked,
+        ]);
+
+        $response = $this->actingAs($this->driver1, 'driver')
+            ->postJson(route('driverportal.shifts.update', [
+                'locale' => 'en',
+                'shift' => $shift->id,
+            ]), [
+                'date' => '2026-04-25',
+                'start_time' => '10:00',
+                'duration_hours' => 6,
+                'extend_ongoing' => true,
+                '_token' => csrf_token(),
+            ]);
+
+        $response->assertOk();
+        $response->assertJson(['success' => true]);
+        $shift->refresh();
+        $this->assertSame('10:00', $shift->starts_at->format('H:i'));
+        $this->assertEqualsWithDelta(6.0, $shift->durationHours(), 0.01);
+    }
+
+    public function test_extend_ongoing_rejects_wrong_start_time(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-04-25 12:00:00', 'UTC'));
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver1->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => Carbon::parse('2026-04-25 10:00:00', 'UTC'),
+            'ends_at' => Carbon::parse('2026-04-25 14:00:00', 'UTC'),
+            'status' => ShiftStatus::Booked,
+        ]);
+
+        $response = $this->actingAs($this->driver1, 'driver')
+            ->postJson(route('driverportal.shifts.update', [
+                'locale' => 'en',
+                'shift' => $shift->id,
+            ]), [
+                'date' => '2026-04-25',
+                'start_time' => '11:00',
+                'duration_hours' => 6,
+                'extend_ongoing' => true,
+                '_token' => csrf_token(),
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJson(['reason_code' => 'EXTEND_START_MISMATCH']);
+    }
+
+    public function test_extend_ongoing_rejects_duration_not_in_allowed_list(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-04-25 12:00:00', 'UTC'));
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver1->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => Carbon::parse('2026-04-25 10:00:00', 'UTC'),
+            'ends_at' => Carbon::parse('2026-04-25 14:00:00', 'UTC'),
+            'status' => ShiftStatus::Booked,
+        ]);
+
+        $response = $this->actingAs($this->driver1, 'driver')
+            ->postJson(route('driverportal.shifts.update', [
+                'locale' => 'en',
+                'shift' => $shift->id,
+            ]), [
+                'date' => '2026-04-25',
+                'start_time' => '10:00',
+                'duration_hours' => 10,
+                'extend_ongoing' => true,
+                '_token' => csrf_token(),
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJson(['reason_code' => 'INVALID_DURATION']);
     }
 }

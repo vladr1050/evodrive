@@ -11,15 +11,14 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Driver shift edit: only when shift is booked, and enough downtime before/after on same vehicle.
- * Edit must respect policy: allowed durations, min duration, time slot, vehicle downtime.
+ * Driver shift edit: future shifts (move start + duration) or ongoing shifts (extend end only).
+ * Respects policy: allowed durations, min duration, time slot, vehicle downtime.
  */
 class ShiftEditService
 {
     public function __construct(
         protected ShiftAvailabilityService $availabilityService
-    ) {
-    }
+    ) {}
 
     /**
      * Whether the driver can edit this shift (without cancelling).
@@ -61,6 +60,114 @@ class ShiftEditService
         }
 
         return true;
+    }
+
+    /**
+     * Next booked shift on the same vehicle that starts at or after this shift's current end (UTC).
+     * Used for extend hints and max end time.
+     */
+    public function nextBookedShiftOnVehicleAfter(Shift $shift): ?Shift
+    {
+        return Shift::query()
+            ->where('vehicle_id', $shift->vehicle_id)
+            ->where('id', '!=', $shift->id)
+            ->where('status', ShiftStatus::Booked)
+            ->where('starts_at', '>=', $shift->ends_at)
+            ->orderBy('starts_at')
+            ->first();
+    }
+
+    /**
+     * Allowed total duration hours (from shift start) the driver can extend to; each value is in policy allowed list, strictly longer than current, and passes vehicle rules.
+     *
+     * @return list<int>
+     */
+    public function allowedExtensionDurationsHours(Shift $shift, Carbon $nowInPolicyTz): array
+    {
+        if ($shift->status !== ShiftStatus::Booked) {
+            return [];
+        }
+
+        $policy = ShiftPolicy::active();
+        if (! $policy) {
+            return [];
+        }
+
+        $tz = $policy->timezone ?? 'UTC';
+        $startTz = $shift->starts_at->copy()->setTimezone($tz);
+        $endTz = $shift->ends_at->copy()->setTimezone($tz);
+        if (! $startTz->lte($nowInPolicyTz) || ! $endTz->gt($nowInPolicyTz)) {
+            return [];
+        }
+
+        $currentDur = (int) round($shift->durationHours());
+        $next = $this->nextBookedShiftOnVehicleAfter($shift);
+        $downtimeMinutes = (int) round($policy->vehicle_downtime_hours * 60);
+        $maxEndUtc = null;
+        if ($next !== null) {
+            $maxEndUtc = $next->starts_at->copy()->subMinutes($downtimeMinutes);
+        }
+
+        $out = [];
+        foreach ($policy->allowedDurations() as $d) {
+            $d = (int) $d;
+            if ($d <= $currentDur) {
+                continue;
+            }
+            $newEndsUtc = $shift->starts_at->copy()->addHours($d);
+            if ($newEndsUtc->lte($shift->ends_at)) {
+                continue;
+            }
+            if ($maxEndUtc !== null && $newEndsUtc->gt($maxEndUtc)) {
+                continue;
+            }
+            if (! $this->availabilityService->vehicleAvailableForExcludingShift(
+                (int) $shift->vehicle_id,
+                (int) $shift->id,
+                $shift->starts_at->copy(),
+                $newEndsUtc->copy(),
+                $policy
+            )) {
+                continue;
+            }
+            $out[] = $d;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Extend an in-progress booked shift to a longer allowed total duration (same start, new end).
+     *
+     * @throws ShiftBookingException
+     */
+    public function extendOngoingShift(Shift $shift, int $newDurationHoursInt, Carbon $nowInPolicyTz): Shift
+    {
+        if ($shift->status !== ShiftStatus::Booked) {
+            throw ShiftBookingException::shiftNotEditable();
+        }
+
+        $policy = ShiftPolicy::active();
+        if (! $policy) {
+            throw ShiftBookingException::noVehiclesAvailable();
+        }
+
+        $allowed = $this->allowedExtensionDurationsHours($shift, $nowInPolicyTz);
+        if (! in_array($newDurationHoursInt, $allowed, true)) {
+            throw ShiftBookingException::invalidDuration();
+        }
+
+        $newEndsUtc = $shift->starts_at->copy()->addHours($newDurationHoursInt);
+
+        return DB::transaction(function () use ($shift, $newEndsUtc) {
+            $shift->update([
+                'ends_at' => $newEndsUtc,
+            ]);
+
+            ShiftEvent::logEdited($shift->fresh(), 'driver', (int) $shift->driver_id);
+
+            return $shift->fresh(['vehicle', 'station']);
+        });
     }
 
     /**
