@@ -32,13 +32,12 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => \Filament\Support\Colors\Color::Blue,
             ])
             ->navigationGroups([
-                NavigationGroup::make()
-                    ->label('Statistics'),
                 NavigationGroup::make()->label('Fleet Management'),
                 NavigationGroup::make()->label('Rental'),
                 NavigationGroup::make()->label('Leads'),
                 NavigationGroup::make()->label('Content'),
                 NavigationGroup::make()->label('Settings'),
+                NavigationGroup::make()->label('Statistics'),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')

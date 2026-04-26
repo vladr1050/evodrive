@@ -127,7 +127,6 @@ class DriverStatistics extends Page
         }
 
         return [
-            'rows' => $rows,
             'dateKeys' => $dateKeys,
             'drivers' => $drivers,
             'heatmap' => $heatmap,

@@ -275,49 +275,6 @@
                 </div>
             </x-filament::section>
 
-            {{-- Daily detail table --}}
-            @if(!empty($rows))
-            <x-filament::section>
-                <x-slot name="heading">Daily detail</x-slot>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="text-left border-b">
-                            <tr>
-                                <th class="p-2">Date</th>
-                                <th class="p-2">Driver</th>
-                                <th class="p-2">Station</th>
-                                <th class="p-2">Vehicle</th>
-                                <th class="p-2 w-40">Total</th>
-                                <th class="p-2 text-right">Worked (h)</th>
-                                <th class="p-2 text-right">Planned (h)</th>
-                                <th class="p-2 text-right">W/P</th>
-                                <th class="p-2"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($rows as $r)
-                                <tr class="border-b border-gray-200 dark:border-gray-700">
-                                    <td class="p-2">{{ \Carbon\Carbon::parse($r->date)->format('d.m.Y') }}</td>
-                                    <td class="p-2">{{ $r->driver_name }}</td>
-                                    <td class="p-2">{{ implode(', ', $r->stations ?? []) ?: '—' }}</td>
-                                    <td class="p-2">{{ implode(', ', $r->vehicles ?? []) ?: '—' }}</td>
-                                    <td class="p-2">
-                                        <x-utilization-bar :minutes="$r->total_minutes" />
-                                    </td>
-                                    <td class="p-2 text-right">{{ number_format($r->worked_minutes / 60, 1) }}</td>
-                                    <td class="p-2 text-right">{{ number_format($r->planned_minutes / 60, 1) }}</td>
-                                    <td class="p-2 text-right">{{ $r->planned_minutes > 0 ? round($r->worked_minutes / $r->planned_minutes * 100, 0) . '%' : '—' }}</td>
-                                    <td class="p-2">
-                                        <x-filament::button size="sm" wire:click="openBreakdownModal({{ $r->driver_id }}, '{{ $r->date }}')">View</x-filament::button>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </x-filament::section>
-            @endif
-
             {{-- Station workload --}}
             @if(!empty($stationBreakdown))
                 <x-filament::section>
