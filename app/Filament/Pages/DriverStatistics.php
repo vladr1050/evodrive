@@ -9,6 +9,7 @@ use App\Models\Shift;
 use App\Models\ShiftPolicy;
 use App\Models\Station;
 use App\Services\Utilization\DateRange;
+use App\Services\Utilization\DriverFleetInsightsService;
 use App\Services\Utilization\DriverUtilizationFilters;
 use App\Services\Utilization\DriverUtilizationService;
 use Carbon\Carbon;
@@ -25,7 +26,7 @@ class DriverStatistics extends Page
 
     protected static ?string $navigationLabel = 'Driver Statistics';
 
-    protected static ?int $navigationSort = 16;
+    protected static ?int $navigationSort = 14;
 
     protected static string $view = 'filament.pages.driver-statistics';
 
@@ -69,16 +70,16 @@ class DriverStatistics extends Page
     public static function canAccess(): bool
     {
         $user = auth()->user();
-        return $user === null || $user->canAccessResource('fleet_management');
+
+        return $user === null || $user->canAccessResource('statistics');
     }
 
     protected function getViewData(): array
     {
         $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
         $driversSelect = Driver::orderBy('name')->get(['id', 'name']);
-        $effectiveDriverIds = $this->selectAllDrivers
-            ? $driversSelect->pluck('id')->map(fn ($id) => (int) $id)->all()
-            : ($this->driverIds ?: null);
+        $effectiveDriverIds = $this->effectiveDriverIdsForShiftQuery($driversSelect);
+        $fleetDriverIds = $this->fleetDriverIdsForRoster();
 
         $range = new DateRange($this->dateFrom, $this->dateTo);
         $filters = new DriverUtilizationFilters(
@@ -92,13 +93,21 @@ class DriverStatistics extends Page
         $rows = $service->getDailyDriverUtilization($range, $filters);
 
         $dateKeys = $range->dateKeys();
-        $drivers = $this->getDriverList($rows);
+        $drivers = $this->getDriverListForHeatmap($fleetDriverIds);
         $heatmap = $this->buildHeatmap($rows, $drivers, $dateKeys);
-        $kpis = $this->computeKpis($rows, $drivers->count(), count($dateKeys));
+        $kpis = $this->computeKpis($rows, max(1, $drivers->count()), count($dateKeys));
         $stationBreakdown = $this->computeStationBreakdown($rows);
         $vehicleBreakdown = $this->computeVehicleBreakdown($rows);
-        $driverTotals = $this->computeDriverTotals($rows);
+        $driverTotals = $this->computeDriverTotals($rows, $fleetDriverIds, $drivers);
         $totalsSummary = $this->computeTotalsSummary($rows, $range, $effectiveDriverIds, $tz);
+        $fleetInsights = app(DriverFleetInsightsService::class)->build(
+            $rows,
+            $range,
+            $filters,
+            $fleetDriverIds,
+            $tz,
+            30,
+        );
 
         $breakdownDetail = [];
         $breakdownDriverName = null;
@@ -118,12 +127,59 @@ class DriverStatistics extends Page
             'vehicleBreakdown' => $vehicleBreakdown,
             'driverTotals' => $driverTotals,
             'totalsSummary' => $totalsSummary,
+            'fleetInsights' => $fleetInsights,
             'driversSelect' => $driversSelect,
             'stationsSelect' => Station::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'vehiclesSelect' => FleetVehicle::orderBy('registration_number')->get(['id', 'brand', 'model', 'registration_number']),
             'breakdownDetail' => $breakdownDetail,
             'breakdownDriverName' => $breakdownDriverName,
+            'statisticsTimezone' => $tz,
         ];
+    }
+
+    /**
+     * Driver IDs used when loading shifts for utilization (null = all drivers).
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Driver>  $driversSelect
+     * @return array<int>|null
+     */
+    protected function effectiveDriverIdsForShiftQuery(Collection $driversSelect): ?array
+    {
+        if ($this->selectAllDrivers) {
+            return $driversSelect->pluck('id')->map(fn ($id) => (int) $id)->all();
+        }
+
+        return $this->driverIds !== [] ? array_map('intval', $this->driverIds) : null;
+    }
+
+    /**
+     * Full roster for heatmap + fleet table (all drivers when none selected).
+     *
+     * @return array<int>
+     */
+    protected function fleetDriverIdsForRoster(): array
+    {
+        if ($this->selectAllDrivers || $this->driverIds === []) {
+            return app(DriverFleetInsightsService::class)->defaultFleetDriverIds();
+        }
+
+        return array_values(array_unique(array_map('intval', $this->driverIds)));
+    }
+
+    /**
+     * @param  array<int>  $fleetDriverIds
+     * @param  \Illuminate\Support\Collection<int, object{id: int, name: string}>  $drivers
+     */
+    protected function getDriverListForHeatmap(array $fleetDriverIds): Collection
+    {
+        $byId = Driver::whereIn('id', $fleetDriverIds)->get()->keyBy('id');
+
+        return collect($fleetDriverIds)
+            ->map(fn (int $id) => (object) [
+                'id' => $id,
+                'name' => (string) ($byId->get($id)?->name ?? '—'),
+            ])
+            ->values();
     }
 
     public function openBreakdownModal(int $driverId, string $date): void
@@ -138,13 +194,6 @@ class DriverStatistics extends Page
         $this->showBreakdownModal = false;
         $this->breakdownDriverId = null;
         $this->breakdownDate = null;
-    }
-
-    protected function getDriverList(Collection $rows): Collection
-    {
-        $byDriver = $rows->unique('driver_id')->sortBy('driver_name')->values();
-
-        return $byDriver->map(fn ($r) => (object) ['id' => $r->driver_id, 'name' => $r->driver_name])->values();
     }
 
     protected function buildHeatmap(Collection $rows, Collection $drivers, array $dateKeys): array
@@ -255,19 +304,26 @@ class DriverStatistics extends Page
         return $out;
     }
 
-    protected function computeDriverTotals(Collection $rows): array
+    /**
+     * @param  array<int>  $fleetDriverIds
+     * @param  \Illuminate\Support\Collection<int, object{id: int, name: string}>  $drivers
+     */
+    protected function computeDriverTotals(Collection $rows, array $fleetDriverIds, Collection $drivers): array
     {
         $byDriver = [];
+        foreach ($fleetDriverIds as $id) {
+            $byDriver[$id] = [
+                'driver_id' => $id,
+                'driver_name' => $drivers->firstWhere('id', $id)->name ?? '—',
+                'worked_minutes' => 0,
+                'booked_minutes' => 0,
+                'total_minutes' => 0,
+            ];
+        }
         foreach ($rows as $r) {
             $driverId = (int) $r->driver_id;
             if (! isset($byDriver[$driverId])) {
-                $byDriver[$driverId] = [
-                    'driver_id' => $driverId,
-                    'driver_name' => $r->driver_name,
-                    'worked_minutes' => 0,
-                    'booked_minutes' => 0,
-                    'total_minutes' => 0,
-                ];
+                continue;
             }
             $byDriver[$driverId]['worked_minutes'] += (int) $r->worked_minutes;
             $byDriver[$driverId]['booked_minutes'] += (int) $r->planned_minutes;
@@ -388,8 +444,10 @@ class DriverStatistics extends Page
     {
         $range = new DateRange($this->dateFrom, $this->dateTo);
         $tz = ShiftPolicy::active()?->timezone ?? 'Europe/Riga';
+        $driversSelect = Driver::orderBy('name')->get(['id', 'name']);
+        $effectiveDriverIds = $this->effectiveDriverIdsForShiftQuery($driversSelect);
         $filters = new DriverUtilizationFilters(
-            $this->driverIds ?: null,
+            $effectiveDriverIds,
             $this->stationIds ?: null,
             $this->vehicleIds ?: null,
             $this->statusMode,
@@ -415,7 +473,7 @@ class DriverStatistics extends Page
                 ]);
             }
             fclose($out);
-        }, 'driver-statistics-' . $this->dateFrom . '-to-' . $this->dateTo . '.csv', [
+        }, 'driver-statistics-'.$this->dateFrom.'-to-'.$this->dateTo.'.csv', [
             'Content-Type' => 'text/csv',
         ]);
     }

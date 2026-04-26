@@ -64,7 +64,77 @@
             </div>
         </x-filament::section>
 
-        @if(!empty($rows))
+        @if(isset($fleetInsights) && $fleetInsights->rows->isNotEmpty())
+            <x-filament::section>
+                <x-slot name="heading">Fleet overview — worked / planned / future / activity</x-slot>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mb-3 max-w-4xl">
+                    All drivers in scope are listed (including 0 h in range). <strong>Median worked</strong> (completed hours in range): {{ $fleetInsights->median_worked_hours }} h —
+                    compare each row to this line (±15% = “at median”). <strong>Future booked</strong>: next {{ $fleetInsights->future_horizon_days }} days from today.
+                    <strong>Activity score</strong> (0–100): 45% worked vs median + 35% future booked vs median + 20% reliability (cancellations vs volume). Score is hidden for drivers with <strong>no completed shifts</strong> in history (filters apply), so new hires are not ranked until they complete work.
+                </p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-left border-b">
+                            <tr>
+                                <th class="p-2">Driver</th>
+                                <th class="p-2 text-right">Worked (h)</th>
+                                <th class="p-2 text-right">Booked in range (h)</th>
+                                <th class="p-2 text-right">Future booked (h)</th>
+                                <th class="p-2 text-right">Cancelled (h)</th>
+                                <th class="p-2 text-right">Days w/ shift</th>
+                                <th class="p-2 text-right">vs med.</th>
+                                <th class="p-2">Band</th>
+                                <th class="p-2 text-right">Score</th>
+                                <th class="p-2">Note</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($fleetInsights->rows as $fr)
+                                @php
+                                    $bandClass = match ($fr->median_band) {
+                                        'below_median' => 'text-red-600 dark:text-red-400',
+                                        'above_median' => 'text-green-600 dark:text-green-400',
+                                        default => 'text-gray-600 dark:text-gray-400',
+                                    };
+                                @endphp
+                                <tr class="border-b border-gray-200 dark:border-gray-700 {{ $fr->is_novice ? 'opacity-90' : '' }}">
+                                    <td class="p-2 font-medium">{{ $fr->driver_name }}</td>
+                                    <td class="p-2 text-right">{{ number_format($fr->worked_hours, 1) }}</td>
+                                    <td class="p-2 text-right">{{ number_format($fr->booked_hours, 1) }}</td>
+                                    <td class="p-2 text-right">{{ number_format($fr->future_booked_hours, 1) }}</td>
+                                    <td class="p-2 text-right">{{ number_format($fr->cancelled_hours, 1) }}</td>
+                                    <td class="p-2 text-right">{{ $fr->shift_days_in_range }} / {{ $fleetInsights->day_count }}</td>
+                                    <td class="p-2 text-right {{ $fr->vs_median_worked < 0 ? 'text-red-600 dark:text-red-400' : ($fr->vs_median_worked > 0 ? 'text-green-600 dark:text-green-400' : '') }}">
+                                        {{ $fr->vs_median_worked >= 0 ? '+' : '' }}{{ number_format($fr->vs_median_worked, 1) }}
+                                    </td>
+                                    <td class="p-2 {{ $bandClass }}">{{ str_replace('_', ' ', $fr->median_band) }}</td>
+                                    <td class="p-2 text-right font-semibold" title="{{ $fr->is_novice ? '' : 'Worked '.$fr->score_worked_component.' · Forward '.$fr->score_forward_component.' · Reliability '.$fr->score_reliability_component }}">
+                                        @if($fr->is_novice)
+                                            <span class="text-gray-400">—</span>
+                                        @else
+                                            {{ $fr->activity_score }}
+                                        @endif
+                                    </td>
+                                    <td class="p-2 text-xs">
+                                        @if($fr->is_novice)
+                                            <span class="rounded bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5">Novice</span>
+                                        @elseif($fr->has_completed_history && $fr->first_shift_at)
+                                            Since {{ $fr->first_shift_at->timezone($statisticsTimezone ?? config('app.timezone'))->format('Y-m-d') }}
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </x-filament::section>
+        @elseif(isset($fleetInsights))
+            <x-filament::section>
+                <p class="text-gray-500 dark:text-gray-400">No drivers to show.</p>
+            </x-filament::section>
+        @endif
+
+        @if(isset($totalsSummary))
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <x-filament::section class="p-4">
                     <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Hours by selected status filter</p>
@@ -83,35 +153,37 @@
                     <p class="text-2xl font-bold">{{ $totalsSummary->cancelled_hours ?? 0 }}</p>
                 </x-filament::section>
             </div>
+        @endif
 
-            @if(!empty($driverTotals))
-                <x-filament::section>
-                    <x-slot name="heading">Drivers by total hours (desc)</x-slot>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="text-left border-b">
-                                <tr>
-                                    <th class="p-2">Driver</th>
-                                    <th class="p-2 text-right">Total (h)</th>
-                                    <th class="p-2 text-right">Worked (h)</th>
-                                    <th class="p-2 text-right">Booked (h)</th>
+        @if(!empty($driverTotals))
+            <x-filament::section>
+                <x-slot name="heading">Drivers by total hours in range (desc)</x-slot>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-left border-b">
+                            <tr>
+                                <th class="p-2">Driver</th>
+                                <th class="p-2 text-right">Total (h)</th>
+                                <th class="p-2 text-right">Worked (h)</th>
+                                <th class="p-2 text-right">Booked (h)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($driverTotals as $dt)
+                                <tr class="border-b border-gray-200 dark:border-gray-700">
+                                    <td class="p-2">{{ $dt->driver_name }}</td>
+                                    <td class="p-2 text-right font-semibold">{{ number_format($dt->total_hours, 1) }}</td>
+                                    <td class="p-2 text-right">{{ number_format($dt->worked_hours, 1) }}</td>
+                                    <td class="p-2 text-right">{{ number_format($dt->booked_hours, 1) }}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($driverTotals as $dt)
-                                    <tr class="border-b border-gray-200 dark:border-gray-700">
-                                        <td class="p-2">{{ $dt->driver_name }}</td>
-                                        <td class="p-2 text-right font-semibold">{{ number_format($dt->total_hours, 1) }}</td>
-                                        <td class="p-2 text-right">{{ number_format($dt->worked_hours, 1) }}</td>
-                                        <td class="p-2 text-right">{{ number_format($dt->booked_hours, 1) }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </x-filament::section>
-            @endif
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </x-filament::section>
+        @endif
 
+        @if(isset($kpis))
             {{-- KPIs --}}
             <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <x-filament::section class="p-4">
@@ -135,7 +207,9 @@
                     <p class="text-2xl font-bold">{{ $kpis->avg_hours_per_driver_per_day ?? 0 }}</p>
                 </x-filament::section>
             </div>
+        @endif
 
+        @if(!empty($drivers) && !empty($dateKeys))
             {{-- Heatmap --}}
             <x-filament::section>
                 <x-slot name="heading">Heatmap (drivers × days)</x-slot>
@@ -192,6 +266,7 @@
             </x-filament::section>
 
             {{-- Daily detail table --}}
+            @if(!empty($rows))
             <x-filament::section>
                 <x-slot name="heading">Daily detail</x-slot>
                 <div class="overflow-x-auto">
@@ -231,6 +306,7 @@
                     </table>
                 </div>
             </x-filament::section>
+            @endif
 
             {{-- Station workload --}}
             @if(!empty($stationBreakdown))
@@ -291,9 +367,11 @@
                     </div>
                 </x-filament::section>
             @endif
-        @else
+        @endif
+
+        @if(isset($drivers) && $drivers->isEmpty())
             <x-filament::section>
-                <p class="text-gray-500 dark:text-gray-400">No data for the selected filters and date range.</p>
+                <p class="text-gray-500 dark:text-gray-400">No drivers in scope.</p>
             </x-filament::section>
         @endif
     </div>

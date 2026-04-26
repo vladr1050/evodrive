@@ -25,7 +25,7 @@ class DriverUtilizationApiController extends Controller
      */
     public function daily(Request $request): JsonResponse
     {
-        $this->authorizeFleetManagement();
+        $this->authorizeStatistics();
         $valid = $request->validate([
             'date_from' => 'required|date',
             'date_to' => 'required|date|after_or_equal:date_from',
@@ -69,7 +69,7 @@ class DriverUtilizationApiController extends Controller
      */
     public function dayBreakdown(Request $request, int $driverId, string $date): JsonResponse
     {
-        $this->authorizeFleetManagement();
+        $this->authorizeStatistics();
         if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             return response()->json(['error' => 'Invalid date format (use Y-m-d)'], 422);
         }
@@ -81,10 +81,10 @@ class DriverUtilizationApiController extends Controller
         return response()->json(['data' => $breakdown]);
     }
 
-    private function authorizeFleetManagement(): void
+    private function authorizeStatistics(): void
     {
         $user = auth()->user();
-        if (! $user || ! $user->canAccessResource('fleet_management')) {
+        if (! $user || ! $user->canAccessResource('statistics')) {
             abort(403, 'Access denied.');
         }
     }
