@@ -49,8 +49,8 @@ class DriverUtilizationServiceTest extends TestCase
             'vehicle_id' => $this->vehicle->id,
             'station_id' => $this->station->id,
             'driver_id' => $this->driver->id,
-            'starts_at' => Carbon::parse($date . ' 08:00:00', 'Europe/Riga')->setTimezone('UTC'),
-            'ends_at' => Carbon::parse($date . ' 15:00:00', 'Europe/Riga')->setTimezone('UTC'),
+            'starts_at' => Carbon::parse($date.' 08:00:00', 'Europe/Riga')->setTimezone('UTC'),
+            'ends_at' => Carbon::parse($date.' 15:00:00', 'Europe/Riga')->setTimezone('UTC'),
             'status' => ShiftStatus::Booked,
         ]);
 
@@ -76,8 +76,8 @@ class DriverUtilizationServiceTest extends TestCase
             'vehicle_id' => $this->vehicle->id,
             'station_id' => $this->station->id,
             'driver_id' => $this->driver->id,
-            'starts_at' => Carbon::parse($day1 . ' 20:00:00', 'Europe/Riga')->setTimezone('UTC'),
-            'ends_at' => Carbon::parse($day2 . ' 02:00:00', 'Europe/Riga')->setTimezone('UTC'),
+            'starts_at' => Carbon::parse($day1.' 20:00:00', 'Europe/Riga')->setTimezone('UTC'),
+            'ends_at' => Carbon::parse($day2.' 02:00:00', 'Europe/Riga')->setTimezone('UTC'),
             'status' => ShiftStatus::Completed,
         ]);
 
@@ -96,7 +96,7 @@ class DriverUtilizationServiceTest extends TestCase
     public function test_overlapping_intervals_merge(): void
     {
         $date = '2026-04-03';
-        $base = Carbon::parse($date . ' 00:00:00', 'Europe/Riga')->setTimezone('UTC');
+        $base = Carbon::parse($date.' 00:00:00', 'Europe/Riga')->setTimezone('UTC');
         Shift::factory()->create([
             'vehicle_id' => $this->vehicle->id,
             'station_id' => $this->station->id,
@@ -127,7 +127,7 @@ class DriverUtilizationServiceTest extends TestCase
     public function test_planned_vs_worked(): void
     {
         $date = '2026-04-03';
-        $base = Carbon::parse($date . ' 00:00:00', 'Europe/Riga')->setTimezone('UTC');
+        $base = Carbon::parse($date.' 00:00:00', 'Europe/Riga')->setTimezone('UTC');
         Shift::factory()->create([
             'vehicle_id' => $this->vehicle->id,
             'station_id' => $this->station->id,
@@ -163,8 +163,8 @@ class DriverUtilizationServiceTest extends TestCase
             'vehicle_id' => $this->vehicle->id,
             'station_id' => $this->station->id,
             'driver_id' => $this->driver->id,
-            'starts_at' => Carbon::parse($date . ' 09:00:00', 'Europe/Riga')->setTimezone('UTC'),
-            'ends_at' => Carbon::parse($date . ' 12:00:00', 'Europe/Riga')->setTimezone('UTC'),
+            'starts_at' => Carbon::parse($date.' 09:00:00', 'Europe/Riga')->setTimezone('UTC'),
+            'ends_at' => Carbon::parse($date.' 12:00:00', 'Europe/Riga')->setTimezone('UTC'),
             'status' => ShiftStatus::Booked,
         ]);
 
@@ -176,5 +176,31 @@ class DriverUtilizationServiceTest extends TestCase
         $this->assertSame('Riga Center', $breakdown[0]['station']);
         $this->assertSame(180, $breakdown[0]['duration_minutes']);
         $this->assertSame('booked', $breakdown[0]['status']);
+    }
+
+    public function test_daily_rows_only_include_days_inside_report_range(): void
+    {
+        $tz = 'Europe/Riga';
+        Shift::factory()->create([
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'driver_id' => $this->driver->id,
+            'starts_at' => Carbon::parse('2026-03-25 08:00:00', $tz)->utc(),
+            'ends_at' => Carbon::parse('2026-04-20 18:00:00', $tz)->utc(),
+            'status' => ShiftStatus::Completed,
+        ]);
+
+        $range = new DateRange('2026-04-01', '2026-04-07');
+        $filters = new DriverUtilizationFilters(null, null, null, DriverUtilizationFilters::STATUS_MODE_COMPLETED, $tz);
+        $rows = $this->service->getDailyDriverUtilization($range, $filters);
+
+        $dates = $rows->pluck('date')->unique()->sort()->values()->all();
+        $this->assertCount(7, $dates);
+        $this->assertSame('2026-04-01', $dates[0]);
+        $this->assertSame('2026-04-07', $dates[6]);
+        foreach ($dates as $d) {
+            $this->assertGreaterThanOrEqual('2026-04-01', $d);
+            $this->assertLessThanOrEqual('2026-04-07', $d);
+        }
     }
 }

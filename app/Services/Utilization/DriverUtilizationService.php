@@ -35,6 +35,9 @@ class DriverUtilizationService
         $tz = $filters->timezone ?? $this->defaultTimezone;
         $shifts = $this->loadShiftsInRange($range, $filters, $tz);
 
+        $reportDayStart = Carbon::parse($range->dateFrom, $tz)->startOfDay();
+        $reportDayEnd = Carbon::parse($range->dateTo, $tz)->startOfDay();
+
         // (date => (driver_id => { planned: [], worked: [], all: [], stations: Set, vehicles: Set }))
         $byDateDriver = [];
 
@@ -52,6 +55,11 @@ class DriverUtilizationService
             $vehicleLabel = $this->shiftVehicleLabel($shift);
 
             while ($day->lte($shiftEnd)) {
+                if ($day->lt($reportDayStart) || $day->gt($reportDayEnd)) {
+                    $day->addDay();
+
+                    continue;
+                }
                 $dayStart = $day->copy()->startOfDay();
                 $dayEndThis = $day->copy()->endOfDay();
                 $overlapStart = $shiftStart->copy()->max($dayStart);

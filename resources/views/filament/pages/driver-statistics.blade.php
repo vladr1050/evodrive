@@ -91,7 +91,7 @@
                                 <th class="p-2 text-right">Booked in range (h)</th>
                                 <th class="p-2 text-right">Future booked (h)</th>
                                 <th class="p-2 text-right">Cancelled (h)</th>
-                                <th class="p-2 text-right">Days w/ shift</th>
+                                <th class="p-2 text-right" title="Distinct calendar days in the selected date range with any booked or completed time. Denominator = number of days in that range.">Days w/ shift</th>
                                 <th class="p-2 text-right">vs med.</th>
                                 <th class="p-2">Band</th>
                                 <th class="p-2 text-right">Score</th>
