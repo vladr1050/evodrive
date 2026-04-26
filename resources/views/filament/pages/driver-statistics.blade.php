@@ -91,9 +91,7 @@
                             <tr>
                                 <th class="p-2">Driver</th>
                                 <th class="p-2 text-right" title="Completed hours in the full selected date range.">Worked (h)</th>
-                                <th class="p-2 text-right" title="Completed on days ≤ today within the range (score ‘past’).">Past ≤today (h)</th>
                                 <th class="p-2 text-right" title="Booked (planned) minutes summed for the full range.">Booked range (h)</th>
-                                <th class="p-2 text-right" title="Booked on today + days after today within the filter (score ‘future’ when the range has future days).">Ahead in range (h)</th>
                                 <th class="p-2 text-right" title="Booked from today for the next N days (rolling; used for score when the filter has no future calendar days).">Next {{ $fleetInsights->future_horizon_days }}d (h)</th>
                                 <th class="p-2 text-right">Cancelled (h)</th>
                                 <th class="p-2 text-right" title="Distinct calendar days in the selected date range with any booked or completed time. Denominator for Avg h/day is the full range length ({{ $fleetInsights->day_count }} days), not this count.">Days w/ shift</th>
@@ -107,9 +105,7 @@
                                 <tr class="border-b border-gray-200 dark:border-gray-700 {{ $fr->is_novice ? 'opacity-90' : '' }}">
                                     <td class="p-2 font-medium">{{ $fr->driver_name }}</td>
                                     <td class="p-2 text-right">{{ number_format($fr->worked_hours, 1) }}</td>
-                                    <td class="p-2 text-right">{{ number_format($fr->past_completed_hours, 1) }}</td>
                                     <td class="p-2 text-right">{{ number_format($fr->booked_hours, 1) }}</td>
-                                    <td class="p-2 text-right">{{ number_format($fr->future_booked_in_range_hours, 1) }}</td>
                                     <td class="p-2 text-right">{{ number_format($fr->future_booked_hours, 1) }}</td>
                                     <td class="p-2 text-right">{{ number_format($fr->cancelled_hours, 1) }}</td>
                                     <td class="p-2 text-right">{{ $fr->shift_days_in_range }} / {{ $fleetInsights->day_count }}</td>
