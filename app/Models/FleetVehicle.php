@@ -77,4 +77,9 @@ class FleetVehicle extends Model
     {
         return $this->hasMany(VehicleCommandDelivery::class, 'vehicle_id')->orderByDesc('created_at');
     }
+
+    public function serviceBlocks(): HasMany
+    {
+        return $this->hasMany(FleetVehicleServiceBlock::class, 'fleet_vehicle_id')->orderByDesc('starts_at');
+    }
 }

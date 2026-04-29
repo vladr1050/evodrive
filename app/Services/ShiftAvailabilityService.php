@@ -6,6 +6,7 @@ use App\Enums\ShiftStatus;
 use App\Enums\VehicleStatus;
 use App\Exceptions\ShiftBookingException;
 use App\Models\FleetVehicle;
+use App\Models\FleetVehicleServiceBlock;
 use App\Models\Shift;
 use App\Models\ShiftPolicy;
 use App\Models\Station;
@@ -39,7 +40,7 @@ class ShiftAvailabilityService
         $availableIds = [];
         foreach ($vehicles as $vehicle) {
             $shifts = $shiftsByVehicle->get($vehicle->id, collect());
-            if ($this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy)) {
+            if ($this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicle->id)) {
                 $availableIds[] = $vehicle->id;
             }
         }
@@ -84,7 +85,7 @@ class ShiftAvailabilityService
         $shiftsByVehicle = $this->fetchRelevantShiftsForVehicles([$vehicleId], $startsAt, $endsAt, $policy);
         $shifts = $shiftsByVehicle->get($vehicleId, collect());
 
-        return $this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy);
+        return $this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicleId);
     }
 
     /**
@@ -96,14 +97,18 @@ class ShiftAvailabilityService
         $shifts = $shiftsByVehicle->get($vehicleId, collect())
             ->reject(fn (Shift $s) => (int) $s->id === $excludeShiftId);
 
-        return $this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy);
+        return $this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicleId);
     }
 
     /**
      * Evaluate availability for a slot given a collection of relevant shifts (no DB queries).
      */
-    protected function vehicleAvailableForWithShifts(Collection $shifts, Carbon $startsAt, Carbon $endsAt, ShiftPolicy $policy): bool
+    protected function vehicleAvailableForWithShifts(Collection $shifts, Carbon $startsAt, Carbon $endsAt, ShiftPolicy $policy, ?int $vehicleId = null): bool
     {
+        if ($vehicleId !== null && $this->vehicleBlockedByService($vehicleId, $startsAt, $endsAt)) {
+            return false;
+        }
+
         $booked = $shifts->filter(fn (Shift $s) => $s->status === ShiftStatus::Booked);
 
         $overlapping = $booked->contains(fn (Shift $s) => $s->starts_at->lt($endsAt) && $s->ends_at->gt($startsAt));
@@ -169,6 +174,34 @@ class ShiftAvailabilityService
         return true;
     }
 
+    protected function vehicleBlockedByService(int $vehicleId, Carbon $startsAtUtc, Carbon $endsAtUtc): bool
+    {
+        return FleetVehicleServiceBlock::query()
+            ->where('fleet_vehicle_id', $vehicleId)
+            ->whereNull('cancelled_at')
+            ->where('starts_at', '<', $endsAtUtc)
+            ->where('ends_at', '>', $startsAtUtc)
+            ->exists();
+    }
+
+    /**
+     * @param  array<int>  $vehicleIds
+     */
+    protected function fetchServiceBlocksForVehicles(array $vehicleIds, Carbon $windowStartUtc, Carbon $windowEndUtc): Collection
+    {
+        if ($vehicleIds === []) {
+            return collect();
+        }
+
+        return FleetVehicleServiceBlock::query()
+            ->whereIn('fleet_vehicle_id', $vehicleIds)
+            ->whereNull('cancelled_at')
+            ->where('starts_at', '<', $windowEndUtc)
+            ->where('ends_at', '>', $windowStartUtc)
+            ->get()
+            ->groupBy('fleet_vehicle_id');
+    }
+
     /**
      * Get available free slots for a week. Returns continuous time windows per station per day
      * when at least one vehicle is free. Slots are split only around booked shifts (with downtime).
@@ -216,6 +249,8 @@ class ShiftAvailabilityService
             ->get()
             ->groupBy('vehicle_id');
 
+        $serviceBlocksByVehicle = $this->fetchServiceBlocksForVehicles($allVehicleIds, $weekStartUtc, $weekEndUtc);
+
         $dayEndMinutes = 24 * 60;
         $freeByDay = [];
         for ($dayIndex = 0; $dayIndex < 7; $dayIndex++) {
@@ -231,6 +266,7 @@ class ShiftAvailabilityService
                 $freeByDay[$dayIndex][$station->id] = $this->computeStationFreeIntervals(
                     $stationVehicleIds,
                     $shifts,
+                    $serviceBlocksByVehicle,
                     $dayStart,
                     $dayEnd,
                     $downtimeMinutes,
@@ -505,6 +541,9 @@ class ShiftAvailabilityService
                 ->orderBy('starts_at')
                 ->get()
                 ->groupBy('vehicle_id');
+            $serviceBlocksByVehicle = $this->fetchServiceBlocksForVehicles($allVehicleIds, $weekStartUtc, $weekEndUtc);
+        } else {
+            $serviceBlocksByVehicle = collect();
         }
 
         $freeByDay = [];
@@ -521,6 +560,7 @@ class ShiftAvailabilityService
                 $freeByDay[$dayIndex][$station->id] = $this->computeStationFreeIntervals(
                     $stationVehicleIds,
                     $shifts,
+                    $serviceBlocksByVehicle,
                     $dayStart,
                     $dayEnd,
                     $downtimeMinutes,
@@ -595,7 +635,7 @@ class ShiftAvailabilityService
         $availableIds = [];
         foreach ($stationVehicleIds as $vehicleId) {
             $shifts = $shiftsByVehicle->get($vehicleId, collect());
-            if ($this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy)) {
+            if ($this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicleId)) {
                 $availableIds[] = $vehicleId;
             }
         }
@@ -630,14 +670,16 @@ class ShiftAvailabilityService
 
     /**
      * Compute free intervals (in minutes from midnight) for a station on a given day.
-     * Union of free intervals across all vehicles. Blocked = shift + downtime.
+     * Union of free intervals across all vehicles. Blocked = shift + downtime + service blocks (no downtime padding).
      *
      * @param  array<int>  $vehicleIds
+     * @param  \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, FleetVehicleServiceBlock>>  $serviceBlocksByVehicle
      * @return array<int, array{0: int, 1: int}>
      */
     protected function computeStationFreeIntervals(
         array $vehicleIds,
         \Illuminate\Support\Collection $shiftsByVehicle,
+        \Illuminate\Support\Collection $serviceBlocksByVehicle,
         Carbon $dayStart,
         Carbon $dayEnd,
         int $downtimeMinutes,
@@ -691,6 +733,23 @@ class ShiftAvailabilityService
                 });
             if ($hasShiftEndingAtMidnight && $downtimeMinutes > 0) {
                 $blocked[] = [0, min($downtimeMinutes, $dayEndMinutes)];
+            }
+
+            foreach ($serviceBlocksByVehicle->get($vehicleId, collect()) as $block) {
+                $bStart = $block->starts_at->copy()->setTimezone($dayStart->timezoneName);
+                $bEnd = $block->ends_at->copy()->setTimezone($dayStart->timezoneName);
+                if ($bEnd->lte($dayStart) || $bStart->gte($dayEnd)) {
+                    continue;
+                }
+                $clipStart = $bStart->max($dayStart);
+                $clipEnd = $bEnd->min($dayEnd);
+                $startMin = (int) round(($clipStart->timestamp - $dayStart->timestamp) / 60);
+                $endMin = (int) round(($clipEnd->timestamp - $dayStart->timestamp) / 60);
+                $blockStart = max(0, $startMin);
+                $blockEnd = min($dayEndMinutes, $endMin);
+                if ($blockEnd > $blockStart) {
+                    $blocked[] = [$blockStart, $blockEnd];
+                }
             }
 
             $free = $this->gapsFromBlocked($dayStartMinutes, $dayEndMinutes, $blocked);

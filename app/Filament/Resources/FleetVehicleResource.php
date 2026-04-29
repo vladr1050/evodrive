@@ -190,6 +190,7 @@ class FleetVehicleResource extends Resource
     {
         return [
             RelationManagers\VehicleCommandDeliveriesRelationManager::class,
+            RelationManagers\FleetVehicleServiceBlocksRelationManager::class,
         ];
     }
 
