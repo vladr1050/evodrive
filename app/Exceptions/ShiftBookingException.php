@@ -25,6 +25,11 @@ class ShiftBookingException extends Exception
         return new self('Shift overlaps with an existing shift.', 'OVERLAP');
     }
 
+    public static function driverShiftOverlap(): self
+    {
+        return new self('This time overlaps another of your booked shifts.', 'DRIVER_SHIFT_OVERLAP');
+    }
+
     public static function downtimeViolation(): self
     {
         return new self('Vehicle downtime between shifts not respected.', 'DOWNTIME');

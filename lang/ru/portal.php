@@ -76,6 +76,7 @@ return [
     'check_failed' => 'Не удалось проверить доступность.',
     'confirm_failed' => 'Не удалось забронировать смену.',
     'shift_start_must_be_future' => 'Смена должна начинаться в будущем.',
+    'driver_shift_overlaps_existing' => 'У вас уже есть смена в это время. Нельзя забронировать две пересекающиеся смены.',
     'shift_date_outside_planning_window' => 'Эта дата выходит за разрешённый период бронирования. Заказывать смены можно только на ближайшие дни.',
     'copied' => 'Смены скопированы.',
 
@@ -95,6 +96,7 @@ return [
     'copy_reason_INVALID_START' => 'Недопустимое время начала',
     'copy_reason_STATION_MISMATCH' => 'Станция недоступна',
     'copy_reason_OUTSIDE_PLANNING_WINDOW' => 'Вне окна бронирования',
+    'copy_reason_DRIVER_SHIFT_OVERLAP' => 'Пересекается с другой вашей сменой',
 
     'edit_shift' => 'Изменить',
     'edit_shift_save' => 'Сохранить',

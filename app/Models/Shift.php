@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ShiftStatus;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -95,5 +96,23 @@ class Shift extends Model
     public function vehicleReplacements(): HasMany
     {
         return $this->hasMany(ShiftVehicleReplacement::class)->orderBy('created_at');
+    }
+
+    /**
+     * Whether the driver already has a booked shift that overlaps the given window (UTC).
+     * Touching intervals (first ends exactly when second starts) are not treated as overlap.
+     */
+    public static function driverHasOverlappingBookedShift(int $driverId, Carbon $rangeStartUtc, Carbon $rangeEndUtc, ?int $exceptShiftId = null): bool
+    {
+        $start = $rangeStartUtc->copy()->utc();
+        $end = $rangeEndUtc->copy()->utc();
+
+        return static::query()
+            ->where('driver_id', $driverId)
+            ->where('status', ShiftStatus::Booked)
+            ->when($exceptShiftId !== null, fn ($q) => $q->where('id', '!=', $exceptShiftId))
+            ->where('starts_at', '<', $end)
+            ->where('ends_at', '>', $start)
+            ->exists();
     }
 }

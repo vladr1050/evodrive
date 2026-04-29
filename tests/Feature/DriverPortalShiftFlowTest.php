@@ -17,9 +17,13 @@ class DriverPortalShiftFlowTest extends TestCase
     use RefreshDatabase;
 
     protected ShiftPolicy $policy;
+
     protected Station $station;
+
     protected FleetVehicle $vehicle;
+
     protected Driver $driver;
+
     protected Driver $otherDriver;
 
     protected function setUp(): void
@@ -45,17 +49,49 @@ class DriverPortalShiftFlowTest extends TestCase
         $tomorrow = Carbon::tomorrow()->format('Y-m-d');
 
         $response = $this->postJson(route('driverportal.shifts.check-availability', ['locale' => 'en']), [
-                '_token' => csrf_token(),
-                'station_id' => $this->station->id,
-                'date' => $tomorrow,
-                'start_time' => '08:00',
-                'duration_hours' => 4,
-            ]);
+            '_token' => csrf_token(),
+            'station_id' => $this->station->id,
+            'date' => $tomorrow,
+            'start_time' => '08:00',
+            'duration_hours' => 4,
+        ]);
 
         $response->assertOk();
         $response->assertJson([
             'available' => true,
             'count' => 1,
+        ]);
+    }
+
+    public function test_check_availability_unavailable_when_overlaps_driver_existing_shift(): void
+    {
+        $stationB = Station::factory()->create();
+        FleetVehicle::factory()->create(['home_station_id' => $stationB->id]);
+        $tomorrow = Carbon::tomorrow()->format('Y-m-d');
+
+        Shift::create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => Carbon::parse($tomorrow)->setTime(18, 0),
+            'ends_at' => Carbon::parse($tomorrow)->setTime(22, 0),
+            'status' => ShiftStatus::Booked,
+        ]);
+
+        $this->actingAs($this->driver, 'driver')->get('/en/driverportal/shifts');
+
+        $response = $this->postJson(route('driverportal.shifts.check-availability', ['locale' => 'en']), [
+            '_token' => csrf_token(),
+            'station_id' => $stationB->id,
+            'date' => $tomorrow,
+            'start_time' => '21:00',
+            'duration_hours' => 4,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJson([
+            'available' => false,
+            'reason_code' => 'DRIVER_SHIFT_OVERLAP',
         ]);
     }
 
@@ -66,12 +102,12 @@ class DriverPortalShiftFlowTest extends TestCase
         $tomorrow = Carbon::tomorrow()->format('Y-m-d');
 
         $response = $this->postJson(route('driverportal.shifts.confirm', ['locale' => 'en']), [
-                '_token' => csrf_token(),
-                'station_id' => $this->station->id,
-                'date' => $tomorrow,
-                'start_time' => '08:00',
-                'duration_hours' => 4,
-            ]);
+            '_token' => csrf_token(),
+            'station_id' => $this->station->id,
+            'date' => $tomorrow,
+            'start_time' => '08:00',
+            'duration_hours' => 4,
+        ]);
 
         $response->assertOk();
         $response->assertJson(['success' => true]);
@@ -97,9 +133,9 @@ class DriverPortalShiftFlowTest extends TestCase
         $this->actingAs($this->driver, 'driver')->get('/en/driverportal/shifts');
 
         $response = $this->post(route('driverportal.shifts.cancel', [
-                'locale' => 'en',
-                'shift' => $shift->id,
-            ]), ['_token' => csrf_token()]);
+            'locale' => 'en',
+            'shift' => $shift->id,
+        ]), ['_token' => csrf_token()]);
 
         $response->assertOk();
         $response->assertJson(['success' => true]);
@@ -124,9 +160,9 @@ class DriverPortalShiftFlowTest extends TestCase
         $this->actingAs($this->driver, 'driver')->get('/en/driverportal/shifts');
 
         $response = $this->post(route('driverportal.shifts.cancel', [
-                'locale' => 'en',
-                'shift' => $shift->id,
-            ]), ['_token' => csrf_token()]);
+            'locale' => 'en',
+            'shift' => $shift->id,
+        ]), ['_token' => csrf_token()]);
 
         $response->assertForbidden();
         $response->assertJson(['success' => false]);

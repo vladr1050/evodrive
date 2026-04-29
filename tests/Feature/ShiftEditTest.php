@@ -19,8 +19,11 @@ class ShiftEditTest extends TestCase
     use RefreshDatabase;
 
     protected ShiftPolicy $policy;
+
     protected Station $station;
+
     protected FleetVehicle $vehicle;
+
     protected Driver $driver;
 
     protected function setUp(): void
@@ -131,6 +134,36 @@ class ShiftEditTest extends TestCase
         $this->expectException(ShiftBookingException::class);
         $this->expectExceptionMessage('Duration');
         $service->updateShift($shift, $newStart, 7);
+    }
+
+    public function test_update_shift_throws_when_new_window_overlaps_driver_other_vehicle_shift(): void
+    {
+        $stationB = Station::factory()->create();
+        $vehicleB = FleetVehicle::factory()->create(['home_station_id' => $stationB->id]);
+        $day = Carbon::tomorrow()->startOfDay();
+
+        Shift::factory()->create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $vehicleB->id,
+            'station_id' => $stationB->id,
+            'status' => ShiftStatus::Booked,
+            'starts_at' => $day->copy()->setTime(18, 0),
+            'ends_at' => $day->copy()->setTime(22, 0),
+        ]);
+
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'status' => ShiftStatus::Booked,
+            'starts_at' => $day->copy()->setTime(8, 0),
+            'ends_at' => $day->copy()->setTime(16, 0),
+        ]);
+
+        $service = app(ShiftEditService::class);
+        $this->expectException(ShiftBookingException::class);
+        $this->expectExceptionMessage('overlaps another of your booked shifts');
+        $service->updateShift($shift, $day->copy()->setTime(20, 0), 4);
     }
 
     public function test_update_shift_throws_when_new_slot_has_insufficient_downtime(): void

@@ -76,6 +76,7 @@ return [
     'check_failed' => 'Could not check availability.',
     'confirm_failed' => 'Could not book shift.',
     'shift_start_must_be_future' => 'Shift must start in the future.',
+    'driver_shift_overlaps_existing' => 'You already have a shift at this time. You cannot book two overlapping shifts.',
     'shift_date_outside_planning_window' => 'This date is outside the allowed booking window. You can only book shifts within the next few days.',
     'copied' => 'Shifts copied.',
 
@@ -96,6 +97,7 @@ return [
     'copy_reason_INVALID_START' => 'Start time invalid',
     'copy_reason_STATION_MISMATCH' => 'Station not available',
     'copy_reason_OUTSIDE_PLANNING_WINDOW' => 'Outside booking window',
+    'copy_reason_DRIVER_SHIFT_OVERLAP' => 'Overlaps another of your shifts',
 
     // Edit shift
     'edit_shift' => 'Edit',

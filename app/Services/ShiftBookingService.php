@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ShiftStatus;
 use App\Exceptions\ShiftBookingException;
+use App\Models\Driver;
 use App\Models\FleetVehicle;
 use App\Models\Shift;
 use App\Models\ShiftEvent;
@@ -30,11 +31,27 @@ class ShiftBookingService
         $this->validatePolicy($policy, $startsAt, $durationHours);
         $this->validateDriverDailyLimit($driverId, $startsAt, $policy);
 
-        return DB::transaction(function () use ($driverId, $stationId, $startsAt, $durationHours, $policy) {
-            $endsAt = $startsAt->copy()->addMinutes((int) round($durationHours * 60));
-            $startsAtUtc = $startsAt->copy()->utc();
-            $endsAtUtc = $endsAt->copy()->utc();
-            $vehicleId = $this->selectAvailableVehicleUnderLock($stationId, $startsAtUtc, $endsAtUtc, $policy);
+        $endsAt = $startsAt->copy()->addMinutes((int) round($durationHours * 60));
+        $startsAtUtc = $startsAt->copy()->utc();
+        $endsAtUtc = $endsAt->copy()->utc();
+
+        if (Shift::driverHasOverlappingBookedShift($driverId, $startsAtUtc, $endsAtUtc)) {
+            throw ShiftBookingException::driverShiftOverlap();
+        }
+
+        return DB::transaction(function () use ($driverId, $stationId, $startsAtUtc, $endsAtUtc, $policy) {
+            Driver::query()->whereKey($driverId)->lockForUpdate()->firstOrFail();
+
+            if (Shift::driverHasOverlappingBookedShift($driverId, $startsAtUtc, $endsAtUtc)) {
+                throw ShiftBookingException::driverShiftOverlap();
+            }
+
+            $vehicleId = $this->selectAvailableVehicleUnderLock(
+                $stationId,
+                $startsAtUtc,
+                $endsAtUtc,
+                $policy
+            );
             if (! $vehicleId) {
                 throw ShiftBookingException::noVehiclesAvailable();
             }

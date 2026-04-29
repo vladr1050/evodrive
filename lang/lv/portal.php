@@ -76,6 +76,7 @@ return [
     'check_failed' => 'Neizdevās pārbaudīt pieejamību.',
     'confirm_failed' => 'Neizdevās rezervēt maiņu.',
     'shift_start_must_be_future' => 'Maiņas sākumam jābūt nākotnē.',
+    'driver_shift_overlaps_existing' => 'Jums jau ir maiņa šajā laikā. Nevar rezervēt divas pārklājošas maiņas.',
     'shift_date_outside_planning_window' => 'Šī datums ir ārpus atļautā rezervēšanas perioda. Maiņas var rezervēt tikai nākamajās dienās.',
     'copied' => 'Maiņas nokopētas.',
 
@@ -95,6 +96,7 @@ return [
     'copy_reason_INVALID_START' => 'Nederīgs sākuma laiks',
     'copy_reason_STATION_MISMATCH' => 'Stacija nav pieejama',
     'copy_reason_OUTSIDE_PLANNING_WINDOW' => 'Ārpus rezervēšanas perioda',
+    'copy_reason_DRIVER_SHIFT_OVERLAP' => 'Pārklājas ar citu jūsu maiņu',
 
     'edit_shift' => 'Rediģēt',
     'edit_shift_save' => 'Saglabāt',

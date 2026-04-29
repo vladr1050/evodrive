@@ -276,6 +276,22 @@ class DriverPortalController extends Controller
                 ], 422);
             }
             $durationHours = (float) $request->input('duration_hours');
+            $endsAt = $startsAt->copy()->addMinutes((int) round($durationHours * 60));
+            $driver = Auth::guard('driver')->user();
+            if ($driver !== null && Shift::driverHasOverlappingBookedShift(
+                (int) $driver->id,
+                $startsAt->copy()->utc(),
+                $endsAt->copy()->utc()
+            )) {
+                return response()->json([
+                    'available' => false,
+                    'count' => 0,
+                    'vehicle_ids' => [],
+                    'error' => __('portal.driver_shift_overlaps_existing'),
+                    'reason_code' => 'DRIVER_SHIFT_OVERLAP',
+                ], 422);
+            }
+
             $result = app(ShiftAvailabilityService::class)->checkAvailability(
                 (int) $request->input('station_id'),
                 $startsAt,
@@ -291,7 +307,7 @@ class DriverPortalController extends Controller
             return response()->json([
                 'available' => false,
                 'count' => 0,
-                'error' => $e->getMessage(),
+                'error' => $this->shiftBookingExceptionMessage($e),
                 'reason_code' => $e->reasonCode,
             ], 422);
         }
@@ -349,7 +365,7 @@ class DriverPortalController extends Controller
         } catch (ShiftBookingException $e) {
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => $this->shiftBookingExceptionMessage($e),
                 'reason_code' => $e->reasonCode,
             ], 422);
         }
@@ -490,7 +506,7 @@ class DriverPortalController extends Controller
         } catch (ShiftBookingException $e) {
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => $this->shiftBookingExceptionMessage($e),
                 'reason_code' => $e->reasonCode,
             ], 422);
         }
@@ -534,5 +550,13 @@ class DriverPortalController extends Controller
         $locale = $request->route('locale', 'en');
 
         return redirect()->route('driverportal.login', ['locale' => $locale]);
+    }
+
+    protected function shiftBookingExceptionMessage(ShiftBookingException $e): string
+    {
+        return match ($e->reasonCode) {
+            'DRIVER_SHIFT_OVERLAP' => __('portal.driver_shift_overlaps_existing'),
+            default => $e->getMessage(),
+        };
     }
 }

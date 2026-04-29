@@ -52,6 +52,8 @@ class ShiftCopyService
 
         $proposed = [];
         $conflicts = [];
+        /** @var list<array{start: Carbon, end: Carbon}> */
+        $plannedCopyUtcWindows = [];
 
         $planningMin = now($tz)->startOfDay();
         $planningMax = now($tz)->copy()->addDays($policy->planning_window_days)->endOfDay();
@@ -75,6 +77,7 @@ class ShiftCopyService
                     'duration_hours' => $durationHours,
                     'reason_code' => 'OUTSIDE_PLANNING_WINDOW',
                 ];
+
                 continue;
             }
 
@@ -92,25 +95,57 @@ class ShiftCopyService
                     'duration_hours' => $durationHours,
                     'reason_code' => $e->reasonCode,
                 ];
+
                 continue;
             }
 
-            if (($result['count'] ?? 0) > 0) {
-                $proposed[] = [
-                    'date' => $newStartsAtForOutput->format('Y-m-d'),
-                    'start_time' => $newStartsAtForOutput->format('H:i'),
-                    'duration_hours' => $durationHours,
-                    'station_id' => $shift->station_id,
-                    'available_vehicle_count' => $result['count'],
-                ];
-            } else {
+            if (($result['count'] ?? 0) <= 0) {
                 $conflicts[] = [
                     'date' => $newStartsAtForOutput->format('Y-m-d'),
                     'start_time' => $newStartsAtForOutput->format('H:i'),
                     'duration_hours' => $durationHours,
                     'reason_code' => 'NO_VEHICLES',
                 ];
+
+                continue;
             }
+
+            $endsAtUtc = $startsAtUtc->copy()->addMinutes((int) round($durationHours * 60));
+            foreach ($plannedCopyUtcWindows as $w) {
+                if ($startsAtUtc->lt($w['end']) && $endsAtUtc->gt($w['start'])) {
+                    $conflicts[] = [
+                        'date' => $newStartsAtForOutput->format('Y-m-d'),
+                        'start_time' => $newStartsAtForOutput->format('H:i'),
+                        'duration_hours' => $durationHours,
+                        'reason_code' => 'DRIVER_SHIFT_OVERLAP',
+                    ];
+
+                    continue 2;
+                }
+            }
+
+            if (Shift::driverHasOverlappingBookedShift((int) $driver->id, $startsAtUtc, $endsAtUtc)) {
+                $conflicts[] = [
+                    'date' => $newStartsAtForOutput->format('Y-m-d'),
+                    'start_time' => $newStartsAtForOutput->format('H:i'),
+                    'duration_hours' => $durationHours,
+                    'reason_code' => 'DRIVER_SHIFT_OVERLAP',
+                ];
+
+                continue;
+            }
+
+            $proposed[] = [
+                'date' => $newStartsAtForOutput->format('Y-m-d'),
+                'start_time' => $newStartsAtForOutput->format('H:i'),
+                'duration_hours' => $durationHours,
+                'station_id' => $shift->station_id,
+                'available_vehicle_count' => $result['count'],
+            ];
+            $plannedCopyUtcWindows[] = [
+                'start' => $startsAtUtc->copy(),
+                'end' => $endsAtUtc->copy(),
+            ];
         }
 
         return ['proposed' => $proposed, 'conflicts' => $conflicts];
@@ -144,6 +179,7 @@ class ShiftCopyService
         } catch (ShiftBookingException $e) {
             $sel = $lastSelection ?? $selections[array_key_first($selections)] ?? [];
             $startsAt = isset($sel['starts_at']) ? Carbon::parse($sel['starts_at']) : null;
+
             return [
                 'success' => false,
                 'conflicts' => [

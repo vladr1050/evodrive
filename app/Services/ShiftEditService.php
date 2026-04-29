@@ -159,6 +159,10 @@ class ShiftEditService
 
         $newEndsUtc = $shift->starts_at->copy()->addHours($newDurationHoursInt);
 
+        if (Shift::driverHasOverlappingBookedShift((int) $shift->driver_id, $shift->starts_at->copy()->utc(), $newEndsUtc->copy()->utc(), (int) $shift->id)) {
+            throw ShiftBookingException::driverShiftOverlap();
+        }
+
         return DB::transaction(function () use ($shift, $newEndsUtc) {
             $shift->update([
                 'ends_at' => $newEndsUtc,
@@ -196,6 +200,10 @@ class ShiftEditService
         $newEndsAt = $newStartsAt->copy()->addMinutes((int) round($newDurationHours * 60));
         $newStartsAtUtc = $newStartsAt->copy()->utc();
         $newEndsAtUtc = $newEndsAt->copy()->utc();
+
+        if (Shift::driverHasOverlappingBookedShift((int) $shift->driver_id, $newStartsAtUtc, $newEndsAtUtc, (int) $shift->id)) {
+            throw ShiftBookingException::driverShiftOverlap();
+        }
 
         $vehicleId = (int) $shift->vehicle_id;
         if (! $this->availabilityService->vehicleAvailableForExcludingShift($vehicleId, (int) $shift->id, $newStartsAtUtc, $newEndsAtUtc, $policy)) {

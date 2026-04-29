@@ -18,9 +18,13 @@ class ShiftCopyWeekTest extends TestCase
     use RefreshDatabase;
 
     protected ShiftPolicy $policy;
+
     protected Station $station;
+
     protected FleetVehicle $vehicle;
+
     protected Driver $driver1;
+
     protected Driver $driver2;
 
     protected function setUp(): void
@@ -80,7 +84,7 @@ class ShiftCopyWeekTest extends TestCase
 
         $selections = array_map(fn ($p) => [
             'station_id' => $p['station_id'],
-            'starts_at' => $p['date'] . ' ' . $p['start_time'] . ':00',
+            'starts_at' => $p['date'].' '.$p['start_time'].':00',
             'duration_hours' => $p['duration_hours'],
         ], $preview['proposed']);
 
@@ -142,7 +146,7 @@ class ShiftCopyWeekTest extends TestCase
         Carbon::setTestNow();
     }
 
-    public function test_copy_week_race_condition(): void
+    public function test_copy_week_preview_detects_driver_overlap_with_existing_target_shift(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 2, 10, 12, 0, 0));
         $prevMonday = Carbon::create(2026, 2, 16, 0, 0, 0);
@@ -178,25 +182,17 @@ class ShiftCopyWeekTest extends TestCase
         $preview1 = $service->previewCopyWeek($this->driver1, $targetMonday);
         $preview2 = $service->previewCopyWeek($this->driver2, $targetMonday);
         $this->assertCount(1, $preview1['proposed']);
-        $this->assertCount(1, $preview2['proposed']);
+        $this->assertCount(0, $preview2['proposed']);
+        $this->assertCount(1, $preview2['conflicts']);
+        $this->assertSame('DRIVER_SHIFT_OVERLAP', $preview2['conflicts'][0]['reason_code']);
 
         $sel1 = [
             'station_id' => $preview1['proposed'][0]['station_id'],
-            'starts_at' => $preview1['proposed'][0]['date'] . ' ' . $preview1['proposed'][0]['start_time'] . ':00',
+            'starts_at' => $preview1['proposed'][0]['date'].' '.$preview1['proposed'][0]['start_time'].':00',
             'duration_hours' => $preview1['proposed'][0]['duration_hours'],
         ];
         $confirm1 = $service->confirmCopyWeek($this->driver1, [$sel1]);
         $this->assertTrue($confirm1['success']);
-
-        $sel2 = [
-            'station_id' => $preview2['proposed'][0]['station_id'],
-            'starts_at' => $preview2['proposed'][0]['date'] . ' ' . $preview2['proposed'][0]['start_time'] . ':00',
-            'duration_hours' => $preview2['proposed'][0]['duration_hours'],
-        ];
-        $confirm2 = $service->confirmCopyWeek($this->driver2, [$sel2]);
-        $this->assertFalse($confirm2['success']);
-        $this->assertArrayHasKey('conflicts', $confirm2);
-        $this->assertSame('NO_VEHICLES', $confirm2['conflicts'][0]['reason_code']);
         Carbon::setTestNow();
     }
 

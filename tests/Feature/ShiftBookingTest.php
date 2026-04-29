@@ -46,6 +46,32 @@ class ShiftBookingTest extends TestCase
         $this->driver2 = Driver::factory()->create();
     }
 
+    public function test_driver_cannot_book_second_shift_overlapping_another_station(): void
+    {
+        $stationB = Station::factory()->create();
+        $vehicleB = FleetVehicle::factory()->create(['home_station_id' => $stationB->id]);
+        $day = Carbon::tomorrow()->startOfDay();
+        $bookingService = app(ShiftBookingService::class);
+
+        $bookingService->bookShift($this->driver1->id, $this->station->id, $day->copy()->setTime(18, 0), 4);
+
+        $this->expectException(ShiftBookingException::class);
+        $this->expectExceptionMessage('overlaps another of your booked shifts');
+        $bookingService->bookShift($this->driver1->id, $stationB->id, $day->copy()->setTime(21, 0), 4);
+    }
+
+    public function test_driver_can_book_back_to_back_on_different_stations(): void
+    {
+        $stationB = Station::factory()->create();
+        FleetVehicle::factory()->create(['home_station_id' => $stationB->id]);
+        $day = Carbon::tomorrow()->startOfDay();
+        $bookingService = app(ShiftBookingService::class);
+
+        $first = $bookingService->bookShift($this->driver1->id, $this->station->id, $day->copy()->setTime(8, 0), 4);
+        $second = $bookingService->bookShift($this->driver1->id, $stationB->id, $day->copy()->setTime(12, 0), 4);
+        $this->assertNotSame($first->vehicle_id, $second->vehicle_id);
+    }
+
     public function test_two_drivers_same_station_time_only_one_succeeds(): void
     {
         $startsAt = Carbon::tomorrow()->setTime(8, 0);
