@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Contracts\SmsProviderInterface;
 use App\Enums\ShiftStatus;
+use App\Enums\VehicleCommandTransport;
 use App\Models\CarCommand;
 use App\Models\Driver;
 use App\Models\FleetVehicle;
 use App\Models\Shift;
 use App\Models\Station;
+use App\Models\VehicleCommandDelivery;
 use App\Services\CarControlService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -181,6 +183,13 @@ class CarControlAccessAndPayloadsTest extends TestCase
         $this->assertSame($this->expectedSmsBody($open), $this->smsLog[1]['text']);
         $this->assertSame('37120000001', $this->smsLog[0]['to']);
         $this->assertSame('37120000001', $this->smsLog[1]['to']);
+
+        $this->assertSame(2, VehicleCommandDelivery::query()->count());
+        $logs = VehicleCommandDelivery::query()->orderBy('sequence')->get();
+        $this->assertSame('37120000001', $logs[0]->sim_number);
+        $this->assertSame('sms', $logs[0]->effective_transport);
+        $this->assertTrue($logs[0]->ok);
+        $this->assertTrue($logs[1]->ok);
     }
 
     public function test_open_car_sends_one_sms(): void
@@ -356,5 +365,46 @@ class CarControlAccessAndPayloadsTest extends TestCase
                 && $request['imei'] === '123456789012345'
                 && $request['command'] === config('car_control.commands.open_car');
         });
+
+        $this->assertSame(1, VehicleCommandDelivery::query()->count());
+        $log = VehicleCommandDelivery::query()->first();
+        $this->assertSame('gprs', $log->effective_transport);
+        $this->assertSame('37120000001', $log->sim_number);
+        $this->assertTrue($log->ok);
+    }
+
+    public function test_vehicle_sms_channel_overrides_global_gprs(): void
+    {
+        Http::fake([
+            'http://teltonika-gw.test/commands' => Http::response(['ok' => true, 'request_id' => 'gw-x'], 200),
+        ]);
+        config([
+            'car_control.default_transport' => 'gprs',
+            'car_control.gprs.internal_base_url' => 'http://teltonika-gw.test',
+            'car_control.gprs.commands_path' => 'commands',
+        ]);
+        $this->vehicle->update([
+            'imei' => '123456789012345',
+            'command_transport' => VehicleCommandTransport::Sms,
+        ]);
+
+        $now = Carbon::parse('2026-03-10 10:00:00');
+        Shift::factory()->create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => $now->copy()->addMinutes(30),
+            'ends_at' => $now->copy()->addHours(4),
+            'status' => ShiftStatus::Booked,
+        ]);
+        $this->app->forgetInstance(CarControlService::class);
+        $service = app(CarControlService::class);
+
+        $result = $service->executeAction($this->driver->id, CarCommand::ACTION_OPEN_CAR, $now);
+
+        $this->assertTrue($result['ok']);
+        $this->assertCount(1, $this->smsLog);
+        Http::assertNothingSent();
+        $this->assertSame('sms', VehicleCommandDelivery::query()->first()->effective_transport);
     }
 }

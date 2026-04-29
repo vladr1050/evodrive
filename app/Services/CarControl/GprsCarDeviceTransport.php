@@ -21,6 +21,7 @@ final class GprsCarDeviceTransport implements CarDeviceCommandTransportInterface
                 transport: 'gprs',
                 error: 'GPRS gateway URL not configured',
                 failureCode: 'gateway_not_configured',
+                responseDetail: null,
             );
         }
 
@@ -31,6 +32,7 @@ final class GprsCarDeviceTransport implements CarDeviceCommandTransportInterface
                 transport: 'gprs',
                 error: 'IMEI missing',
                 failureCode: 'device_offline',
+                responseDetail: null,
             );
         }
 
@@ -61,6 +63,7 @@ final class GprsCarDeviceTransport implements CarDeviceCommandTransportInterface
                 transport: 'gprs',
                 error: 'Gateway unreachable',
                 failureCode: 'gateway_unreachable',
+                responseDetail: $e->getMessage(),
             );
         } catch (\Throwable $e) {
             Log::channel('stack')->error('GprsCarDeviceTransport: unexpected error', [
@@ -73,8 +76,11 @@ final class GprsCarDeviceTransport implements CarDeviceCommandTransportInterface
                 transport: 'gprs',
                 error: $e->getMessage(),
                 failureCode: 'connection_lost',
+                responseDetail: $e->getMessage(),
             );
         }
+
+        $bodyDetail = self::truncateHttpBody($response->body());
 
         if ($response->status() === 408 || $response->json('failure_code') === 'timeout') {
             return new CarDeviceCommandResult(
@@ -82,6 +88,7 @@ final class GprsCarDeviceTransport implements CarDeviceCommandTransportInterface
                 transport: 'gprs',
                 error: $response->json('error') ?? 'Device response timeout',
                 failureCode: 'timeout',
+                responseDetail: $bodyDetail,
             );
         }
 
@@ -98,6 +105,7 @@ final class GprsCarDeviceTransport implements CarDeviceCommandTransportInterface
                     ok: true,
                     transport: 'gprs',
                     providerRefs: $refs,
+                    responseDetail: $bodyDetail,
                 );
             }
 
@@ -108,6 +116,7 @@ final class GprsCarDeviceTransport implements CarDeviceCommandTransportInterface
                 transport: 'gprs',
                 error: (string) ($response->json('error') ?? $response->json('message') ?? 'Command failed'),
                 failureCode: $code !== '' ? $code : 'command_failed',
+                responseDetail: $bodyDetail,
             );
         }
 
@@ -116,7 +125,18 @@ final class GprsCarDeviceTransport implements CarDeviceCommandTransportInterface
             transport: 'gprs',
             error: 'HTTP '.$response->status(),
             failureCode: $response->status() >= 500 ? 'gateway_unreachable' : 'command_failed',
+            responseDetail: $bodyDetail,
         );
+    }
+
+    private static function truncateHttpBody(string $body): ?string
+    {
+        $body = trim($body);
+        if ($body === '') {
+            return null;
+        }
+
+        return strlen($body) > 4000 ? substr($body, 0, 4000).'…' : $body;
     }
 
     public function isDeviceOnline(string $imei): bool

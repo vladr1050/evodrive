@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\VehicleCommandTransport;
 use App\Enums\VehicleStatus;
 use App\Filament\Resources\FleetVehicleResource\Pages;
+use App\Filament\Resources\FleetVehicleResource\RelationManagers;
 use App\Models\FleetVehicle;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,7 +13,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 
 class FleetVehicleResource extends Resource
 {
@@ -33,6 +34,7 @@ class FleetVehicleResource extends Resource
     public static function form(Form $form): Form
     {
         $currentYear = (int) date('Y');
+
         return $form
             ->schema([
                 Forms\Components\Section::make('Vehicle')
@@ -77,6 +79,15 @@ class FleetVehicleResource extends Resource
                             ->tel()
                             ->maxLength(50)
                             ->placeholder('37120000000'),
+                        Forms\Components\Select::make('command_transport')
+                            ->label('Command delivery channel')
+                            ->native(false)
+                            ->placeholder('Fleet default (CAR_CONTROL_TRANSPORT in .env)')
+                            ->options(collect(VehicleCommandTransport::cases())->mapWithKeys(
+                                fn (VehicleCommandTransport $c) => [$c->value => $c->label()]
+                            ))
+                            ->nullable()
+                            ->helperText('Per vehicle: SMS, GPRS (Teltonika gateway), or Auto (GPRS when device online, else SMS). Empty = fleet default.'),
                     ])
                     ->columns(2),
             ]);
@@ -91,7 +102,7 @@ class FleetVehicleResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('brand')
                     ->label('Brand / Model')
-                    ->formatStateUsing(fn (FleetVehicle $r) => trim(($r->brand ?? '') . ' ' . ($r->model ?? '')))
+                    ->formatStateUsing(fn (FleetVehicle $r) => trim(($r->brand ?? '').' '.($r->model ?? '')))
                     ->searchable(query: function (Builder $q, string $search) {
                         if ($q->getModel() === null) {
                             return;
@@ -117,6 +128,21 @@ class FleetVehicleResource extends Resource
                 Tables\Columns\TextColumn::make('sim')
                     ->label('SIM')
                     ->searchable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('command_transport')
+                    ->label('Command channel')
+                    ->badge()
+                    ->formatStateUsing(function ($state) {
+                        if ($state === null) {
+                            return 'Fleet default';
+                        }
+                        if ($state instanceof VehicleCommandTransport) {
+                            return $state->label();
+                        }
+
+                        return (string) $state;
+                    })
+                    ->color(fn ($state) => $state === null ? 'gray' : 'info')
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
@@ -157,6 +183,13 @@ class FleetVehicleResource extends Resource
             'index' => Pages\ListFleetVehicles::route('/'),
             'create' => Pages\CreateFleetVehicle::route('/create'),
             'edit' => Pages\EditFleetVehicle::route('/{record}/edit'),
+        ];
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\VehicleCommandDeliveriesRelationManager::class,
         ];
     }
 

@@ -16,6 +16,7 @@ final readonly class CarDeviceCommandResult
         public array $providerRefs = [],
         public ?string $error = null,
         public ?string $failureCode = null,
+        public ?string $responseDetail = null,
     ) {}
 
     public function allowsSmsFallback(): bool

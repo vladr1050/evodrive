@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CarCommand extends Model
 {
@@ -56,6 +57,11 @@ class CarCommand extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(FleetVehicle::class, 'vehicle_id');
+    }
+
+    public function deliveryLogs(): HasMany
+    {
+        return $this->hasMany(VehicleCommandDelivery::class, 'car_command_id')->orderBy('sequence');
     }
 
     public function isInProgress(): bool

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\VehicleCommandTransport;
 use App\Enums\VehicleStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -33,13 +34,33 @@ class FleetVehicle extends Model
         'status',
         'imei',
         'sim',
+        'command_transport',
     ];
 
     protected function casts(): array
     {
         return [
             'status' => VehicleStatus::class,
+            'command_transport' => VehicleCommandTransport::class,
         ];
+    }
+
+    /**
+     * Per-vehicle channel (sms | gprs | auto). Null uses fleet default from config.
+     */
+    public function effectiveCommandTransport(): string
+    {
+        $fallback = strtolower((string) config('car_control.default_transport', 'sms'));
+        if (! in_array($fallback, ['sms', 'gprs', 'auto'], true)) {
+            $fallback = 'sms';
+        }
+
+        $v = $this->command_transport;
+        if ($v instanceof VehicleCommandTransport) {
+            return $v->value;
+        }
+
+        return $fallback;
     }
 
     public function homeStation(): BelongsTo
@@ -50,5 +71,10 @@ class FleetVehicle extends Model
     public function shifts(): HasMany
     {
         return $this->hasMany(Shift::class, 'vehicle_id');
+    }
+
+    public function commandDeliveries(): HasMany
+    {
+        return $this->hasMany(VehicleCommandDelivery::class, 'vehicle_id')->orderByDesc('created_at');
     }
 }

@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Car control: access window, rate limit, idempotency, command execution.
-     * Delivery uses {@see CarControlTransportRouter} (SMS / GPRS / AUTO). Stored payloads are bare device
-     * commands; SMS prepends `car_control.sms.command_prefix` in {@see \App\Services\CarControl\SmsCarDeviceTransport}.
+ * Delivery uses {@see CarControlTransportRouter} (per-vehicle SMS / GPRS / AUTO). Stored payloads are bare device
+ * commands; SMS prepends `car_control.sms.command_prefix` in {@see \App\Services\CarControl\SmsCarDeviceTransport}.
  */
 class CarControlService
 {
@@ -75,7 +75,7 @@ class CarControlService
             return ['allowed' => false, 'reason' => 'no_shift'];
         }
 
-        $transportMode = $this->transportMode();
+        $transportMode = $vehicle->effectiveCommandTransport();
         $hasSim = filled(trim((string) ($vehicle->sim ?? '')));
         $hasImei = filled(trim((string) ($vehicle->imei ?? '')));
 
@@ -86,6 +86,9 @@ class CarControlService
             return ['allowed' => false, 'reason' => 'car_not_configured'];
         }
         if ($transportMode === 'auto' && ! $hasSim && ! $hasImei) {
+            return ['allowed' => false, 'reason' => 'car_not_configured'];
+        }
+        if ($transportMode === 'auto' && ! $hasSim && $hasImei && ! filled(config('car_control.gprs.internal_base_url'))) {
             return ['allowed' => false, 'reason' => 'car_not_configured'];
         }
 
@@ -138,7 +141,7 @@ class CarControlService
 
         $shift = $context['shift'];
         $vehicle = $context['vehicle'];
-        $transportMode = $this->transportMode();
+        $transportMode = $vehicle->effectiveCommandTransport();
         $phone = preg_replace('/\D/', '', (string) $vehicle->sim);
         $imei = trim((string) ($vehicle->imei ?? ''));
 
@@ -183,7 +186,11 @@ class CarControlService
             'status' => CarCommand::STATUS_QUEUED,
         ]);
 
-        $delivery = $this->transportRouter->deliverSequential($transportMode, $vehicle, $payloads);
+        $delivery = $this->transportRouter->deliverSequential($transportMode, $vehicle, $payloads, [
+            'car_command_id' => (int) $command->id,
+            'driver_id' => $driverId,
+            'shift_id' => (int) $shift->id,
+        ]);
 
         if (! $delivery['ok']) {
             /** @var CarDeviceCommandResult $last */
@@ -219,13 +226,6 @@ class CarControlService
         ]);
 
         return ['ok' => true, 'message' => $this->actionSuccessMessage($action), 'command' => $command];
-    }
-
-    private function transportMode(): string
-    {
-        $mode = strtolower((string) config('car_control.default_transport', 'sms'));
-
-        return in_array($mode, ['sms', 'gprs', 'auto'], true) ? $mode : 'sms';
     }
 
     private function deliveryFailureUserMessage(?CarDeviceCommandResult $last, string $transportMode): string

@@ -20,6 +20,7 @@ final class SmsCarDeviceTransport implements CarDeviceCommandTransportInterface
                 transport: 'sms',
                 error: 'SMS number missing',
                 failureCode: 'sms_number_missing',
+                responseDetail: null,
             );
         }
 
@@ -29,6 +30,8 @@ final class SmsCarDeviceTransport implements CarDeviceCommandTransportInterface
             $refs[] = (string) $result['message_id'];
         }
 
+        $providerSummary = self::truncateDetail(json_encode($result, JSON_UNESCAPED_UNICODE));
+
         if (($result['status'] ?? '') === 'failed') {
             return new CarDeviceCommandResult(
                 ok: false,
@@ -36,6 +39,7 @@ final class SmsCarDeviceTransport implements CarDeviceCommandTransportInterface
                 providerRefs: $refs,
                 error: $result['error'] ?? 'Send failed',
                 failureCode: 'sms_send_failed',
+                responseDetail: $providerSummary,
             );
         }
 
@@ -43,6 +47,7 @@ final class SmsCarDeviceTransport implements CarDeviceCommandTransportInterface
             ok: true,
             transport: 'sms',
             providerRefs: $refs,
+            responseDetail: $providerSummary,
         );
     }
 
@@ -58,5 +63,14 @@ final class SmsCarDeviceTransport implements CarDeviceCommandTransportInterface
         }
 
         return $bareCommand === '' ? $prefix : $prefix.' '.$bareCommand;
+    }
+
+    private static function truncateDetail(?string $text): ?string
+    {
+        if ($text === null || $text === '') {
+            return null;
+        }
+
+        return strlen($text) > 4000 ? substr($text, 0, 4000).'…' : $text;
     }
 }

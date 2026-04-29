@@ -3,10 +3,11 @@
 namespace App\Services\CarControl;
 
 use App\Models\FleetVehicle;
+use App\Models\VehicleCommandDelivery;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Runs sequential device commands using global transport policy (sms | gprs | auto).
+ * Runs sequential device commands using per-vehicle transport (sms | gprs | auto), with optional delivery logging.
  */
 final class CarControlTransportRouter
 {
@@ -17,9 +18,10 @@ final class CarControlTransportRouter
 
     /**
      * @param  list<string>  $payloads
+     * @param  array{car_command_id: int, driver_id: int, shift_id: int}|null  $deliveryLogContext
      * @return array{ok: bool, meta: array<string, mixed>, last_result?: CarDeviceCommandResult}
      */
-    public function deliverSequential(string $mode, FleetVehicle $vehicle, array $payloads): array
+    public function deliverSequential(string $mode, FleetVehicle $vehicle, array $payloads, ?array $deliveryLogContext = null): array
     {
         $mode = strtolower($mode);
         if (! in_array($mode, ['sms', 'gprs', 'auto'], true)) {
@@ -60,6 +62,10 @@ final class CarControlTransportRouter
                 $meta,
                 $stepContext,
             );
+
+            if ($deliveryLogContext !== null) {
+                $this->persistDeliveryLog($deliveryLogContext, $vehicle, $index + 1, $mode, $text, $result);
+            }
 
             $meta['steps'][] = [
                 'sequence' => $index + 1,
@@ -148,6 +154,7 @@ final class CarControlTransportRouter
                 transport: 'sms',
                 error: 'Car SIM (phone) not configured for SMS fallback.',
                 failureCode: 'sms_number_missing',
+                responseDetail: null,
             );
         }
 
@@ -182,5 +189,28 @@ final class CarControlTransportRouter
         $gprsReady = filled(config('car_control.gprs.internal_base_url')) && $imei !== '';
 
         return $gprsReady && $this->gprsTransport->isDeviceOnline($imei);
+    }
+
+    /**
+     * @param  array{car_command_id: int, driver_id: int, shift_id: int}  $ctx
+     */
+    private function persistDeliveryLog(array $ctx, FleetVehicle $vehicle, int $sequence, string $requestedMode, string $commandText, CarDeviceCommandResult $result): void
+    {
+        VehicleCommandDelivery::query()->create([
+            'car_command_id' => $ctx['car_command_id'],
+            'vehicle_id' => $vehicle->id,
+            'driver_id' => $ctx['driver_id'],
+            'shift_id' => $ctx['shift_id'],
+            'sequence' => $sequence,
+            'requested_mode' => strtolower($requestedMode),
+            'effective_transport' => $result->transport,
+            'sim_number' => (string) ($vehicle->sim ?? ''),
+            'command_text' => $commandText,
+            'ok' => $result->ok,
+            'failure_code' => $result->failureCode,
+            'error_message' => $result->error,
+            'provider_refs' => $result->providerRefs !== [] ? $result->providerRefs : null,
+            'response_detail' => $result->responseDetail,
+        ]);
     }
 }
