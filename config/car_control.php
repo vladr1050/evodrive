@@ -33,6 +33,12 @@ return [
     'rate_limit_vehicle_seconds' => (int) env('CAR_CONTROL_RATE_LIMIT_VEHICLE_SECONDS', 10),
 
     /*
+    | Queued commands that never transitioned to sent/failed (crash, gateway hang) block new
+    | actions until marked failed. Rows older than this TTL are auto-failed at the next attempt.
+    */
+    'stale_queued_command_ttl_seconds' => (int) env('CAR_CONTROL_STALE_QUEUED_TTL_SECONDS', 180),
+
+    /*
     | Delay between two SMS when sending a pair (e.g. start_shift = UNLOCK_ENGINE + OPEN_CAR)
     */
     'pair_sms_delay_seconds' => (int) env('CAR_CONTROL_PAIR_SMS_DELAY_SECONDS', 3),

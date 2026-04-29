@@ -134,6 +134,7 @@ class CarControlService
     public function executeAction(int $driverId, string $action, ?Carbon $now = null): array
     {
         $now = $now ?? now();
+        $this->failStaleQueuedCarCommandsForDriver($driverId, $now);
         $context = $this->getDriverCarControlContext($driverId, $now);
         if (! ($context['allowed'] ?? false)) {
             return ['ok' => false, 'message' => $this->reasonToMessage($context['reason'] ?? 'no_shift')];
@@ -280,5 +281,23 @@ class CarControlService
             CarCommand::ACTION_END_SHIFT => 'Shift ended. Engine locked, car closed.',
             default => 'Done.',
         };
+    }
+
+    /**
+     * Mark long-abandoned queued commands as failed so drivers are not blocked forever.
+     */
+    private function failStaleQueuedCarCommandsForDriver(int $driverId, Carbon $now): void
+    {
+        $ttl = max(30, (int) config('car_control.stale_queued_command_ttl_seconds', 180));
+        $cutoff = $now->copy()->subSeconds($ttl);
+
+        CarCommand::query()
+            ->where('driver_id', $driverId)
+            ->where('status', CarCommand::STATUS_QUEUED)
+            ->where('created_at', '<', $cutoff)
+            ->update([
+                'status' => CarCommand::STATUS_FAILED,
+                'error_message' => 'Command timed out (stale queued).',
+            ]);
     }
 }

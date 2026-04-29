@@ -310,6 +310,40 @@ class CarControlAccessAndPayloadsTest extends TestCase
         $this->assertCount(0, $this->smsLog);
     }
 
+    public function test_stale_queued_command_is_failed_and_execute_proceeds(): void
+    {
+        config(['car_control.stale_queued_command_ttl_seconds' => 120]);
+        $now = Carbon::parse('2026-03-10 10:00:00');
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => $now->copy()->addMinutes(30),
+            'ends_at' => $now->copy()->addHours(4),
+            'status' => ShiftStatus::Booked,
+        ]);
+        $stale = CarCommand::create([
+            'driver_id' => $this->driver->id,
+            'shift_id' => $shift->id,
+            'vehicle_id' => $this->vehicle->id,
+            'action' => CarCommand::ACTION_OPEN_CAR,
+            'sms_to' => $this->vehicle->sim,
+            'sms_payloads' => [config('car_control.commands.open_car')],
+            'status' => CarCommand::STATUS_QUEUED,
+        ]);
+        CarCommand::query()->whereKey($stale->id)->update(['created_at' => $now->copy()->subMinutes(5)]);
+
+        $this->app->forgetInstance(CarControlService::class);
+        $service = app(CarControlService::class);
+
+        $result = $service->executeAction($this->driver->id, CarCommand::ACTION_OPEN_CAR, $now);
+
+        $this->assertTrue($result['ok']);
+        $stale->refresh();
+        $this->assertSame(CarCommand::STATUS_FAILED, $stale->status);
+        $this->assertStringContainsString('stale', strtolower((string) $stale->error_message));
+    }
+
     public function test_sms_sends_bare_command_when_sms_prefix_empty(): void
     {
         config(['car_control.sms.command_prefix' => '']);
