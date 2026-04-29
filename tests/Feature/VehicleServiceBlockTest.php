@@ -9,10 +9,12 @@ use App\Models\FleetVehicleServiceBlock;
 use App\Models\Shift;
 use App\Models\ShiftPolicy;
 use App\Models\Station;
+use App\Models\User;
 use App\Services\ShiftAvailabilityService;
 use App\Services\VehicleServiceBlockService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class VehicleServiceBlockTest extends TestCase
@@ -171,5 +173,18 @@ class VehicleServiceBlockTest extends TestCase
         );
         $this->assertGreaterThanOrEqual(1, $avail['count']);
         $this->assertContains($this->vehicle->id, $avail['vehicle_ids']);
+    }
+
+    public function test_filament_create_service_block_page_returns_200(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'email' => 'admin-svc-block@test.com',
+            'password' => Hash::make('password'),
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/admin/fleet-vehicle-service-blocks/create')
+            ->assertOk();
     }
 }

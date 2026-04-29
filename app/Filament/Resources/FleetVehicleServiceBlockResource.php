@@ -40,7 +40,7 @@ class FleetVehicleServiceBlockResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('fleet_vehicle_id')
                             ->label('Vehicle')
-                            ->relationship('vehicle', 'registration_number', fn ($q) => $q->orderBy('registration_number'))
+                            ->relationship('vehicle', 'registration_number', fn (Builder $query) => $query->orderBy('registration_number'))
                             ->searchable()
                             ->preload()
                             ->required()
