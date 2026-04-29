@@ -36,11 +36,12 @@ class ShiftAvailabilityService
 
         $vehicleIds = $vehicles->pluck('id')->all();
         $shiftsByVehicle = $this->fetchRelevantShiftsForVehicles($vehicleIds, $startsAt, $endsAt, $policy);
+        $serviceBlockedSet = $this->fetchServiceBlockedVehicleIdSet($vehicleIds, $startsAt, $endsAt);
 
         $availableIds = [];
         foreach ($vehicles as $vehicle) {
             $shifts = $shiftsByVehicle->get($vehicle->id, collect());
-            if ($this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicle->id)) {
+            if ($this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicle->id, $serviceBlockedSet)) {
                 $availableIds[] = $vehicle->id;
             }
         }
@@ -85,7 +86,7 @@ class ShiftAvailabilityService
         $shiftsByVehicle = $this->fetchRelevantShiftsForVehicles([$vehicleId], $startsAt, $endsAt, $policy);
         $shifts = $shiftsByVehicle->get($vehicleId, collect());
 
-        return $this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicleId);
+        return $this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicleId, null);
     }
 
     /**
@@ -97,16 +98,24 @@ class ShiftAvailabilityService
         $shifts = $shiftsByVehicle->get($vehicleId, collect())
             ->reject(fn (Shift $s) => (int) $s->id === $excludeShiftId);
 
-        return $this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicleId);
+        return $this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicleId, null);
     }
 
     /**
      * Evaluate availability for a slot given a collection of relevant shifts (no DB queries).
+     *
+     * @param  array<int, true>|null  $serviceBlockedVehicleIdSet  from {@see fetchServiceBlockedVehicleIdSet}; null = query DB for this vehicle only
      */
-    protected function vehicleAvailableForWithShifts(Collection $shifts, Carbon $startsAt, Carbon $endsAt, ShiftPolicy $policy, ?int $vehicleId = null): bool
+    protected function vehicleAvailableForWithShifts(Collection $shifts, Carbon $startsAt, Carbon $endsAt, ShiftPolicy $policy, ?int $vehicleId = null, ?array $serviceBlockedVehicleIdSet = null): bool
     {
-        if ($vehicleId !== null && $this->vehicleBlockedByService($vehicleId, $startsAt, $endsAt)) {
-            return false;
+        if ($vehicleId !== null) {
+            if ($serviceBlockedVehicleIdSet !== null) {
+                if (isset($serviceBlockedVehicleIdSet[$vehicleId])) {
+                    return false;
+                }
+            } elseif ($this->vehicleBlockedByService($vehicleId, $startsAt, $endsAt)) {
+                return false;
+            }
         }
 
         $booked = $shifts->filter(fn (Shift $s) => $s->status === ShiftStatus::Booked);
@@ -182,6 +191,30 @@ class ShiftAvailabilityService
             ->where('starts_at', '<', $endsAtUtc)
             ->where('ends_at', '>', $startsAtUtc)
             ->exists();
+    }
+
+    /**
+     * One query: vehicle IDs that have an active service block overlapping [startsAt, endsAt).
+     *
+     * @param  array<int>  $vehicleIds
+     * @return array<int, true>
+     */
+    protected function fetchServiceBlockedVehicleIdSet(array $vehicleIds, Carbon $startsAtUtc, Carbon $endsAtUtc): array
+    {
+        if ($vehicleIds === []) {
+            return [];
+        }
+
+        $ids = FleetVehicleServiceBlock::query()
+            ->whereIn('fleet_vehicle_id', $vehicleIds)
+            ->whereNull('cancelled_at')
+            ->where('starts_at', '<', $endsAtUtc)
+            ->where('ends_at', '>', $startsAtUtc)
+            ->pluck('fleet_vehicle_id')
+            ->unique()
+            ->all();
+
+        return array_fill_keys(array_map('intval', $ids), true);
     }
 
     /**
@@ -631,11 +664,11 @@ class ShiftAvailabilityService
         Carbon $endsAt,
         ShiftPolicy $policy
     ): array {
-        $durationHours = $startsAt->diffInMinutes($endsAt) / 60.0;
+        $serviceBlockedSet = $this->fetchServiceBlockedVehicleIdSet($stationVehicleIds, $startsAt, $endsAt);
         $availableIds = [];
         foreach ($stationVehicleIds as $vehicleId) {
             $shifts = $shiftsByVehicle->get($vehicleId, collect());
-            if ($this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicleId)) {
+            if ($this->vehicleAvailableForWithShifts($shifts, $startsAt, $endsAt, $policy, $vehicleId, $serviceBlockedSet)) {
                 $availableIds[] = $vehicleId;
             }
         }
