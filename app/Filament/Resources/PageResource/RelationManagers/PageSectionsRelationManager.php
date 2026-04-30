@@ -25,7 +25,7 @@ class PageSectionsRelationManager extends RelationManager
                                     ->keyLabel('Field')
                                     ->valueLabel('Value')
                                     ->reorderable()
-                                    ->helperText('Use key "items" with value as JSON array for lists, e.g. ["Item 1","Item 2"]'),
+                                    ->helperText('Keys: heading (optional), body (Markdown). For lists on landings use key "items" with JSON array, e.g. ["Item 1","Item 2"].'),
                             ]),
                         Forms\Components\Tabs\Tab::make('RU')
                             ->schema([

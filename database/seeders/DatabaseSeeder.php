@@ -24,6 +24,8 @@ class DatabaseSeeder extends Seeder
             'role' => 'admin',
         ]);
 
+        $legalSectionsSeed = require database_path('data/legal_sections_seed.php');
+
         $pages = [
             [
                 'key' => 'google_landing',
@@ -76,7 +78,7 @@ class DatabaseSeeder extends Seeder
                 'slug' => ['en' => 'privacy', 'ru' => 'privacy', 'lv' => 'privacy'],
                 'meta_title' => ['en' => 'Privacy Policy | Evo.drive', 'ru' => 'Политика конфиденциальности | Evo.drive', 'lv' => 'Privātuma politika | Evo.drive'],
                 'is_active' => true,
-                'sections' => [],
+                'sections' => $legalSectionsSeed['privacy'],
             ],
             [
                 'key' => 'terms',
@@ -84,7 +86,7 @@ class DatabaseSeeder extends Seeder
                 'slug' => ['en' => 'terms', 'ru' => 'terms', 'lv' => 'terms'],
                 'meta_title' => ['en' => 'Terms of Service | Evo.drive', 'ru' => 'Условия использования | Evo.drive', 'lv' => 'Lietošanas noteikumi | Evo.drive'],
                 'is_active' => true,
-                'sections' => [],
+                'sections' => $legalSectionsSeed['terms'],
             ],
         ];
 

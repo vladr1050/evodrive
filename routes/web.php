@@ -7,6 +7,7 @@ use App\Http\Controllers\ApplyController;
 use App\Http\Controllers\DriverPortalController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\LegalPageController;
 use App\Http\Controllers\TelegramCarControlWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -33,8 +34,8 @@ Route::prefix('{locale}')
         Route::post('apply', [ApplyController::class, 'submit'])->name('apply.submit')->middleware('throttle:10,1');
         Route::get('thanks', [ApplyController::class, 'thanks'])->name('apply.thanks');
         Route::get('faq', [LandingController::class, 'faq'])->name('landing.faq');
-        Route::get('privacy', fn () => view('legal.privacy'))->name('legal.privacy');
-        Route::get('terms', fn () => view('legal.terms'))->name('legal.terms');
+        Route::get('privacy', [LegalPageController::class, 'privacy'])->name('legal.privacy');
+        Route::get('terms', [LegalPageController::class, 'terms'])->name('legal.terms');
 
         // Driver Portal (Fleet)
         Route::get('driverportal', [DriverPortalController::class, 'login'])->name('driverportal.login');
