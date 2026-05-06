@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\ShiftStatus;
+use App\Models\FleetVehicle;
 use App\Models\Shift;
 use App\Models\ShiftPolicy;
 use App\Services\TelegramNotifier;
@@ -36,7 +37,7 @@ class SendShiftCancellationTelegramNotificationJob implements ShouldQueue
 
     public function handle(TelegramNotifier $notifier): void
     {
-        $shift = $this->shift->fresh(['station', 'cancelledByUser', 'cancelledByDriver']);
+        $shift = $this->shift->fresh(['station', 'cancelledByUser', 'cancelledByDriver', 'vehicle', 'originalVehicle']);
         if (! $shift) {
             Log::channel('stack')->warning('SendShiftCancellationTelegramNotificationJob: shift no longer exists', ['shift_id' => $this->shift->id]);
 
@@ -78,6 +79,10 @@ class SendShiftCancellationTelegramNotificationJob implements ShouldQueue
         $stationName = $shift->station?->name ?? '—';
         $stationAddress = $shift->station?->address ?? '';
         $text = "Station: {$stationName} — {$stationAddress}\n";
+        $vehicleLine = $this->reservedVehicleLine($shift);
+        if ($vehicleLine !== '') {
+            $text .= $vehicleLine."\n";
+        }
         $text .= 'Slot freed: '.$starts->format('Y-m-d H:i').'-'.$ends->format('H:i');
         $who = $this->cancellationActorLine($shift);
         if ($who !== '') {
@@ -134,6 +139,29 @@ class SendShiftCancellationTelegramNotificationJob implements ShouldQueue
         }
         if ($shift->cancelled_by_driver_id && $shift->cancelledByDriver) {
             return 'Cancelled by: '.$shift->cancelledByDriver->name.' (driver)';
+        }
+
+        return '';
+    }
+
+    /**
+     * Vehicle reserved for the shift: original booking when set, otherwise current assignment.
+     */
+    private function reservedVehicleLine(Shift $shift): string
+    {
+        $vehicle = $shift->originalVehicle ?? $shift->vehicle;
+        if (! $vehicle instanceof FleetVehicle) {
+            return '';
+        }
+
+        $plate = trim((string) $vehicle->registration_number);
+        if ($plate !== '') {
+            return 'Vehicle: '.$plate;
+        }
+
+        $label = trim((string) $vehicle->label);
+        if ($label !== '') {
+            return 'Vehicle: '.$label;
         }
 
         return '';

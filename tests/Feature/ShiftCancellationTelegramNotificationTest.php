@@ -81,9 +81,54 @@ class ShiftCancellationTelegramNotificationTest extends TestCase
                 && ($body['chat_id'] ?? '') !== ''
                 && str_contains($body['text'] ?? '', 'Central Station')
                 && str_contains($body['text'] ?? '', '123 Main St')
+                && str_contains($body['text'] ?? '', 'Vehicle:')
+                && str_contains($body['text'] ?? '', (string) $this->vehicle->registration_number)
                 && str_contains($body['text'] ?? '', 'Slot freed:')
                 && str_contains($body['text'] ?? '', 'Cancelled by:')
                 && str_contains($body['text'] ?? '', '(driver)');
+        });
+    }
+
+    public function test_telegram_message_uses_original_vehicle_plate_when_vehicle_was_reassigned(): void
+    {
+        Http::fake([
+            'api.telegram.org/*' => Http::response(['ok' => true], 200),
+        ]);
+
+        $original = FleetVehicle::factory()->create([
+            'home_station_id' => $this->station->id,
+            'registration_number' => 'ORIG-1111',
+            'label' => 'Original car',
+        ]);
+        $reassigned = FleetVehicle::factory()->create([
+            'home_station_id' => $this->station->id,
+            'registration_number' => 'REAS-2222',
+            'label' => 'Reassigned car',
+        ]);
+
+        $startsAt = Carbon::tomorrow()->setTime(10, 0);
+        $endsAt = $startsAt->copy()->addHours(4);
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $reassigned->id,
+            'original_vehicle_id' => $original->id,
+            'station_id' => $this->station->id,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'status' => ShiftStatus::Cancelled,
+            'cancelled_at' => now(),
+            'cancelled_by_driver_id' => $this->driver->id,
+            'cancellation_notified_at' => null,
+        ]);
+
+        $job = new SendShiftCancellationTelegramNotificationJob($shift);
+        $job->handle(TelegramNotifier::fromConfig());
+
+        Http::assertSent(function ($request) {
+            $text = $request->data()['text'] ?? '';
+
+            return str_contains($text, 'Vehicle: ORIG-1111')
+                && ! str_contains($text, 'REAS-2222');
         });
     }
 
