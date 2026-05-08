@@ -16,6 +16,7 @@ services:
       - storage_app:/var/www/html/storage
       - storage_logs:/var/www/html/storage/logs
       - public_assets:/shared/public
+      - ./docker/php/zz-evodrive.ini:/usr/local/etc/php/conf.d/zz-evodrive.ini:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,6 +65,7 @@ services:
     volumes:
       - storage_app:/var/www/html/storage
       - storage_logs:/var/www/html/storage/logs
+      - ./docker/php/zz-evodrive.ini:/usr/local/etc/php/conf.d/zz-evodrive.ini:ro
     depends_on:
       - app
       - redis
@@ -82,6 +84,7 @@ services:
     volumes:
       - storage_app:/var/www/html/storage
       - storage_logs:/var/www/html/storage/logs
+      - ./docker/php/zz-evodrive.ini:/usr/local/etc/php/conf.d/zz-evodrive.ini:ro
     depends_on:
       - app
       - redis
