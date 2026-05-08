@@ -7,6 +7,7 @@ use App\Filament\Resources\FleetVehicleServiceBlockResource;
 use App\Models\FleetVehicleServiceBlock;
 use App\Services\VehicleServiceBlockService;
 use Carbon\Carbon;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
@@ -22,21 +23,40 @@ class EditFleetVehicleServiceBlock extends EditRecord
             return $record;
         }
 
-        $tz = VehicleServiceBlockService::policyTimezone();
-        $starts = $this->toUtc($data['starts_at'], $tz);
-        $ends = $this->toUtc($data['ends_at'], $tz);
+        $starts = $this->toUtc($data['starts_at']);
+        $ends = $this->toUtc($data['ends_at']);
 
         try {
             app(VehicleServiceBlockService::class)->updateWindow($record, $starts, $ends);
         } catch (VehicleServiceBlockException $e) {
+            $tz = VehicleServiceBlockService::policyTimezone();
+            $title = match ($e->reasonCode) {
+                'OVERLAPS_SHIFTS' => 'Range overlaps booked shifts',
+                'OVERLAPS_SERVICE' => 'Range overlaps another service block',
+                default => 'Cannot update service block',
+            };
             $body = $e->getMessage();
             if ($e->suggestions !== []) {
-                $lines = collect($e->suggestions)->map(function (array $s) {
-                    return Carbon::parse($s['starts_at'])->toIso8601String().' → '.Carbon::parse($s['ends_at'])->toIso8601String();
+                $lines = collect($e->suggestions)->map(function (array $s) use ($tz) {
+                    $a = Carbon::parse($s['starts_at'])->setTimezone($tz)->format('Y-m-d H:i');
+                    $b = Carbon::parse($s['ends_at'])->setTimezone($tz)->format('Y-m-d H:i');
+
+                    return $a.' — '.$b;
                 })->implode("\n");
-                $body .= "\n\nSuggested windows (ISO UTC):\n".$lines;
+                $body .= "\n\nSuggested free windows (".$tz."):\n".$lines;
             }
-            throw ValidationException::withMessages(['starts_at' => $body]);
+
+            Notification::make()
+                ->title($title)
+                ->body($body)
+                ->danger()
+                ->persistent()
+                ->send();
+
+            throw ValidationException::withMessages([
+                'data.starts_at' => $title,
+                'data.ends_at' => $title,
+            ]);
         }
 
         $record->update(['note' => $data['note'] ?? null]);
@@ -44,12 +64,12 @@ class EditFleetVehicleServiceBlock extends EditRecord
         return $record->refresh();
     }
 
-    private function toUtc(mixed $value, string $tz): Carbon
+    private function toUtc(mixed $value): Carbon
     {
         if ($value instanceof Carbon) {
             return $value->copy()->utc();
         }
 
-        return Carbon::parse($value, $tz)->utc();
+        return Carbon::parse($value, config('app.timezone'))->utc();
     }
 }

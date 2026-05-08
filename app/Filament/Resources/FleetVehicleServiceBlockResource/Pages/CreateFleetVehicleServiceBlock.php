@@ -34,9 +34,8 @@ class CreateFleetVehicleServiceBlock extends CreateRecord
             'data' => $data,
         ]);
 
-        $tz = VehicleServiceBlockService::policyTimezone();
-        $starts = $this->toUtc($data['starts_at'], $tz);
-        $ends = $this->toUtc($data['ends_at'], $tz);
+        $starts = $this->toUtc($data['starts_at']);
+        $ends = $this->toUtc($data['ends_at']);
 
         try {
             $block = app(VehicleServiceBlockService::class)->create(
@@ -88,12 +87,12 @@ class CreateFleetVehicleServiceBlock extends CreateRecord
         }
     }
 
-    private function toUtc(mixed $value, string $tz): Carbon
+    private function toUtc(mixed $value): Carbon
     {
         if ($value instanceof Carbon) {
             return $value->copy()->utc();
         }
 
-        return Carbon::parse($value, $tz)->utc();
+        return Carbon::parse($value, config('app.timezone'))->utc();
     }
 }
