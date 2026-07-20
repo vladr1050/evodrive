@@ -53,6 +53,7 @@ return [
     'select_station_hint' => 'Choose a station above to load availability for that location.',
     'cars_available' => ':count cars available',
     'car_available' => '1 car available',
+    'cars_short' => ':count cars',
     'clear_station_filter' => 'Clear',
     'map_stations' => 'Stations map',
     'map_no_coordinates' => 'No stations with coordinates yet. Add lat/lng in admin to use the map.',

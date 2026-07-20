@@ -53,6 +53,7 @@ return [
     'select_station_hint' => 'Выберите станцию выше — загрузится доступность по этому месту.',
     'cars_available' => 'Доступно машин: :count',
     'car_available' => '1 машина доступна',
+    'cars_short' => ':count авт.',
     'clear_station_filter' => 'Сбросить',
     'map_stations' => 'Карта станций',
     'map_no_coordinates' => 'Нет станций с координатами. Добавьте lat/lng в админке, чтобы пользоваться картой.',

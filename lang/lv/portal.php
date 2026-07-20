@@ -53,6 +53,7 @@ return [
     'select_station_hint' => 'Izvēlieties staciju augšā — ielādēsies pieejamība šai vietai.',
     'cars_available' => 'Pieejamas :count automašīnas',
     'car_available' => 'Pieejama 1 automašīna',
+    'cars_short' => ':count auto',
     'clear_station_filter' => 'Notīrīt',
     'map_stations' => 'Staciju karte',
     'map_no_coordinates' => 'Nav staciju ar koordinātām. Pievienojiet lat/lng administrācijā, lai izmantotu karti.',

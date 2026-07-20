@@ -10,8 +10,8 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <style>
     .shifts-map { width: 100%; height: 200px; border-radius: 1rem; z-index: 0; background: #e2e8f0; }
-    @media (min-width: 1024px) {
-        .shifts-map { height: min(440px, calc(100vh - 14rem)); min-height: 320px; }
+    @media (min-width: 1280px) {
+        .shifts-map { height: min(420px, calc(100vh - 14rem)); min-height: 280px; }
     }
     .shifts-map-pin-wrap { background: transparent; border: 0; }
     .shifts-map-pin {
@@ -76,6 +76,7 @@
                     other: @json(__('portal.other_stations')),
                     carOne: @json(__('portal.car_available')),
                     carsMany: @json(__('portal.cars_available')),
+                    carsShort: @json(__('portal.cars_short')),
                     selectPrompt: @json(__('portal.select_station_prompt')),
                     selectHint: @json(__('portal.select_station_hint')),
                     mapTitle: @json(__('portal.map_stations')),
@@ -195,6 +196,10 @@
                     const n = count || 0;
                     if (n === 1) return this.labels.carOne;
                     return this.labels.carsMany.replace(':count', String(n));
+                },
+                carsShort(count) {
+                    const n = count || 0;
+                    return this.labels.carsShort.replace(':count', String(n));
                 },
                 slotsForDay(dayName) {
                     return this.availableSlots.filter(s => s.day === dayName);
@@ -493,8 +498,8 @@
     </div>
 
     <!-- Split: map filter + week schedule -->
-    <div class="flex flex-col lg:grid lg:grid-cols-5 gap-6 items-start">
-        <aside class="w-full lg:col-span-2 lg:sticky lg:top-4 space-y-3">
+    <div class="flex flex-col xl:grid xl:grid-cols-12 gap-4 xl:gap-5 items-start">
+        <aside class="w-full xl:col-span-4 xl:sticky xl:top-4 space-y-3">
             <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
                 <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
                     <span class="text-sm font-bold text-slate-800" x-text="labels.mapTitle"></span>
@@ -513,9 +518,9 @@
             </p>
         </aside>
 
-        <div class="w-full lg:col-span-3 min-w-0">
-            {{-- Mobile: single-day chips --}}
-            <div class="flex lg:hidden gap-2 overflow-x-auto pb-3 -mx-1 px-1">
+        <div class="w-full xl:col-span-8 min-w-0">
+            {{-- Mobile / tablet: single-day chips --}}
+            <div class="flex xl:hidden gap-2 overflow-x-auto pb-3 -mx-1 px-1">
                 <template x-for="d in weekDates" :key="d.iso">
                     <button
                         type="button"
@@ -530,8 +535,8 @@
             </div>
 
             <!-- Shifts Grid -->
-            <div class="overflow-x-auto pb-4 lg:overflow-visible">
-                <div class="grid grid-cols-1 lg:grid-cols-7 gap-4 min-w-0">
+            <div class="overflow-x-auto pb-4 xl:overflow-visible">
+                <div class="grid grid-cols-1 xl:grid-cols-7 gap-2 min-w-0">
                     @foreach($weekDates as $dayInfo)
                         @php
                             $sortShifts = fn ($c) => $c->sortBy(fn ($s) => (int) str_replace(':', '', $s['start']))->all();
@@ -539,52 +544,60 @@
                             $dayShiftsMine = $sortShifts(collect($shiftsMine)->where('date_iso', $dayInfo['iso']));
                         @endphp
                         <div
-                            class="space-y-4"
-                            :class="{ 'hidden lg:block': selectedDayIso !== '{{ $dayInfo['iso'] }}' }"
+                            class="space-y-2 min-w-0"
+                            :class="{ 'hidden xl:block': selectedDayIso !== '{{ $dayInfo['iso'] }}' }"
                         >
-                            <div class="flex flex-col items-center py-3 bg-slate-100 rounded-2xl border border-slate-200 relative group">
-                                <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-1">{{ $dayInfo['name'] }}</span>
-                                <span class="text-sm font-bold text-slate-700">{{ $dayInfo['date'] }} {{ $dayInfo['month'] }}</span>
+                            <div class="flex flex-col items-center py-2 bg-slate-100 rounded-xl border border-slate-200 relative group">
+                                <span class="text-[9px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-0.5">{{ $dayInfo['name'] }}</span>
+                                <span class="text-xs font-bold text-slate-700">{{ $dayInfo['date'] }} {{ $dayInfo['month'] }}</span>
                                 <button type="button" onclick="openCreateModalForDate('{{ $dayInfo['iso'] }}')" class="absolute -top-2 -right-2 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-brand-600 hover:border-brand-600 shadow-sm transition-all opacity-0 group-hover:opacity-100">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
                                 </button>
                             </div>
-                            <div class="space-y-3 min-h-[200px]">
-                                <div x-show="shiftsMode === 'all'" class="space-y-3" x-cloak>
+                            <div class="space-y-2 min-h-[120px]">
+                                <div x-show="shiftsMode === 'all'" class="space-y-2" x-cloak>
                                     @foreach($dayShiftsAll as $shift)
-                                        @include('driverportal.components.shift-block', ['shift' => $shift])
+                                        @include('driverportal.components.shift-block', ['shift' => $shift, 'hideStation' => (bool) $selectedStationId])
                                     @endforeach
                                 </div>
-                                <div x-show="shiftsMode === 'mine'" class="space-y-3" x-cloak>
+                                <div x-show="shiftsMode === 'mine'" class="space-y-2" x-cloak>
                                     @foreach($dayShiftsMine as $shift)
-                                        @include('driverportal.components.shift-block', ['shift' => $shift])
+                                        @include('driverportal.components.shift-block', ['shift' => $shift, 'hideStation' => (bool) $selectedStationId])
                                     @endforeach
                                 </div>
-                                <div x-show="shiftsMode === 'free' && !needsStationForFree()" class="space-y-3" x-cloak>
+                                <div x-show="shiftsMode === 'free' && !needsStationForFree()" class="space-y-1.5" x-cloak>
                                     <template x-for="slot in slotsForDay('{{ $dayInfo['name'] }}')" :key="slot.id">
-                                        <div class="relative p-3 rounded-2xl border border-dashed border-brand-300 bg-brand-50/30 transition-all hover:bg-brand-50 hover:border-brand-400 cursor-pointer group/slot"
-                                             @click="window.openCreateModalFromSlot && window.openCreateModalFromSlot(slot)">
-                                            <div class="flex justify-between items-start mb-2">
-                                                <div class="flex flex-col">
-                                                    <span class="text-base font-bold text-brand-700 leading-none" x-text="slot.start + ' – ' + slot.end"></span>
-                                                    <span class="text-[10px] font-bold text-brand-400 mt-1" x-show="slot.end_date_iso">+1</span>
-                                                    <span class="text-[10px] font-bold text-brand-400 mt-1" x-text="(slot.duration || '') + 'h'"></span>
-                                                </div>
-                                                <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700">{{ __('portal.available') }}</span>
+                                        <button
+                                            type="button"
+                                            class="w-full text-left px-2 py-1.5 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 hover:bg-brand-50 hover:border-brand-500 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                            @click="window.openCreateModalFromSlot && window.openCreateModalFromSlot(slot)"
+                                            :title="(slot.station_short || slot.station || '') + ' · ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
+                                            :aria-label="slot.start + '–' + slot.end + ', ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
+                                        >
+                                            <div class="flex items-baseline justify-between gap-1 min-w-0">
+                                                <span class="text-xs font-bold text-brand-700 tabular-nums leading-tight truncate">
+                                                    <span x-text="slot.start"></span><span class="text-brand-400 font-semibold">–</span><span x-text="slot.end"></span><span class="text-brand-400" x-show="slot.end_date_iso">+1</span>
+                                                </span>
+                                                <span class="text-[10px] font-bold text-brand-500 shrink-0 tabular-nums" x-text="(slot.duration || '') + 'h'"></span>
                                             </div>
-                                            <div class="mt-2 text-[10px] text-brand-600 font-medium" x-text="slot.station_short || slot.station"></div>
-                                            <div class="mt-1.5 text-[10px] text-slate-500 font-medium" x-text="carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"></div>
-                                            <div class="mt-3 opacity-0 group-hover/slot:opacity-100 transition-opacity">
-                                                <span class="block w-full py-1.5 bg-brand-600 text-white text-[10px] font-bold rounded-lg shadow-sm text-center">{{ __('portal.book_now') }}</span>
+                                            <div class="mt-1 flex items-center justify-between gap-1 min-w-0">
+                                                <span class="text-[10px] font-bold text-slate-600 truncate" x-text="carsShort(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"></span>
+                                                <span class="text-[9px] font-bold uppercase tracking-wide text-brand-600 shrink-0">{{ __('portal.book_now') }}</span>
                                             </div>
-                                        </div>
+                                            <div
+                                                x-show="!filterStationId"
+                                                x-cloak
+                                                class="mt-0.5 text-[9px] font-medium text-brand-600/80 truncate"
+                                                x-text="slot.station_short || slot.station"
+                                            ></div>
+                                        </button>
                                     </template>
                                 </div>
                                 <div x-show="!needsStationForFree() && ((shiftsMode === 'all' && {{ empty($dayShiftsAll) ? 'true' : 'false' }}) || (shiftsMode === 'mine' && {{ empty($dayShiftsMine) ? 'true' : 'false' }}) || (shiftsMode === 'free' && slotsForDay('{{ $dayInfo['name'] }}').length === 0))"
                                      x-transition
-                                     class="h-full flex flex-col items-center justify-center py-12 text-center">
-                                    <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 mb-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                     class="h-full flex flex-col items-center justify-center py-8 text-center">
+                                    <div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 mb-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                                     </div>
                                     <span class="text-[10px] font-medium text-slate-300 italic" x-text="shiftsMode === 'free' ? '{{ __("portal.no_slots_found") }}' : '{{ __("portal.no_shifts_planned") }}'"></span>
                                 </div>
