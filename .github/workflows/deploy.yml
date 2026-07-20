@@ -17,15 +17,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy summary (commit info)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          DISPLAY_TITLE: ${{ github.event.workflow_run.display_title }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            echo "## Deployed commit" >> $GITHUB_STEP_SUMMARY
-            echo "- **SHA:** \`${{ github.event.workflow_run.head_sha }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "- **Branch:** ${{ github.event.workflow_run.head_branch }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Message:** ${{ github.event.workflow_run.display_title }}" >> $GITHUB_STEP_SUMMARY
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            {
+              echo "## Deployed commit"
+              echo "- **SHA:** \`$HEAD_SHA\`"
+              echo "- **Branch:** $HEAD_BRANCH"
+              echo "- **Message:** $DISPLAY_TITLE"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "## Manual deploy" >> $GITHUB_STEP_SUMMARY
-            echo "Deploy triggered manually. Server will pull latest \`main\`." >> $GITHUB_STEP_SUMMARY
+            {
+              echo "## Manual deploy"
+              echo "Deploy triggered manually. Server will pull latest \`main\`."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Check deploy secrets
         run: |
