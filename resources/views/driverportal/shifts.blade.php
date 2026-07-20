@@ -574,12 +574,9 @@
                                             :title="(slot.station_short || slot.station || '') + ' · ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
                                             :aria-label="slot.start + '–' + slot.end + ', ' + (slot.duration || 0) + 'h, ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
                                         >
-                                            {{-- From – To: stacked so both times always fit in narrow day columns --}}
-                                            <div class="text-xs font-bold text-brand-700 tabular-nums leading-tight">
-                                                <div class="whitespace-nowrap" x-text="slot.start"></div>
-                                                <div class="whitespace-nowrap text-brand-600">
-                                                    <span class="text-brand-400 font-semibold">–</span><span x-text="slot.end"></span><span class="text-brand-400" x-show="slot.end_date_iso">+1</span>
-                                                </div>
+                                            {{-- From – To on one line; no truncate so both times stay visible --}}
+                                            <div class="text-[11px] font-bold text-brand-700 tabular-nums leading-tight whitespace-nowrap">
+                                                <span x-text="slot.start"></span><span class="text-brand-400 font-semibold">–</span><span x-text="slot.end"></span><span class="text-brand-400" x-show="slot.end_date_iso">+1</span>
                                             </div>
                                             <div class="mt-1 text-[10px] font-bold text-brand-500 tabular-nums" x-text="(slot.duration || 0) + 'h'"></div>
                                             <div class="mt-1 space-y-0.5">
