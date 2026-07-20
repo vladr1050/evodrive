@@ -18,6 +18,10 @@ class StationFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name),
             'is_active' => true,
+            'address' => fake()->optional()->streetAddress(),
+            'provider' => fake()->optional()->randomElement(['Elektrum', 'Eleport', 'Enefit', 'Ignitis']),
+            'latitude' => fake()->optional()->latitude(56.8, 57.1),
+            'longitude' => fake()->optional()->longitude(23.9, 24.3),
         ];
     }
 }

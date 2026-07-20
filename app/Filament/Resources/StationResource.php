@@ -38,6 +38,20 @@ class StationResource extends Resource
                         Forms\Components\TextInput::make('address')
                             ->maxLength(255)
                             ->columnSpanFull(),
+                        Forms\Components\TextInput::make('provider')
+                            ->label('Provider')
+                            ->helperText('Used for grouping in the driver portal (e.g. Electrum, Eleport).')
+                            ->maxLength(100),
+                        Forms\Components\TextInput::make('latitude')
+                            ->numeric()
+                            ->step(0.0000001)
+                            ->minValue(-90)
+                            ->maxValue(90),
+                        Forms\Components\TextInput::make('longitude')
+                            ->numeric()
+                            ->step(0.0000001)
+                            ->minValue(-180)
+                            ->maxValue(180),
                         Forms\Components\Select::make('is_active')
                             ->label('Status')
                             ->options([
@@ -61,6 +75,12 @@ class StationResource extends Resource
                 Tables\Columns\TextColumn::make('address')
                     ->limit(40)
                     ->toggleable(),
+                Tables\Columns\TextColumn::make('provider')
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('latitude')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('longitude')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('is_active')
                     ->label('Status')
                     ->badge()

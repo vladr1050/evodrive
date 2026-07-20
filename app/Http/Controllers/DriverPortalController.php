@@ -173,6 +173,7 @@ class DriverPortalController extends Controller
                 'vehicle' => $vehicleLabel,
                 'vehicle_reg_number' => $vehicleRegNumber,
                 'station' => $s->station?->name ?? '-',
+                'station_short' => $s->station?->shortLabel() ?? '-',
                 'station_address' => $s->station?->address ?: null,
                 'status' => $s->status->value,
                 'is_mine' => $isMine,
@@ -183,21 +184,37 @@ class DriverPortalController extends Controller
                 'next_vehicle_booked_display' => $nextVehicleBookedDisplay,
             ];
         };
+        $stations = Station::where('is_active', true)->orderBy('name')->get(['id', 'name', 'address', 'provider', 'latitude', 'longitude']);
+        $selectedStationId = null;
+        $initialFilterStationId = null;
+        $initialFilterStation = 'All';
+        if ($stationId && $stations->contains('id', (int) $stationId)) {
+            $selectedStationId = (int) $stationId;
+            $initialFilterStationId = $selectedStationId;
+            $initialFilterStation = $stations->firstWhere('id', $selectedStationId)->name;
+            $driver->rememberRecentStation($selectedStationId);
+        }
+
         $shiftsBaseQuery = Shift::whereIn('status', [ShiftStatus::Booked, ShiftStatus::Completed])
             ->where('starts_at', '<', $weekRangeEndExclusive)
             ->where('ends_at', '>', $weekRangeStart)
             ->with(['vehicle', 'station'])
             ->orderBy('starts_at');
-        $shiftsAll = $shiftsBaseQuery->clone()->get()->map($mapShiftRow)->all();
-        $shiftsMine = $shiftsBaseQuery->clone()->where('driver_id', $driverId)->get()->map($mapShiftRow)->all();
-        $policy = $policyForTz;
-        $stations = Station::where('is_active', true)->orderBy('name')->get(['id', 'name', 'address']);
-        $selectedStationId = null;
-        $initialFilterStation = 'All';
-        if ($stationId && $stations->contains('id', (int) $stationId)) {
-            $selectedStationId = (int) $stationId;
-            $initialFilterStation = $stations->firstWhere('id', $selectedStationId)->name;
+        if ($selectedStationId) {
+            $shiftsBaseQuery->where('station_id', $selectedStationId);
         }
+        $shiftsAll = $shiftsBaseQuery->clone()->get()->map($mapShiftRow)->all();
+        // My shifts stay unfiltered by station so drivers always see their own schedule.
+        $shiftsMine = Shift::whereIn('status', [ShiftStatus::Booked, ShiftStatus::Completed])
+            ->where('starts_at', '<', $weekRangeEndExclusive)
+            ->where('ends_at', '>', $weekRangeStart)
+            ->where('driver_id', $driverId)
+            ->with(['vehicle', 'station'])
+            ->orderBy('starts_at')
+            ->get()
+            ->map($mapShiftRow)
+            ->all();
+        $policy = $policyForTz;
         $allowedDurations = $policy ? $policy->allowedDurations() : [4, 6, 8, 10, 12];
         $timeSlotMinutes = $policy->time_slot_minutes ?? 15;
         $minDate = $todayStart->format('Y-m-d');
@@ -211,8 +228,9 @@ class DriverPortalController extends Controller
             }
         }
         $dayNames = array_column($weekDates, 'name');
-        $availableSlots = $policy
-            ? app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($startOfWeek, $dayNames)
+        // Free slots are station-scoped to keep the grid usable as the fleet grows.
+        $availableSlots = ($policy && $selectedStationId)
+            ? app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($startOfWeek, $dayNames, $selectedStationId)
             : [];
         if (! empty($availableSlots)) {
             $availableSlots = array_values(array_filter($availableSlots, function ($slot) use ($minDate, $maxDate) {
@@ -229,12 +247,31 @@ class DriverPortalController extends Controller
             $label = $w === 0 ? __('portal.current_week') : ($w === 1 ? __('portal.next_week') : $mon->format('d').'–'.$sun->format('d').' '.$sun->translatedFormat('M'));
             $weekOptions[] = ['index' => $w, 'label' => $label];
         }
+        $favoriteStationIds = $driver->favoriteStationIds();
+        $recentStationIds = $driver->recentStationIds();
+        $stationPayload = $stations->map(function (Station $s) use ($favoriteStationIds) {
+            return [
+                'id' => $s->id,
+                'name' => $s->name,
+                'short' => $s->shortLabel(),
+                'address' => $s->address,
+                'provider' => $s->resolvedProvider(),
+                'latitude' => $s->latitude,
+                'longitude' => $s->longitude,
+                'is_favorite' => in_array((int) $s->id, $favoriteStationIds, true),
+            ];
+        })->values()->all();
         $shiftsPageInit = [
             'initialFilterStation' => $initialFilterStation,
-            'stations' => $stations->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()->all(),
+            'initialFilterStationId' => $initialFilterStationId,
+            'stations' => $stationPayload,
+            'favoriteStationIds' => $favoriteStationIds,
+            'recentStationIds' => $recentStationIds,
             'shiftsBaseUrl' => $shiftsBaseUrl,
             'currentView' => (string) $weekIndex,
             'weekOptions' => $weekOptions,
+            'toggleFavoriteUrl' => route('driverportal.stations.toggle-favorite', ['locale' => $request->route('locale', app()->getLocale())]),
+            'requireStationForFree' => true,
         ];
 
         return view('driverportal.shifts', [
@@ -244,6 +281,7 @@ class DriverPortalController extends Controller
             'shiftsAll' => $shiftsAll,
             'shiftsMine' => $shiftsMine,
             'stations' => $stations,
+            'selectedStationId' => $selectedStationId,
             'allowedDurations' => $allowedDurations,
             'timeSlotMinutes' => $timeSlotMinutes,
             'minDate' => $minDate,
@@ -253,6 +291,22 @@ class DriverPortalController extends Controller
             'initialFilterStation' => $initialFilterStation,
             'shiftsBaseUrl' => $shiftsBaseUrl,
             'shiftsPageInit' => $shiftsPageInit,
+        ]);
+    }
+
+    public function toggleFavoriteStation(Request $request): JsonResponse
+    {
+        $request->validate([
+            'station_id' => 'required|integer|exists:stations,id',
+        ]);
+        $driver = Auth::guard('driver')->user();
+        $stationId = (int) $request->input('station_id');
+        $driver->toggleFavoriteStation($stationId);
+
+        return response()->json([
+            'ok' => true,
+            'favorite_station_ids' => $driver->favoriteStationIds(),
+            'is_favorite' => in_array($stationId, $driver->favoriteStationIds(), true),
         ]);
     }
 

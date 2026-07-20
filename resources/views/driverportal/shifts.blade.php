@@ -10,30 +10,123 @@
         Alpine.data('shiftsPage', function() {
             const init = window.__SHIFTS_PAGE_INIT__ || {};
             return {
+                filterStationId: init.initialFilterStationId || null,
                 filterStation: init.initialFilterStation || 'All',
                 isStationDropdownOpen: false,
-                shiftsMode: 'all',
+                stationSearch: '',
+                shiftsMode: init.initialFilterStationId ? 'free' : 'mine',
                 availableSlots: window.__SHIFTS_AVAILABLE_SLOTS__ || [],
                 stations: init.stations || [],
+                favoriteStationIds: init.favoriteStationIds || [],
+                recentStationIds: init.recentStationIds || [],
                 shiftsBaseUrl: init.shiftsBaseUrl || '',
                 currentView: init.currentView || '0',
                 weekOptions: init.weekOptions || [],
-                weekUrl(view) {
+                toggleFavoriteUrl: init.toggleFavoriteUrl || '',
+                requireStationForFree: init.requireStationForFree !== false,
+                labels: {
+                    allStations: @json(__('portal.all_stations')),
+                    favorites: @json(__('portal.favorite_stations')),
+                    recent: @json(__('portal.recent_stations')),
+                    other: @json(__('portal.other_stations')),
+                    carOne: @json(__('portal.car_available')),
+                    carsMany: @json(__('portal.cars_available')),
+                    selectPrompt: @json(__('portal.select_station_prompt')),
+                    selectHint: @json(__('portal.select_station_hint')),
+                },
+                weekUrl(view, stationId) {
                     const params = new URLSearchParams();
                     params.set('view', view);
-                    if (this.filterStation !== 'All') {
-                        const st = this.stations.find(s => s.name === this.filterStation);
-                        if (st) params.set('station_id', st.id);
-                    }
+                    const sid = stationId === undefined ? this.filterStationId : stationId;
+                    if (sid) params.set('station_id', sid);
                     return this.shiftsBaseUrl + '?' + params.toString();
                 },
-                applyStationFilter(name) {
-                    this.filterStation = name;
+                selectedStationLabel() {
+                    if (!this.filterStationId) return this.labels.allStations;
+                    const st = this.stations.find(s => s.id === this.filterStationId);
+                    return st ? (st.short || st.name) : this.filterStation;
+                },
+                filteredStations() {
+                    const q = (this.stationSearch || '').trim().toLowerCase();
+                    if (!q) return this.stations;
+                    return this.stations.filter(s => {
+                        const hay = [s.name, s.short, s.address, s.provider].filter(Boolean).join(' ').toLowerCase();
+                        return hay.includes(q);
+                    });
+                },
+                favoriteStations() {
+                    const ids = this.favoriteStationIds;
+                    return this.filteredStations().filter(s => ids.includes(s.id));
+                },
+                recentStations() {
+                    const fav = new Set(this.favoriteStationIds);
+                    return this.recentStationIds
+                        .map(id => this.filteredStations().find(s => s.id === id))
+                        .filter(s => s && !fav.has(s.id));
+                },
+                groupedStations() {
+                    const skip = new Set([
+                        ...this.favoriteStationIds,
+                        ...this.recentStationIds,
+                    ]);
+                    const groups = {};
+                    this.filteredStations().forEach(s => {
+                        if (skip.has(s.id) && !this.stationSearch) return;
+                        if (this.stationSearch && (this.favoriteStationIds.includes(s.id) || this.recentStationIds.includes(s.id))) {
+                            // still show in search results under provider groups only if not already in fav/recent sections
+                        }
+                        if (!this.stationSearch && (this.favoriteStationIds.includes(s.id) || this.recentStationIds.includes(s.id))) return;
+                        const key = s.provider || this.labels.other;
+                        if (!groups[key]) groups[key] = [];
+                        groups[key].push(s);
+                    });
+                    return Object.keys(groups).sort().map(name => ({ name, stations: groups[name] }));
+                },
+                applyStationFilter(stationId) {
                     this.isStationDropdownOpen = false;
-                    if (typeof history !== 'undefined' && history.replaceState) {
-                        history.replaceState(null, '', this.weekUrl(this.currentView));
+                    this.stationSearch = '';
+                    window.location = this.weekUrl(this.currentView, stationId || null);
+                },
+                clearStationFilter() {
+                    this.applyStationFilter(null);
+                },
+                async toggleFavorite(stationId, event) {
+                    if (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
                     }
-                }
+                    if (!this.toggleFavoriteUrl) return;
+                    try {
+                        const res = await fetch(this.toggleFavoriteUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                            },
+                            body: JSON.stringify({ station_id: stationId }),
+                        });
+                        const data = await res.json();
+                        if (data.ok) {
+                            this.favoriteStationIds = data.favorite_station_ids || [];
+                            this.stations = this.stations.map(s => ({
+                                ...s,
+                                is_favorite: this.favoriteStationIds.includes(s.id),
+                            }));
+                        }
+                    } catch (e) {}
+                },
+                carsLabel(count) {
+                    const n = count || 0;
+                    if (n === 1) return this.labels.carOne;
+                    return this.labels.carsMany.replace(':count', String(n));
+                },
+                slotsForDay(dayName) {
+                    return this.availableSlots.filter(s => s.day === dayName);
+                },
+                needsStationForFree() {
+                    return this.shiftsMode === 'free' && this.requireStationForFree && !this.filterStationId;
+                },
             };
         });
     });
@@ -56,44 +149,161 @@
                 @endforeach
             </div>
 
-            <!-- Custom Station Dropdown (reference 1:1) -->
+            <!-- Station picker: search + favorites + provider groups (desktop panel / mobile sheet) -->
             <div class="relative">
                 <button
                     type="button"
                     @click="isStationDropdownOpen = !isStationDropdownOpen"
-                    class="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm hover:border-brand-300 transition-all min-w-[180px] justify-between group"
+                    class="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm hover:border-brand-300 transition-all min-w-[200px] max-w-[280px] justify-between group"
                 >
-                    <div class="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :class="filterStation !== 'All' ? 'text-brand-600' : 'text-slate-400'"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        <span class="text-sm font-bold text-slate-700" x-text="filterStation === 'All' ? '{{ __("portal.all_stations") }}' : filterStation"></span>
+                    <div class="flex items-center gap-2 min-w-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" :class="filterStationId ? 'text-brand-600' : 'text-slate-400'"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <span class="text-sm font-bold text-slate-700 truncate" x-text="selectedStationLabel()"></span>
                     </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400 transition-transform duration-300" :class="isStationDropdownOpen ? 'rotate-45' : 'rotate-0'"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400 shrink-0 transition-transform duration-300" :class="isStationDropdownOpen ? 'rotate-45' : 'rotate-0'"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
                 </button>
 
+                {{-- Desktop dropdown --}}
                 <div
                     x-show="isStationDropdownOpen"
                     x-cloak
                     @click.away="isStationDropdownOpen = false"
-                    class="absolute top-full left-0 mt-2 w-full bg-white border border-slate-100 rounded-2xl shadow-xl z-20 overflow-hidden"
+                    class="hidden md:block absolute top-full left-0 mt-2 w-[340px] max-h-[420px] bg-white border border-slate-100 rounded-2xl shadow-xl z-30 overflow-hidden"
                     x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0 transform -translate-y-2"
                     x-transition:enter-end="opacity-100 transform translate-y-0"
                 >
-                    <button type="button" @click="applyStationFilter('All')" class="w-full px-5 py-3 text-left text-sm font-bold transition-colors flex items-center justify-between" :class="filterStation === 'All' ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
-                        <span>{{ __('portal.all_stations') }}</span>
-                        <svg x-show="filterStation === 'All'" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    </button>
-                    @foreach($stations as $s)
-                    <button type="button" @click="applyStationFilter('{{ addslashes($s->name) }}')" class="w-full px-5 py-3 text-left text-sm font-bold transition-colors flex items-center justify-between gap-2" :class="filterStation === '{{ addslashes($s->name) }}' ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
-                        <div class="min-w-0 flex-1 text-left">
-                            <span class="block">{{ $s->name }}</span>
-                            @if(!empty($s->address))
-                                <span class="block text-xs font-normal text-slate-400 mt-0.5 break-words">{{ $s->address }}</span>
-                            @endif
+                    <div class="p-3 border-b border-slate-100 sticky top-0 bg-white z-10">
+                        <input type="search" x-model="stationSearch" placeholder="{{ __('portal.search_stations') }}" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400" @click.stop>
+                    </div>
+                    <div class="overflow-y-auto max-h-[360px]">
+                        <button type="button" @click="clearStationFilter()" class="w-full px-4 py-2.5 text-left text-sm font-bold transition-colors flex items-center justify-between" :class="!filterStationId ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                            <span>{{ __('portal.all_stations') }}</span>
+                        </button>
+                        <template x-if="favoriteStations().length">
+                            <div>
+                                <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.favorites"></div>
+                                <template x-for="s in favoriteStations()" :key="'fav-'+s.id">
+                                    <div class="flex items-stretch">
+                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                                            <span class="block truncate" x-text="s.short || s.name"></span>
+                                            <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
+                                        </button>
+                                        <button type="button" class="px-3 text-amber-500 hover:bg-amber-50" @click="toggleFavorite(s.id, $event)" title="{{ __('portal.favorite_stations') }}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="recentStations().length && !stationSearch">
+                            <div>
+                                <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.recent"></div>
+                                <template x-for="s in recentStations()" :key="'rec-'+s.id">
+                                    <div class="flex items-stretch">
+                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                                            <span class="block truncate" x-text="s.short || s.name"></span>
+                                            <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
+                                        </button>
+                                        <button type="button" class="px-3 text-slate-300 hover:text-amber-500 hover:bg-amber-50" @click="toggleFavorite(s.id, $event)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-for="group in groupedStations()" :key="group.name">
+                            <div>
+                                <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="group.name"></div>
+                                <template x-for="s in group.stations" :key="'g-'+s.id">
+                                    <div class="flex items-stretch">
+                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                                            <span class="block truncate" x-text="s.short || s.name"></span>
+                                            <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
+                                        </button>
+                                        <button type="button" class="px-3 hover:bg-amber-50" :class="favoriteStationIds.includes(s.id) ? 'text-amber-500' : 'text-slate-300 hover:text-amber-500'" @click="toggleFavorite(s.id, $event)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" :fill="favoriteStationIds.includes(s.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                {{-- Mobile bottom sheet --}}
+                <div
+                    x-show="isStationDropdownOpen"
+                    x-cloak
+                    class="md:hidden fixed inset-0 z-40"
+                    x-transition.opacity
+                >
+                    <div class="absolute inset-0 bg-slate-900/40" @click="isStationDropdownOpen = false"></div>
+                    <div class="absolute bottom-0 left-0 right-0 max-h-[85vh] bg-white rounded-t-3xl shadow-2xl flex flex-col"
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="translate-y-full"
+                         x-transition:enter-end="translate-y-0">
+                        <div class="flex items-center justify-between px-5 pt-4 pb-2">
+                            <span class="text-base font-bold text-slate-900">{{ __('portal.all_stations') }}</span>
+                            <button type="button" @click="isStationDropdownOpen = false" class="p-2 text-slate-400 hover:text-slate-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                            </button>
                         </div>
-                        <svg x-show="filterStation === '{{ addslashes($s->name) }}'" class="shrink-0" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    </button>
-                    @endforeach
+                        <div class="px-5 pb-3">
+                            <input type="search" x-model="stationSearch" placeholder="{{ __('portal.search_stations') }}" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400">
+                        </div>
+                        <div class="overflow-y-auto px-2 pb-8">
+                            <button type="button" @click="clearStationFilter()" class="w-full px-4 py-3 text-left text-sm font-bold rounded-xl" :class="!filterStationId ? 'bg-brand-50 text-brand-600' : 'text-slate-600'">{{ __('portal.all_stations') }}</button>
+                            <template x-if="favoriteStations().length">
+                                <div>
+                                    <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.favorites"></div>
+                                    <template x-for="s in favoriteStations()" :key="'mfav-'+s.id">
+                                        <div class="flex items-stretch">
+                                            <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0" :class="filterStationId === s.id ? 'text-brand-600' : 'text-slate-700'">
+                                                <span class="block truncate" x-text="s.short || s.name"></span>
+                                                <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
+                                            </button>
+                                            <button type="button" class="px-3 text-amber-500" @click="toggleFavorite(s.id, $event)">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="recentStations().length && !stationSearch">
+                                <div>
+                                    <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.recent"></div>
+                                    <template x-for="s in recentStations()" :key="'mrec-'+s.id">
+                                        <div class="flex items-stretch">
+                                            <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0">
+                                                <span class="block truncate" x-text="s.short || s.name"></span>
+                                                <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
+                                            </button>
+                                            <button type="button" class="px-3 text-slate-300" @click="toggleFavorite(s.id, $event)">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-for="group in groupedStations()" :key="'mg-'+group.name">
+                                <div>
+                                    <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="group.name"></div>
+                                    <template x-for="s in group.stations" :key="'mg-'+s.id">
+                                        <div class="flex items-stretch">
+                                            <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0" :class="filterStationId === s.id ? 'text-brand-600' : 'text-slate-700'">
+                                                <span class="block truncate" x-text="s.short || s.name"></span>
+                                                <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
+                                            </button>
+                                            <button type="button" class="px-3" :class="favoriteStationIds.includes(s.id) ? 'text-amber-500' : 'text-slate-300'" @click="toggleFavorite(s.id, $event)">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" :fill="favoriteStationIds.includes(s.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -133,6 +343,11 @@
         </button>
     </div>
 
+    <div x-show="needsStationForFree()" x-cloak class="mb-6 p-4 rounded-2xl border border-dashed border-brand-300 bg-brand-50/50 text-sm text-brand-800 font-medium">
+        <p x-text="labels.selectPrompt"></p>
+        <p class="mt-1 text-xs font-normal text-brand-600/80" x-text="labels.selectHint"></p>
+    </div>
+
     <!-- Shifts Grid (reference UI 1:1) -->
     <div class="overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0">
         <div class="grid grid-cols-1 md:grid-cols-7 gap-4 min-w-[1000px] md:min-w-0">
@@ -151,50 +366,40 @@
                         </button>
                     </div>
                     <div class="space-y-3 min-h-[200px]">
-                        {{-- All drivers' shifts --}}
+                        {{-- All drivers' shifts (server-filtered when station selected) --}}
                         <div x-show="shiftsMode === 'all'" class="space-y-3" x-cloak>
                             @foreach($dayShiftsAll as $shift)
-                                <div x-data="{ stationName: {{ json_encode($shift['station'] ?? '') }} }" x-show="filterStation === 'All' || filterStation === stationName">
-                                    @include('driverportal.components.shift-block', ['shift' => $shift])
-                                </div>
+                                @include('driverportal.components.shift-block', ['shift' => $shift])
                             @endforeach
                         </div>
                         {{-- My shifts only --}}
                         <div x-show="shiftsMode === 'mine'" class="space-y-3" x-cloak>
                             @foreach($dayShiftsMine as $shift)
-                                <div x-data="{ stationName: {{ json_encode($shift['station'] ?? '') }} }" x-show="filterStation === 'All' || filterStation === stationName">
-                                    @include('driverportal.components.shift-block', ['shift' => $shift])
-                                </div>
+                                @include('driverportal.components.shift-block', ['shift' => $shift])
                             @endforeach
                         </div>
-                        {{-- Free Slots mode --}}
-                        <div x-show="shiftsMode === 'free'" class="space-y-3" x-cloak>
-                            <template x-for="slot in availableSlots.filter(s => s.day === dayName && (filterStation === 'All' || s.station === filterStation))" :key="slot.id">
+                        {{-- Free Slots mode — grouped by window, N cars --}}
+                        <div x-show="shiftsMode === 'free' && !needsStationForFree()" class="space-y-3" x-cloak>
+                            <template x-for="slot in slotsForDay(dayName)" :key="slot.id">
                                 <div class="relative p-3 rounded-2xl border border-dashed border-brand-300 bg-brand-50/30 transition-all hover:bg-brand-50 hover:border-brand-400 cursor-pointer group/slot"
                                      @click="openCreateModalFromSlot(slot)">
                                     <div class="flex justify-between items-start mb-2">
                                         <div class="flex flex-col">
-                                            <span class="text-base font-bold text-brand-700 leading-none" x-text="slot.start"></span>
-                                            <span class="text-[10px] font-bold text-brand-400 mt-1" x-text="slot.end_date_iso ? slot.end + ' (+1)' : slot.end"></span>
+                                            <span class="text-base font-bold text-brand-700 leading-none" x-text="slot.start + ' – ' + slot.end"></span>
+                                            <span class="text-[10px] font-bold text-brand-400 mt-1" x-text="(slot.duration || '') + 'h'"></span>
                                         </div>
                                         <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700">{{ __('portal.available') }}</span>
                                     </div>
-                                    <div class="mt-2 text-[10px] text-brand-600 font-medium" x-text="slot.station"></div>
-                                    <template x-if="slot.vehicles && slot.vehicles.length">
-                                        <div class="mt-1.5 text-[10px] text-slate-500 font-medium">
-                                            <template x-for="(v, i) in slot.vehicles" :key="i">
-                                                <div x-text="v.number ? (v.model + ' — ' + v.number) : v.model"></div>
-                                            </template>
-                                        </div>
-                                    </template>
+                                    <div class="mt-2 text-[10px] text-brand-600 font-medium" x-text="slot.station_short || slot.station"></div>
+                                    <div class="mt-1.5 text-[10px] text-slate-500 font-medium" x-text="carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"></div>
                                     <div class="mt-3 opacity-0 group-hover/slot:opacity-100 transition-opacity">
                                         <span class="block w-full py-1.5 bg-brand-600 text-white text-[10px] font-bold rounded-lg shadow-sm text-center">{{ __('portal.book_now') }}</span>
                                     </div>
                                 </div>
                             </template>
                         </div>
-                        {{-- Empty state --}}
-                        <div x-show="(shiftsMode === 'all' && !dayHasShiftsAll) || (shiftsMode === 'mine' && !dayHasShiftsMine) || (shiftsMode === 'free' && availableSlots.filter(s => s.day === dayName && (filterStation === 'All' || s.station === filterStation)).length === 0)"
+                        {{-- Empty / select station handled in banner above grid --}}
+                        <div x-show="!needsStationForFree() && ((shiftsMode === 'all' && !dayHasShiftsAll) || (shiftsMode === 'mine' && !dayHasShiftsMine) || (shiftsMode === 'free' && slotsForDay(dayName).length === 0))"
                              x-transition
                              class="h-full flex flex-col items-center justify-center py-12 text-center">
                             <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 mb-2">

@@ -78,6 +78,39 @@ class DriverPortalAccessTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_driver_can_toggle_favorite_station(): void
+    {
+        $driver = Driver::factory()->create();
+        $station = \App\Models\Station::factory()->create();
+
+        $response = $this->actingAs($driver, 'driver')
+            ->postJson('/en/driverportal/stations/toggle-favorite', [
+                'station_id' => $station->id,
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('is_favorite', true);
+
+        $this->assertContains($station->id, $driver->fresh()->favoriteStationIds());
+    }
+
+    public function test_shifts_page_with_station_filter_loads(): void
+    {
+        $driver = Driver::factory()->create();
+        \App\Models\ShiftPolicy::factory()->create();
+        $station = \App\Models\Station::factory()->create([
+            'provider' => 'Elektrum',
+            'address' => 'Saharova iela 23a',
+        ]);
+
+        $response = $this->actingAs($driver, 'driver')
+            ->get('/en/driverportal/shifts?station_id='.$station->id);
+
+        $response->assertStatus(200);
+        $this->assertSame($station->id, $driver->fresh()->recentStationIds()[0] ?? null);
+    }
+
     public function test_authenticated_driver_sees_profile(): void
     {
         $driver = Driver::factory()->create();

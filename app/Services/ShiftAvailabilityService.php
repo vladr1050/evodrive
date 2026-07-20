@@ -240,15 +240,19 @@ class ShiftAvailabilityService
      * when at least one vehicle is free. Slots are split only around booked shifts (with downtime).
      * Only windows >= min_duration_hours are shown.
      *
-     * @return array<int, array{id: string, day: string, start: string, end: string, duration: int, station: string, station_id: int, date_iso: string}>
+     * @return array<int, array{id: string, day: string, start: string, end: string, duration: int, station: string, station_short: string, station_id: int, date_iso: string, vehicles: array, cars_count: int}>
      */
-    public function getAvailableSlotsForWeek(Carbon $weekStart, array $dayNames): array
+    public function getAvailableSlotsForWeek(Carbon $weekStart, array $dayNames, ?int $stationId = null): array
     {
         $policy = ShiftPolicy::active();
         if (! $policy) {
             return [];
         }
-        $stations = Station::where('is_active', true)->orderBy('name')->get();
+        $stationsQuery = Station::where('is_active', true)->orderBy('name');
+        if ($stationId !== null) {
+            $stationsQuery->where('id', $stationId);
+        }
+        $stations = $stationsQuery->get();
         if ($stations->isEmpty()) {
             return [];
         }
@@ -267,7 +271,7 @@ class ShiftAvailabilityService
             ->get(['id', 'home_station_id', 'brand', 'model', 'registration_number', 'label']);
         $vehiclesByStation = $vehicles->groupBy('home_station_id')->map(fn ($v) => $v->pluck('id')->values()->all())->all();
         $vehiclesById = $vehicles->keyBy('id');
-        $allVehicleIds = array_unique(array_merge(...array_values($vehiclesByStation)));
+        $allVehicleIds = array_values(array_unique($vehicles->pluck('id')->all()));
         if (empty($allVehicleIds)) {
             return [];
         }
@@ -371,9 +375,11 @@ class ShiftAvailabilityService
                             'end' => $slotEnd,
                             'duration' => $suggestedDuration,
                             'station' => $station->name,
+                            'station_short' => $station->shortLabel(),
                             'station_id' => $station->id,
                             'date_iso' => $dateIso,
                             'vehicles' => $vehiclesDisplay,
+                            'cars_count' => count($vehiclesDisplay),
                         ];
                         $slotAdded = true;
                     }
@@ -434,10 +440,12 @@ class ShiftAvailabilityService
                                     'end' => $slotEnd,
                                     'duration' => $suggestedDuration,
                                     'station' => $station->name,
+                                    'station_short' => $station->shortLabel(),
                                     'station_id' => $station->id,
                                     'date_iso' => $dateIso,
                                     'end_date_iso' => $nextDayStart->format('Y-m-d'),
                                     'vehicles' => $vehiclesDisplay,
+                                    'cars_count' => count($vehiclesDisplay),
                                 ];
                                 break;
                             }
@@ -503,10 +511,12 @@ class ShiftAvailabilityService
                                 'end' => $slotEnd,
                                 'duration' => $suggestedDuration,
                                 'station' => $station->name,
+                                'station_short' => $station->shortLabel(),
                                 'station_id' => $station->id,
                                 'date_iso' => $prevDateIso,
                                 'end_date_iso' => $dateIso,
                                 'vehicles' => $vehiclesDisplay,
+                                'cars_count' => count($vehiclesDisplay),
                             ];
                             break;
                         }
@@ -560,7 +570,7 @@ class ShiftAvailabilityService
             ->where('status', VehicleStatus::Active)
             ->get(['id', 'home_station_id']);
         $vehiclesByStation = $vehicles->groupBy('home_station_id')->map(fn ($v) => $v->pluck('id')->values()->all())->all();
-        $allVehicleIds = array_unique(array_merge(...array_values($vehiclesByStation)));
+        $allVehicleIds = array_values(array_unique($vehicles->pluck('id')->all()));
         $shifts = [];
         if (! empty($allVehicleIds)) {
             $weekEnd = $weekStart->copy()->addDays(7)->setTimezone($tz);

@@ -50,6 +50,7 @@ Route::prefix('{locale}')
             Route::post('driverportal/shifts/copy-previous-week-confirm', [DriverPortalController::class, 'copyPreviousWeekConfirm'])->name('driverportal.shifts.copy-previous-week-confirm');
             Route::post('driverportal/shifts/{shift}/update', [DriverPortalController::class, 'updateShift'])->name('driverportal.shifts.update');
             Route::post('driverportal/shifts/{shift}/cancel', [DriverPortalController::class, 'cancelShift'])->name('driverportal.shifts.cancel');
+            Route::post('driverportal/stations/toggle-favorite', [DriverPortalController::class, 'toggleFavoriteStation'])->name('driverportal.stations.toggle-favorite');
             Route::get('driverportal/profile', [DriverPortalController::class, 'profile'])->name('driverportal.profile');
             Route::post('driverportal/profile', [DriverPortalController::class, 'updateProfile'])->name('driverportal.profile.update');
             Route::post('driverportal/logout', [DriverPortalController::class, 'logout'])->name('driverportal.logout');
