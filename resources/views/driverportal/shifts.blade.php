@@ -594,7 +594,7 @@
                                             <div
                                                 x-show="!filterStationId"
                                                 x-cloak
-                                                class="mt-1 text-[9px] font-medium text-brand-600/80 leading-snug"
+                                                class="mt-1 text-[9px] font-medium text-brand-600/80 whitespace-nowrap overflow-visible"
                                                 x-text="slot.station_address || slot.station_short || slot.station"
                                             ></div>
                                         </button>
