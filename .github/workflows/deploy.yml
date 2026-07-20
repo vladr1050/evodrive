@@ -54,7 +54,9 @@ jobs:
             cd "$APP_DIR"
             GIT_SSH_COMMAND="ssh -i /root/.ssh/evodrive_deploy -o StrictHostKeyChecking=no" git fetch origin && git reset --hard origin/main
             docker compose build --no-cache app
-            docker compose up -d
+            # Leftovers from interrupted recreates use names like "<hash>_evodrive-app-1" and block `up -d`.
+            docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 ~ /^[0-9a-f]+_evodrive-app-1$/ {print $1}' | xargs -r docker rm -f
+            docker compose up -d --remove-orphans
             docker compose exec -T app php artisan migrate --force
             docker compose exec -T app php artisan storage:link || true
             docker compose exec -T app sh -c 'mkdir -p /shared/public && rm -f /shared/public/storage && ln -sf /var/www/html/storage/app/public /shared/public/storage'
