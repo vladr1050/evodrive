@@ -3,12 +3,34 @@
 @section('title', __('portal.shifts'))
 
 @section('content')
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<style>
+    .shifts-map { width: 100%; height: 200px; border-radius: 1rem; z-index: 0; background: #e2e8f0; }
+    @media (min-width: 1024px) {
+        .shifts-map { height: min(440px, calc(100vh - 14rem)); min-height: 320px; }
+    }
+    .shifts-map-pin-wrap { background: transparent; border: 0; }
+    .shifts-map-pin {
+        width: 14px; height: 14px; border-radius: 9999px;
+        background: #64748b; border: 2px solid #fff;
+    }
+    .shifts-map-pin.is-selected {
+        width: 18px; height: 18px; background: #2563eb;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.25);
+    }
+    .leaflet-container { font: inherit; }
+</style>
 <script>
     window.__SHIFTS_AVAILABLE_SLOTS__ = @json($availableSlots ?? []);
     window.__SHIFTS_PAGE_INIT__ = @json($shiftsPageInit ?? []);
     document.addEventListener('alpine:init', function() {
         Alpine.data('shiftsPage', function() {
             const init = window.__SHIFTS_PAGE_INIT__ || {};
+            const LAST_KEY = init.lastStationStorageKey || 'evodrive.driver.lastStationId';
             return {
                 filterStationId: init.initialFilterStationId || null,
                 filterStation: init.initialFilterStation || 'All',
@@ -22,8 +44,15 @@
                 shiftsBaseUrl: init.shiftsBaseUrl || '',
                 currentView: init.currentView || '0',
                 weekOptions: init.weekOptions || [],
+                weekDates: init.weekDates || [],
+                selectedDayIso: null,
                 toggleFavoriteUrl: init.toggleFavoriteUrl || '',
                 requireStationForFree: init.requireStationForFree !== false,
+                lastStationStorageKey: LAST_KEY,
+                map: null,
+                markerLayer: null,
+                markersById: {},
+                mapReady: false,
                 labels: {
                     allStations: @json(__('portal.all_stations')),
                     favorites: @json(__('portal.favorite_stations')),
@@ -33,6 +62,27 @@
                     carsMany: @json(__('portal.cars_available')),
                     selectPrompt: @json(__('portal.select_station_prompt')),
                     selectHint: @json(__('portal.select_station_hint')),
+                    mapTitle: @json(__('portal.map_stations')),
+                    mapNoCoords: @json(__('portal.map_no_coordinates')),
+                },
+                boot() {
+                    const today = init.todayIso;
+                    const days = this.weekDates;
+                    this.selectedDayIso = (days.find(d => d.iso === today) || days[0] || {}).iso || null;
+
+                    if (this.filterStationId) {
+                        try { localStorage.setItem(this.lastStationStorageKey, String(this.filterStationId)); } catch (e) {}
+                    } else {
+                        try {
+                            const last = localStorage.getItem(this.lastStationStorageKey);
+                            if (last && this.stations.some(s => String(s.id) === String(last))) {
+                                window.location.replace(this.weekUrl(this.currentView, parseInt(last, 10)));
+                                return;
+                            }
+                        } catch (e) {}
+                    }
+
+                    this.$nextTick(() => this.initMap());
                 },
                 weekUrl(view, stationId) {
                     const params = new URLSearchParams();
@@ -43,8 +93,11 @@
                 },
                 selectedStationLabel() {
                     if (!this.filterStationId) return this.labels.allStations;
-                    const st = this.stations.find(s => s.id === this.filterStationId);
+                    const st = this.stations.find(s => Number(s.id) === Number(this.filterStationId));
                     return st ? (st.short || st.name) : this.filterStation;
+                },
+                stationsWithCoords() {
+                    return this.stations.filter(s => s.latitude != null && s.longitude != null);
                 },
                 filteredStations() {
                     const q = (this.stationSearch || '').trim().toLowerCase();
@@ -55,27 +108,23 @@
                     });
                 },
                 favoriteStations() {
-                    const ids = this.favoriteStationIds;
-                    return this.filteredStations().filter(s => ids.includes(s.id));
+                    const ids = this.favoriteStationIds.map(Number);
+                    return this.filteredStations().filter(s => ids.includes(Number(s.id)));
                 },
                 recentStations() {
-                    const fav = new Set(this.favoriteStationIds);
+                    const fav = new Set(this.favoriteStationIds.map(Number));
                     return this.recentStationIds
-                        .map(id => this.filteredStations().find(s => s.id === id))
-                        .filter(s => s && !fav.has(s.id));
+                        .map(id => this.filteredStations().find(s => Number(s.id) === Number(id)))
+                        .filter(s => s && !fav.has(Number(s.id)));
                 },
                 groupedStations() {
                     const skip = new Set([
-                        ...this.favoriteStationIds,
-                        ...this.recentStationIds,
+                        ...this.favoriteStationIds.map(Number),
+                        ...this.recentStationIds.map(Number),
                     ]);
                     const groups = {};
                     this.filteredStations().forEach(s => {
-                        if (skip.has(s.id) && !this.stationSearch) return;
-                        if (this.stationSearch && (this.favoriteStationIds.includes(s.id) || this.recentStationIds.includes(s.id))) {
-                            // still show in search results under provider groups only if not already in fav/recent sections
-                        }
-                        if (!this.stationSearch && (this.favoriteStationIds.includes(s.id) || this.recentStationIds.includes(s.id))) return;
+                        if (!this.stationSearch && skip.has(Number(s.id))) return;
                         const key = s.provider || this.labels.other;
                         if (!groups[key]) groups[key] = [];
                         groups[key].push(s);
@@ -85,6 +134,11 @@
                 applyStationFilter(stationId) {
                     this.isStationDropdownOpen = false;
                     this.stationSearch = '';
+                    if (stationId) {
+                        try { localStorage.setItem(this.lastStationStorageKey, String(stationId)); } catch (e) {}
+                    } else {
+                        try { localStorage.removeItem(this.lastStationStorageKey); } catch (e) {}
+                    }
                     window.location = this.weekUrl(this.currentView, stationId || null);
                 },
                 clearStationFilter() {
@@ -111,7 +165,7 @@
                             this.favoriteStationIds = data.favorite_station_ids || [];
                             this.stations = this.stations.map(s => ({
                                 ...s,
-                                is_favorite: this.favoriteStationIds.includes(s.id),
+                                is_favorite: this.favoriteStationIds.map(Number).includes(Number(s.id)),
                             }));
                         }
                     } catch (e) {}
@@ -127,11 +181,80 @@
                 needsStationForFree() {
                     return this.shiftsMode === 'free' && this.requireStationForFree && !this.filterStationId;
                 },
+                pinIcon(selected) {
+                    return L.divIcon({
+                        className: 'shifts-map-pin-wrap',
+                        html: '<div class="shifts-map-pin' + (selected ? ' is-selected' : '') + '"></div>',
+                        iconSize: selected ? [18, 18] : [14, 14],
+                        iconAnchor: selected ? [9, 9] : [7, 7],
+                    });
+                },
+                initMap() {
+                    const el = document.getElementById('shifts-stations-map');
+                    if (!el || typeof L === 'undefined') return;
+
+                    const withCoords = this.stationsWithCoords();
+                    if (!withCoords.length) {
+                        el.innerHTML = '<div class="h-full flex items-center justify-center p-4 text-center text-xs font-medium text-slate-500">' + this.labels.mapNoCoords + '</div>';
+                        return;
+                    }
+
+                    if (this.map) {
+                        this.map.remove();
+                        this.map = null;
+                        this.markersById = {};
+                    }
+
+                    this.map = L.map(el, {
+                        scrollWheelZoom: false,
+                        zoomControl: true,
+                    });
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                        maxZoom: 19,
+                    }).addTo(this.map);
+
+                    const useCluster = typeof L.markerClusterGroup === 'function';
+                    this.markerLayer = useCluster
+                        ? L.markerClusterGroup({ maxClusterRadius: 42, showCoverageOnHover: false })
+                        : L.layerGroup();
+
+                    withCoords.forEach(s => {
+                        const selected = Number(this.filterStationId) === Number(s.id);
+                        const marker = L.marker([s.latitude, s.longitude], {
+                            icon: this.pinIcon(selected),
+                            title: s.short || s.name,
+                            keyboard: true,
+                        });
+                        marker.bindTooltip(s.short || s.name, { direction: 'top', offset: [0, -8] });
+                        marker.on('click', () => {
+                            if (Number(this.filterStationId) === Number(s.id)) return;
+                            this.applyStationFilter(s.id);
+                        });
+                        this.markersById[s.id] = marker;
+                        this.markerLayer.addLayer(marker);
+                    });
+
+                    this.map.addLayer(this.markerLayer);
+
+                    const selected = withCoords.find(s => Number(s.id) === Number(this.filterStationId));
+                    if (selected) {
+                        this.map.setView([selected.latitude, selected.longitude], 14);
+                    } else if (this.markerLayer.getBounds && this.markerLayer.getBounds().isValid()) {
+                        this.map.fitBounds(this.markerLayer.getBounds().pad(0.18));
+                    } else {
+                        this.map.setView([56.9496, 24.1052], 11);
+                    }
+
+                    this.mapReady = true;
+                    setTimeout(() => this.map && this.map.invalidateSize(), 150);
+                    setTimeout(() => this.map && this.map.invalidateSize(), 400);
+                },
             };
         });
     });
 </script>
-<div x-data="shiftsPage()" class="animate-fade-in">
+<div x-data="shiftsPage()" x-init="boot()" class="animate-fade-in">
     <!-- Header Section (UI 1:1 reference) -->
     <div class="mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div>
@@ -348,68 +471,107 @@
         <p class="mt-1 text-xs font-normal text-brand-600/80" x-text="labels.selectHint"></p>
     </div>
 
-    <!-- Shifts Grid (reference UI 1:1) -->
-    <div class="overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0">
-        <div class="grid grid-cols-1 md:grid-cols-7 gap-4 min-w-[1000px] md:min-w-0">
-            @foreach($weekDates as $dayInfo)
-                @php
-                    $sortShifts = fn ($c) => $c->sortBy(fn ($s) => (int) str_replace(':', '', $s['start']))->all();
-                    $dayShiftsAll = $sortShifts(collect($shiftsAll)->where('date_iso', $dayInfo['iso']));
-                    $dayShiftsMine = $sortShifts(collect($shiftsMine)->where('date_iso', $dayInfo['iso']));
-                @endphp
-                <div class="space-y-4" x-data="{ dayName: '{{ $dayInfo['name'] }}', dayIso: '{{ $dayInfo['iso'] }}', dayHasShiftsAll: {{ json_encode(!empty($dayShiftsAll)) }}, dayHasShiftsMine: {{ json_encode(!empty($dayShiftsMine)) }} }">
-                    <div class="flex flex-col items-center py-3 bg-slate-100 rounded-2xl border border-slate-200 relative group">
-                        <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-1">{{ $dayInfo['name'] }}</span>
-                        <span class="text-sm font-bold text-slate-700">{{ $dayInfo['date'] }} {{ $dayInfo['month'] }}</span>
-                        <button type="button" onclick="openCreateModalForDate('{{ $dayInfo['iso'] }}')" class="absolute -top-2 -right-2 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-brand-600 hover:border-brand-600 shadow-sm transition-all opacity-0 group-hover:opacity-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-                        </button>
-                    </div>
-                    <div class="space-y-3 min-h-[200px]">
-                        {{-- All drivers' shifts (server-filtered when station selected) --}}
-                        <div x-show="shiftsMode === 'all'" class="space-y-3" x-cloak>
-                            @foreach($dayShiftsAll as $shift)
-                                @include('driverportal.components.shift-block', ['shift' => $shift])
-                            @endforeach
-                        </div>
-                        {{-- My shifts only --}}
-                        <div x-show="shiftsMode === 'mine'" class="space-y-3" x-cloak>
-                            @foreach($dayShiftsMine as $shift)
-                                @include('driverportal.components.shift-block', ['shift' => $shift])
-                            @endforeach
-                        </div>
-                        {{-- Free Slots mode — grouped by window, N cars --}}
-                        <div x-show="shiftsMode === 'free' && !needsStationForFree()" class="space-y-3" x-cloak>
-                            <template x-for="slot in slotsForDay(dayName)" :key="slot.id">
-                                <div class="relative p-3 rounded-2xl border border-dashed border-brand-300 bg-brand-50/30 transition-all hover:bg-brand-50 hover:border-brand-400 cursor-pointer group/slot"
-                                     @click="openCreateModalFromSlot(slot)">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <div class="flex flex-col">
-                                            <span class="text-base font-bold text-brand-700 leading-none" x-text="slot.start + ' – ' + slot.end"></span>
-                                            <span class="text-[10px] font-bold text-brand-400 mt-1" x-text="(slot.duration || '') + 'h'"></span>
-                                        </div>
-                                        <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700">{{ __('portal.available') }}</span>
-                                    </div>
-                                    <div class="mt-2 text-[10px] text-brand-600 font-medium" x-text="slot.station_short || slot.station"></div>
-                                    <div class="mt-1.5 text-[10px] text-slate-500 font-medium" x-text="carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"></div>
-                                    <div class="mt-3 opacity-0 group-hover/slot:opacity-100 transition-opacity">
-                                        <span class="block w-full py-1.5 bg-brand-600 text-white text-[10px] font-bold rounded-lg shadow-sm text-center">{{ __('portal.book_now') }}</span>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                        {{-- Empty / select station handled in banner above grid --}}
-                        <div x-show="!needsStationForFree() && ((shiftsMode === 'all' && !dayHasShiftsAll) || (shiftsMode === 'mine' && !dayHasShiftsMine) || (shiftsMode === 'free' && slotsForDay(dayName).length === 0))"
-                             x-transition
-                             class="h-full flex flex-col items-center justify-center py-12 text-center">
-                            <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 mb-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                            </div>
-                            <span class="text-[10px] font-medium text-slate-300 italic" x-text="shiftsMode === 'free' ? '{{ __("portal.no_slots_found") }}' : '{{ __("portal.no_shifts_planned") }}'"></span>
-                        </div>
-                    </div>
+    <!-- Split: map filter + week schedule -->
+    <div class="flex flex-col lg:grid lg:grid-cols-5 gap-6 items-start">
+        <aside class="w-full lg:col-span-2 lg:sticky lg:top-4 space-y-3">
+            <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+                    <span class="text-sm font-bold text-slate-800" x-text="labels.mapTitle"></span>
+                    <button
+                        type="button"
+                        x-show="filterStationId"
+                        x-cloak
+                        @click="clearStationFilter()"
+                        class="text-xs font-bold text-slate-500 hover:text-brand-600"
+                    >{{ __('portal.clear_station_filter') }}</button>
                 </div>
-            @endforeach
+                <div id="shifts-stations-map" class="shifts-map" role="application" aria-label="{{ __('portal.map_stations') }}"></div>
+            </div>
+            <p class="text-[11px] text-slate-400 font-medium px-1" x-show="stationsWithCoords().length" x-cloak>
+                <span x-text="stationsWithCoords().length"></span> / <span x-text="stations.length"></span>
+            </p>
+        </aside>
+
+        <div class="w-full lg:col-span-3 min-w-0">
+            {{-- Mobile: single-day chips --}}
+            <div class="flex lg:hidden gap-2 overflow-x-auto pb-3 -mx-1 px-1">
+                <template x-for="d in weekDates" :key="d.iso">
+                    <button
+                        type="button"
+                        @click="selectedDayIso = d.iso"
+                        class="shrink-0 px-3 py-2 rounded-xl text-xs font-bold border transition-all"
+                        :class="selectedDayIso === d.iso ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200'"
+                    >
+                        <span class="block uppercase tracking-wide opacity-80" x-text="d.name"></span>
+                        <span x-text="d.date + ' ' + d.month"></span>
+                    </button>
+                </template>
+            </div>
+
+            <!-- Shifts Grid -->
+            <div class="overflow-x-auto pb-4 lg:overflow-visible">
+                <div class="grid grid-cols-1 lg:grid-cols-7 gap-4 min-w-0">
+                    @foreach($weekDates as $dayInfo)
+                        @php
+                            $sortShifts = fn ($c) => $c->sortBy(fn ($s) => (int) str_replace(':', '', $s['start']))->all();
+                            $dayShiftsAll = $sortShifts(collect($shiftsAll)->where('date_iso', $dayInfo['iso']));
+                            $dayShiftsMine = $sortShifts(collect($shiftsMine)->where('date_iso', $dayInfo['iso']));
+                        @endphp
+                        <div
+                            class="space-y-4"
+                            :class="{ 'hidden lg:block': selectedDayIso !== '{{ $dayInfo['iso'] }}' }"
+                        >
+                            <div class="flex flex-col items-center py-3 bg-slate-100 rounded-2xl border border-slate-200 relative group">
+                                <span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none mb-1">{{ $dayInfo['name'] }}</span>
+                                <span class="text-sm font-bold text-slate-700">{{ $dayInfo['date'] }} {{ $dayInfo['month'] }}</span>
+                                <button type="button" onclick="openCreateModalForDate('{{ $dayInfo['iso'] }}')" class="absolute -top-2 -right-2 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-brand-600 hover:border-brand-600 shadow-sm transition-all opacity-0 group-hover:opacity-100">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                                </button>
+                            </div>
+                            <div class="space-y-3 min-h-[200px]">
+                                <div x-show="shiftsMode === 'all'" class="space-y-3" x-cloak>
+                                    @foreach($dayShiftsAll as $shift)
+                                        @include('driverportal.components.shift-block', ['shift' => $shift])
+                                    @endforeach
+                                </div>
+                                <div x-show="shiftsMode === 'mine'" class="space-y-3" x-cloak>
+                                    @foreach($dayShiftsMine as $shift)
+                                        @include('driverportal.components.shift-block', ['shift' => $shift])
+                                    @endforeach
+                                </div>
+                                <div x-show="shiftsMode === 'free' && !needsStationForFree()" class="space-y-3" x-cloak>
+                                    <template x-for="slot in slotsForDay('{{ $dayInfo['name'] }}')" :key="slot.id">
+                                        <div class="relative p-3 rounded-2xl border border-dashed border-brand-300 bg-brand-50/30 transition-all hover:bg-brand-50 hover:border-brand-400 cursor-pointer group/slot"
+                                             @click="window.openCreateModalFromSlot && window.openCreateModalFromSlot(slot)">
+                                            <div class="flex justify-between items-start mb-2">
+                                                <div class="flex flex-col">
+                                                    <span class="text-base font-bold text-brand-700 leading-none" x-text="slot.start + ' – ' + slot.end"></span>
+                                                    <span class="text-[10px] font-bold text-brand-400 mt-1" x-show="slot.end_date_iso">+1</span>
+                                                    <span class="text-[10px] font-bold text-brand-400 mt-1" x-text="(slot.duration || '') + 'h'"></span>
+                                                </div>
+                                                <span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700">{{ __('portal.available') }}</span>
+                                            </div>
+                                            <div class="mt-2 text-[10px] text-brand-600 font-medium" x-text="slot.station_short || slot.station"></div>
+                                            <div class="mt-1.5 text-[10px] text-slate-500 font-medium" x-text="carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"></div>
+                                            <div class="mt-3 opacity-0 group-hover/slot:opacity-100 transition-opacity">
+                                                <span class="block w-full py-1.5 bg-brand-600 text-white text-[10px] font-bold rounded-lg shadow-sm text-center">{{ __('portal.book_now') }}</span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div x-show="!needsStationForFree() && ((shiftsMode === 'all' && {{ empty($dayShiftsAll) ? 'true' : 'false' }}) || (shiftsMode === 'mine' && {{ empty($dayShiftsMine) ? 'true' : 'false' }}) || (shiftsMode === 'free' && slotsForDay('{{ $dayInfo['name'] }}').length === 0))"
+                                     x-transition
+                                     class="h-full flex flex-col items-center justify-center py-12 text-center">
+                                    <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 mb-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    </div>
+                                    <span class="text-[10px] font-medium text-slate-300 italic" x-text="shiftsMode === 'free' ? '{{ __("portal.no_slots_found") }}' : '{{ __("portal.no_shifts_planned") }}'"></span>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
         </div>
     </div>
 

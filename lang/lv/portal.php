@@ -54,6 +54,8 @@ return [
     'cars_available' => 'Pieejamas :count automašīnas',
     'car_available' => 'Pieejama 1 automašīna',
     'clear_station_filter' => 'Notīrīt',
+    'map_stations' => 'Staciju karte',
+    'map_no_coordinates' => 'Nav staciju ar koordinātām. Pievienojiet lat/lng administrācijā, lai izmantotu karti.',
     'overlap_error' => 'Laiks pārklājas ar esošu maiņu',
     'profile_subtitle' => 'Pārvaldi savu personīgo informāciju un piekļuves datus',
     'personal_details' => 'Personīgā informācija',

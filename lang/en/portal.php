@@ -54,6 +54,8 @@ return [
     'cars_available' => ':count cars available',
     'car_available' => '1 car available',
     'clear_station_filter' => 'Clear',
+    'map_stations' => 'Stations map',
+    'map_no_coordinates' => 'No stations with coordinates yet. Add lat/lng in admin to use the map.',
     'overlap_error' => 'Time overlaps with an existing shift',
     'profile_subtitle' => 'Manage your personal information and credentials',
     'personal_details' => 'Personal Details',

@@ -272,6 +272,9 @@ class DriverPortalController extends Controller
             'weekOptions' => $weekOptions,
             'toggleFavoriteUrl' => route('driverportal.stations.toggle-favorite', ['locale' => $request->route('locale', app()->getLocale())]),
             'requireStationForFree' => true,
+            'weekDates' => $weekDates,
+            'todayIso' => $todayStart->format('Y-m-d'),
+            'lastStationStorageKey' => 'evodrive.driver.lastStationId',
         ];
 
         return view('driverportal.shifts', [

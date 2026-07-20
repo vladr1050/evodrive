@@ -54,6 +54,8 @@ return [
     'cars_available' => 'Доступно машин: :count',
     'car_available' => '1 машина доступна',
     'clear_station_filter' => 'Сбросить',
+    'map_stations' => 'Карта станций',
+    'map_no_coordinates' => 'Нет станций с координатами. Добавьте lat/lng в админке, чтобы пользоваться картой.',
     'overlap_error' => 'Время пересекается с существующей сменой',
     'profile_subtitle' => 'Управление личными данными и доступом',
     'personal_details' => 'Личные данные',
