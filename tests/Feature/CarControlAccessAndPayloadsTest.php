@@ -190,6 +190,39 @@ class CarControlAccessAndPayloadsTest extends TestCase
         $this->assertSame('sms', $logs[0]->effective_transport);
         $this->assertTrue($logs[0]->ok);
         $this->assertTrue($logs[1]->ok);
+
+        $shift = Shift::query()->where('driver_id', $this->driver->id)->first();
+        $this->assertNotNull($shift->started_via_bot_at);
+        $this->assertTrue($shift->started_via_bot_at->equalTo($now));
+    }
+
+    public function test_failed_start_shift_does_not_set_started_via_bot_at(): void
+    {
+        $now = Carbon::parse('2026-03-10 10:00:00');
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => $now->copy()->addMinutes(30),
+            'ends_at' => $now->copy()->addHours(4),
+            'status' => ShiftStatus::Booked,
+        ]);
+
+        $failing = new class implements SmsProviderInterface
+        {
+            public function send(string $to, string $text): array
+            {
+                return ['status' => 'failed', 'error' => 'SMS failed'];
+            }
+        };
+        $this->app->instance(SmsProviderInterface::class, $failing);
+        $this->app->forgetInstance(CarControlService::class);
+
+        $result = app(CarControlService::class)->executeAction($this->driver->id, CarCommand::ACTION_START_SHIFT, $now);
+
+        $this->assertFalse($result['ok']);
+        $shift->refresh();
+        $this->assertNull($shift->started_via_bot_at);
     }
 
     public function test_open_car_sends_one_sms(): void

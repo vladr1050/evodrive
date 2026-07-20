@@ -31,6 +31,8 @@ class Shift extends Model
         'ends_at',
         'status',
         'confirmed_at',
+        'started_via_bot_at',
+        'no_start_notified_at',
         'cancelled_at',
         'cancel_reason',
         'cancelled_by_driver_id',
@@ -45,6 +47,8 @@ class Shift extends Model
             'ends_at' => 'datetime',
             'status' => ShiftStatus::class,
             'confirmed_at' => 'datetime',
+            'started_via_bot_at' => 'datetime',
+            'no_start_notified_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'cancellation_notified_at' => 'datetime',
         ];

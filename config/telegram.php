@@ -21,4 +21,14 @@ return [
     | minutes of the cancelled slot, we consider it a "replacement" and do not notify.
     */
     'replacement_tolerance_minutes' => (int) env('TELEGRAM_REPLACEMENT_TOLERANCE_MINUTES', 15),
+
+    /*
+    |--------------------------------------------------------------------------
+    | No Start shift (bot) notification
+    |--------------------------------------------------------------------------
+    | If the driver never successfully pressed Start shift within this many
+    | minutes after starts_at, notify the shifts chat once.
+    */
+    'no_start_grace_minutes' => (int) env('TELEGRAM_NO_START_GRACE_MINUTES', 60),
+    'no_start_lookback_hours' => (int) env('TELEGRAM_NO_START_LOOKBACK_HOURS', 24),
 ];

@@ -226,6 +226,10 @@ class CarControlService
             'transport_meta' => $delivery['meta'],
         ]);
 
+        if ($action === CarCommand::ACTION_START_SHIFT && $shift->started_via_bot_at === null) {
+            $shift->update(['started_via_bot_at' => $now]);
+        }
+
         return ['ok' => true, 'message' => $this->actionSuccessMessage($action), 'command' => $command];
     }
 
