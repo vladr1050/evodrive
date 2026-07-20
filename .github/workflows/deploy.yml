@@ -11,6 +11,11 @@ on:
     branches: [main]
   workflow_dispatch: {}   # Ручной запуск: Actions → Deploy → Run workflow
 
+# One deploy at a time — overlapping `compose up` leaves rename leftovers and name conflicts.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run && github.event.workflow_run.conclusion == 'success') }}
@@ -54,8 +59,9 @@ jobs:
             cd "$APP_DIR"
             GIT_SSH_COMMAND="ssh -i /root/.ssh/evodrive_deploy -o StrictHostKeyChecking=no" git fetch origin && git reset --hard origin/main
             docker compose build --no-cache app
-            # Leftovers from interrupted recreates use names like "<hash>_evodrive-app-1" and block `up -d`.
-            docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 ~ /^[0-9a-f]+_evodrive-app-1$/ {print $1}' | xargs -r docker rm -f
+            # Interrupted recreates leave names like "<id>_evodrive-app-1" that block the next `up -d`.
+            docker compose stop app || true
+            docker ps -aq --filter name=evodrive-app | while read -r id; do docker rm -f "$id" || true; done
             docker compose up -d --remove-orphans
             docker compose exec -T app php artisan migrate --force
             docker compose exec -T app php artisan storage:link || true
