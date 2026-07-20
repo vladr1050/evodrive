@@ -31,7 +31,7 @@
                 </div>
             </div>
             @unless($hideStation)
-                <div class="mt-1 text-[9px] font-medium {{ $isMyShift ? 'text-green-700/80' : 'text-slate-500' }} break-words">{{ $stationLabel }}</div>
+                <div class="mt-1 text-[9px] font-medium {{ $isMyShift ? 'text-green-700/80' : 'text-slate-500' }} whitespace-nowrap truncate">{{ $stationLabel }}</div>
             @endunless
         </div>
         <div class="flex flex-col items-end gap-0.5 shrink-0">

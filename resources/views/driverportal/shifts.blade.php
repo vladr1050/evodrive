@@ -594,7 +594,7 @@
                                             <div
                                                 x-show="!filterStationId"
                                                 x-cloak
-                                                class="mt-1 text-[9px] font-medium text-brand-600/80 break-words"
+                                                class="mt-1 text-[9px] font-medium text-brand-600/80 whitespace-nowrap truncate"
                                                 x-text="slot.station_short || slot.station"
                                             ></div>
                                         </button>
@@ -956,7 +956,7 @@
                         var li = document.createElement('li');
                         var stationName = stationNames[item.station_id] || ('#' + item.station_id);
                         var stationAddr = (stationAddresses && stationAddresses[item.station_id]) ? stationAddresses[item.station_id] : '';
-                        var addrHtml = stationAddr ? '<span class="block text-slate-400 text-xs mt-0.5 break-words">' + stationAddr + '</span>' : '';
+                        var addrHtml = stationAddr ? '<span class="block text-slate-400 text-xs mt-0.5 whitespace-nowrap truncate" title="' + stationAddr.replace(/"/g, '&quot;') + '">' + stationAddr + '</span>' : '';
                         li.className = 'flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50/50';
                         li.innerHTML = '<label class="flex items-center gap-3 flex-1 cursor-pointer min-w-0">' +
                             '<input type="checkbox" class="copy-proposed-cb rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0" data-index="' + index + '" checked>' +
