@@ -6,27 +6,32 @@
     $editable = (bool) ($shift['editable'] ?? false);
     $extendable = (bool) ($shift['extendable'] ?? false);
     $stationLabel = $shift['station_short'] ?? $shift['station'] ?? '';
-    $vehicleLabel = ! empty($shift['vehicle_reg_number'])
-        ? ($shift['vehicle_reg_number'] ?? '')
-        : (explode(' ', $shift['vehicle'] ?? '')[0] ?? $shift['vehicle'] ?? '-');
+    $vehiclePlate = ! empty($shift['vehicle_reg_number'])
+        ? (string) $shift['vehicle_reg_number']
+        : null;
+    $vehicleFallback = explode(' ', $shift['vehicle'] ?? '')[0] ?? $shift['vehicle'] ?? '-';
     $hideStation = (bool) $hideStation;
 @endphp
+{{-- Layout mirrors Free Slot cards: time · hours · plate(s) · optional station --}}
 <div
-    class="shift-card relative px-2 py-1.5 rounded-lg border {{ $isMyShift ? 'bg-green-50 border-green-200' : 'bg-slate-100 border-slate-200/80 opacity-90' }}"
+    class="shift-card relative w-full text-left px-2 py-1.5 rounded-lg border {{ $isMyShift ? 'bg-green-50 border-green-300' : 'bg-slate-100/80 border-slate-200' }}"
     data-shift-id="{{ $shift['id'] ?? '' }}"
     data-station-name="{{ $shift['station'] ?? '' }}"
     title="{{ $stationLabel }} · {{ $shift['vehicle'] ?? '' }}"
 >
     <div class="flex items-start justify-between gap-1 min-w-0">
-        <div class="min-w-0">
-            <div class="text-xs font-bold {{ $isMyShift ? 'text-green-900' : 'text-slate-800' }} tabular-nums leading-tight truncate">
-                {{ $shift['start'] }}–{{ $shift['end'] }}
+        <div class="min-w-0 flex-1">
+            <div class="text-[11px] font-bold {{ $isMyShift ? 'text-green-800' : 'text-slate-800' }} tabular-nums leading-tight whitespace-nowrap">
+                {{ $shift['start'] }}<span class="{{ $isMyShift ? 'text-green-500' : 'text-slate-400' }} font-semibold">–</span>{{ $shift['end'] }}
             </div>
-            <div class="mt-0.5 text-[10px] font-medium text-slate-500 truncate">
-                {{ $shift['duration'] }}h · {{ $vehicleLabel }}
+            <div class="mt-1 text-[10px] font-bold {{ $isMyShift ? 'text-green-600' : 'text-slate-500' }} tabular-nums">{{ $shift['duration'] }}h</div>
+            <div class="mt-1 space-y-0.5">
+                <div class="text-[10px] font-semibold {{ $isMyShift ? 'text-green-900' : 'text-slate-700' }} tabular-nums leading-tight whitespace-nowrap">
+                    {{ $vehiclePlate ?: $vehicleFallback }}
+                </div>
             </div>
             @unless($hideStation)
-                <div class="mt-0.5 text-[9px] font-medium text-slate-400 truncate">{{ $stationLabel }}</div>
+                <div class="mt-1 text-[9px] font-medium {{ $isMyShift ? 'text-green-700/80' : 'text-slate-500' }} break-words">{{ $stationLabel }}</div>
             @endunless
         </div>
         <div class="flex flex-col items-end gap-0.5 shrink-0">

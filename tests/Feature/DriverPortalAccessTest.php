@@ -164,6 +164,62 @@ class DriverPortalAccessTest extends TestCase
         $this->assertSame([], $response->viewData('availableSlots'));
     }
 
+    public function test_all_shifts_includes_mine_outside_favorite_stations(): void
+    {
+        $driver = Driver::factory()->create();
+        $other = Driver::factory()->create();
+        \App\Models\ShiftPolicy::factory()->create(['timezone' => 'Europe/Riga']);
+
+        $fav = \App\Models\Station::factory()->create(['is_active' => true]);
+        $elsewhere = \App\Models\Station::factory()->create(['is_active' => true]);
+        $favVehicle = \App\Models\FleetVehicle::factory()->create(['home_station_id' => $fav->id]);
+        $elseVehicle = \App\Models\FleetVehicle::factory()->create(['home_station_id' => $elsewhere->id]);
+
+        $driver->update([
+            'portal_preferences' => ['favorite_station_ids' => [$fav->id]],
+        ]);
+
+        $tz = 'Europe/Riga';
+        $start = now($tz)->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(1)->setTime(10, 0);
+
+        $mineElsewhere = \App\Models\Shift::factory()->create([
+            'driver_id' => $driver->id,
+            'vehicle_id' => $elseVehicle->id,
+            'station_id' => $elsewhere->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addHours(4),
+            'status' => \App\Enums\ShiftStatus::Booked,
+        ]);
+        $reservedOnFav = \App\Models\Shift::factory()->create([
+            'driver_id' => $other->id,
+            'vehicle_id' => $favVehicle->id,
+            'station_id' => $fav->id,
+            'starts_at' => $start->copy()->addHours(1),
+            'ends_at' => $start->copy()->addHours(5),
+            'status' => \App\Enums\ShiftStatus::Booked,
+        ]);
+        $reservedElsewhere = \App\Models\Shift::factory()->create([
+            'driver_id' => $other->id,
+            'vehicle_id' => $elseVehicle->id,
+            'station_id' => $elsewhere->id,
+            'starts_at' => $start->copy()->addHours(6),
+            'ends_at' => $start->copy()->addHours(10),
+            'status' => \App\Enums\ShiftStatus::Booked,
+        ]);
+
+        $response = $this->actingAs($driver, 'driver')
+            ->get('/en/driverportal/shifts');
+
+        $response->assertOk();
+        $allIds = collect($response->viewData('shiftsAll'))->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $this->assertContains($mineElsewhere->id, $allIds);
+        $this->assertContains($reservedOnFav->id, $allIds);
+        $this->assertNotContains($reservedElsewhere->id, $allIds);
+
+        $first = $response->viewData('shiftsAll')[0] ?? null;
+        $this->assertTrue((bool) ($first['is_mine'] ?? false));
+    }
+
     public function test_authenticated_driver_sees_profile(): void
     {
         $driver = Driver::factory()->create();

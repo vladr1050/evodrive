@@ -195,6 +195,14 @@ class DriverPortalController extends Controller
             $driver->rememberRecentStation($selectedStationId);
         }
 
+        $favoriteStationIds = $driver->favoriteStationIds();
+        $favoriteActiveIds = $stations
+            ->whereIn('id', $favoriteStationIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
         $shiftsBaseQuery = Shift::whereIn('status', [ShiftStatus::Booked, ShiftStatus::Completed])
             ->where('starts_at', '<', $weekRangeEndExclusive)
             ->where('ends_at', '>', $weekRangeStart)
@@ -202,8 +210,26 @@ class DriverPortalController extends Controller
             ->orderBy('starts_at');
         if ($selectedStationId) {
             $shiftsBaseQuery->where('station_id', $selectedStationId);
+        } elseif ($favoriteActiveIds !== []) {
+            // Favorites scope for All: occupancy at favorite stations + always include my shifts.
+            $shiftsBaseQuery->where(function ($q) use ($favoriteActiveIds, $driverId) {
+                $q->whereIn('station_id', $favoriteActiveIds)
+                    ->orWhere('driver_id', $driverId);
+            });
         }
-        $shiftsAll = $shiftsBaseQuery->clone()->get()->map($mapShiftRow)->all();
+        $shiftsAll = $shiftsBaseQuery->clone()->get()
+            ->map($mapShiftRow)
+            ->sort(function (array $a, array $b): int {
+                $aMine = ! empty($a['is_mine']) ? 0 : 1;
+                $bMine = ! empty($b['is_mine']) ? 0 : 1;
+                if ($aMine !== $bMine) {
+                    return $aMine <=> $bMine;
+                }
+
+                return strcmp(($a['date_iso'] ?? '').' '.($a['start'] ?? ''), ($b['date_iso'] ?? '').' '.($b['start'] ?? ''));
+            })
+            ->values()
+            ->all();
         // My shifts stay unfiltered by station so drivers always see their own schedule.
         $shiftsMine = Shift::whereIn('status', [ShiftStatus::Booked, ShiftStatus::Completed])
             ->where('starts_at', '<', $weekRangeEndExclusive)
@@ -228,7 +254,6 @@ class DriverPortalController extends Controller
             }
         }
         $dayNames = array_column($weekDates, 'name');
-        $favoriteStationIds = $driver->favoriteStationIds();
         $recentStationIds = $driver->recentStationIds();
 
         // Free slots: one selected station, otherwise all favorite stations (keeps the grid usable).
@@ -239,18 +264,10 @@ class DriverPortalController extends Controller
                 $availableSlots = app(ShiftAvailabilityService::class)
                     ->getAvailableSlotsForWeek($startOfWeek, $dayNames, $selectedStationId);
                 $requireStationForFree = false;
-            } else {
-                $favoriteActiveIds = $stations
-                    ->whereIn('id', $favoriteStationIds)
-                    ->pluck('id')
-                    ->map(fn ($id) => (int) $id)
-                    ->values()
-                    ->all();
-                if ($favoriteActiveIds !== []) {
-                    $availableSlots = app(ShiftAvailabilityService::class)
-                        ->getAvailableSlotsForWeek($startOfWeek, $dayNames, $favoriteActiveIds);
-                    $requireStationForFree = false;
-                }
+            } elseif ($favoriteActiveIds !== []) {
+                $availableSlots = app(ShiftAvailabilityService::class)
+                    ->getAvailableSlotsForWeek($startOfWeek, $dayNames, $favoriteActiveIds);
+                $requireStationForFree = false;
             }
         }
         if (! empty($availableSlots)) {
