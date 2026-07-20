@@ -15,12 +15,28 @@
     }
     .shifts-map-pin-wrap { background: transparent; border: 0; }
     .shifts-map-pin {
-        width: 14px; height: 14px; border-radius: 9999px;
-        background: #64748b; border: 2px solid #fff;
+        width: 18px; height: 18px; border-radius: 9999px;
+        background: #2563eb;
+        border: 3px solid #fff;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45), 0 2px 8px rgba(37, 99, 235, 0.55);
     }
     .shifts-map-pin.is-selected {
-        width: 18px; height: 18px; background: #2563eb;
-        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.25);
+        width: 24px; height: 24px;
+        background: #1d4ed8;
+        border-width: 3px;
+        box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.4), 0 0 16px rgba(37, 99, 235, 0.75);
+    }
+    .marker-cluster-small,
+    .marker-cluster-medium,
+    .marker-cluster-large {
+        background-color: rgba(37, 99, 235, 0.35) !important;
+    }
+    .marker-cluster-small div,
+    .marker-cluster-medium div,
+    .marker-cluster-large div {
+        background-color: #2563eb !important;
+        color: #fff !important;
+        font-weight: 700 !important;
     }
     .leaflet-container { font: inherit; }
 </style>
@@ -97,12 +113,17 @@
                     return st ? (st.short || st.name) : this.filterStation;
                 },
                 stationsWithCoords() {
-                    return this.stations.filter(s => s.latitude != null && s.longitude != null);
+                    return this.stations.filter(s =>
+                        s.is_active !== false
+                        && s.latitude != null
+                        && s.longitude != null
+                    );
                 },
                 filteredStations() {
                     const q = (this.stationSearch || '').trim().toLowerCase();
-                    if (!q) return this.stations;
-                    return this.stations.filter(s => {
+                    const active = this.stations.filter(s => s.is_active !== false);
+                    if (!q) return active;
+                    return active.filter(s => {
                         const hay = [s.name, s.short, s.address, s.provider].filter(Boolean).join(' ').toLowerCase();
                         return hay.includes(q);
                     });
@@ -185,8 +206,8 @@
                     return L.divIcon({
                         className: 'shifts-map-pin-wrap',
                         html: '<div class="shifts-map-pin' + (selected ? ' is-selected' : '') + '"></div>',
-                        iconSize: selected ? [18, 18] : [14, 14],
-                        iconAnchor: selected ? [9, 9] : [7, 7],
+                        iconSize: selected ? [24, 24] : [18, 18],
+                        iconAnchor: selected ? [12, 12] : [9, 9],
                     });
                 },
                 initMap() {
@@ -226,7 +247,7 @@
                             title: s.short || s.name,
                             keyboard: true,
                         });
-                        marker.bindTooltip(s.short || s.name, { direction: 'top', offset: [0, -8] });
+                        marker.bindTooltip(s.short || s.name, { direction: 'top', offset: [0, -12] });
                         marker.on('click', () => {
                             if (Number(this.filterStationId) === Number(s.id)) return;
                             this.applyStationFilter(s.id);

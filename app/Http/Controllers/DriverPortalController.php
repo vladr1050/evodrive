@@ -184,7 +184,7 @@ class DriverPortalController extends Controller
                 'next_vehicle_booked_display' => $nextVehicleBookedDisplay,
             ];
         };
-        $stations = Station::where('is_active', true)->orderBy('name')->get(['id', 'name', 'address', 'provider', 'latitude', 'longitude']);
+        $stations = Station::where('is_active', true)->orderBy('name')->get(['id', 'name', 'address', 'provider', 'latitude', 'longitude', 'is_active']);
         $selectedStationId = null;
         $initialFilterStationId = null;
         $initialFilterStation = 'All';
@@ -258,6 +258,7 @@ class DriverPortalController extends Controller
                 'provider' => $s->resolvedProvider(),
                 'latitude' => $s->latitude,
                 'longitude' => $s->longitude,
+                'is_active' => (bool) $s->is_active,
                 'is_favorite' => in_array((int) $s->id, $favoriteStationIds, true),
             ];
         })->values()->all();
