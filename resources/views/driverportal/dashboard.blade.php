@@ -42,7 +42,7 @@
                             </div>
                             <p class="font-bold">{{ $nextShiftStation }}</p>
                             @if(!empty($nextShiftStationAddress))
-                                <p class="text-sm text-brand-200/90 mt-0.5 whitespace-nowrap truncate" title="{{ $nextShiftStationAddress }}">{{ $nextShiftStationAddress }}</p>
+                                <p class="text-sm text-brand-200/90 mt-0.5 leading-snug">{{ $nextShiftStationAddress }}</p>
                             @endif
                         </div>
                     </div>
@@ -81,7 +81,7 @@
                                             <span>
                                                 <span class="block">{{ $shift['station'] }}</span>
                                                 @if(!empty($shift['station_address']))
-                                                    <span class="block text-slate-400 text-xs whitespace-nowrap truncate" title="{{ $shift['station_address'] }}">{{ $shift['station_address'] }}</span>
+                                                    <span class="block text-slate-400 text-xs leading-snug">{{ $shift['station_address'] }}</span>
                                                 @endif
                                             </span>
                                         </span>

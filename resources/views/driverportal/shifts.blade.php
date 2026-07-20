@@ -578,10 +578,10 @@
                                             type="button"
                                             class="w-full text-left px-2 py-1.5 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 hover:bg-brand-50 hover:border-brand-500 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                                             @click="window.openCreateModalFromSlot && window.openCreateModalFromSlot(slot)"
-                                            :title="(slot.station_short || slot.station || '') + ' · ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
+                                            :title="(slot.station_address || slot.station_short || slot.station || '') + ' · ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
                                             :aria-label="slot.start + '–' + slot.end + ', ' + (slot.duration || 0) + 'h, ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
                                         >
-                                            {{-- From – To on one line; no truncate so both times stay visible --}}
+                                            {{-- From – To on one line --}}
                                             <div class="text-[11px] font-bold text-brand-700 tabular-nums leading-tight whitespace-nowrap">
                                                 <span x-text="slot.start"></span><span class="text-brand-400 font-semibold">–</span><span x-text="slot.end"></span><span class="text-brand-400" x-show="slot.end_date_iso">+1</span>
                                             </div>
@@ -594,8 +594,8 @@
                                             <div
                                                 x-show="!filterStationId"
                                                 x-cloak
-                                                class="mt-1 text-[9px] font-medium text-brand-600/80 whitespace-nowrap truncate"
-                                                x-text="slot.station_short || slot.station"
+                                                class="mt-1 text-[9px] font-medium text-brand-600/80 leading-snug"
+                                                x-text="slot.station_address || slot.station_short || slot.station"
                                             ></div>
                                         </button>
                                     </template>
@@ -956,7 +956,7 @@
                         var li = document.createElement('li');
                         var stationName = stationNames[item.station_id] || ('#' + item.station_id);
                         var stationAddr = (stationAddresses && stationAddresses[item.station_id]) ? stationAddresses[item.station_id] : '';
-                        var addrHtml = stationAddr ? '<span class="block text-slate-400 text-xs mt-0.5 whitespace-nowrap truncate" title="' + stationAddr.replace(/"/g, '&quot;') + '">' + stationAddr + '</span>' : '';
+                        var addrHtml = stationAddr ? '<span class="block text-slate-400 text-xs mt-0.5 leading-snug">' + stationAddr + '</span>' : '';
                         li.className = 'flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50/50';
                         li.innerHTML = '<label class="flex items-center gap-3 flex-1 cursor-pointer min-w-0">' +
                             '<input type="checkbox" class="copy-proposed-cb rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0" data-index="' + index + '" checked>' +
