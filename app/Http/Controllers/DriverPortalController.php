@@ -217,19 +217,7 @@ class DriverPortalController extends Controller
                     ->orWhere('driver_id', $driverId);
             });
         }
-        $shiftsAll = $shiftsBaseQuery->clone()->get()
-            ->map($mapShiftRow)
-            ->sort(function (array $a, array $b): int {
-                $aMine = ! empty($a['is_mine']) ? 0 : 1;
-                $bMine = ! empty($b['is_mine']) ? 0 : 1;
-                if ($aMine !== $bMine) {
-                    return $aMine <=> $bMine;
-                }
-
-                return strcmp(($a['date_iso'] ?? '').' '.($a['start'] ?? ''), ($b['date_iso'] ?? '').' '.($b['start'] ?? ''));
-            })
-            ->values()
-            ->all();
+        $shiftsAll = $shiftsBaseQuery->clone()->get()->map($mapShiftRow)->all();
         // My shifts stay unfiltered by station so drivers always see their own schedule.
         $shiftsMine = Shift::whereIn('status', [ShiftStatus::Booked, ShiftStatus::Completed])
             ->where('starts_at', '<', $weekRangeEndExclusive)

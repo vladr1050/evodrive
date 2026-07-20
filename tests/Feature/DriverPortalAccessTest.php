@@ -216,8 +216,13 @@ class DriverPortalAccessTest extends TestCase
         $this->assertContains($reservedOnFav->id, $allIds);
         $this->assertNotContains($reservedElsewhere->id, $allIds);
 
-        $first = $response->viewData('shiftsAll')[0] ?? null;
-        $this->assertTrue((bool) ($first['is_mine'] ?? false));
+        // Chronological order: mine at 10:00, reserved on fav at 11:00.
+        $orderedIds = collect($response->viewData('shiftsAll'))->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $minePos = array_search($mineElsewhere->id, $orderedIds, true);
+        $reservedPos = array_search($reservedOnFav->id, $orderedIds, true);
+        $this->assertNotFalse($minePos);
+        $this->assertNotFalse($reservedPos);
+        $this->assertLessThan($reservedPos, $minePos);
     }
 
     public function test_authenticated_driver_sees_profile(): void
