@@ -43,7 +43,6 @@ Route::prefix('{locale}')
         Route::middleware(['auth:driver', 'driver.portal'])->group(function () {
             Route::get('driverportal/dashboard', [DriverPortalController::class, 'dashboard'])->name('driverportal.dashboard');
             Route::get('driverportal/shifts', [DriverPortalController::class, 'shifts'])->name('driverportal.shifts');
-            Route::get('driverportal/shifts/week-slots', [DriverPortalController::class, 'weekSlots'])->name('driverportal.shifts.week-slots');
             Route::post('driverportal/shifts/check-availability', [DriverPortalController::class, 'checkAvailability'])->name('driverportal.shifts.check-availability');
             Route::post('driverportal/shifts/confirm', [DriverPortalController::class, 'confirmShift'])->name('driverportal.shifts.confirm');
             Route::post('driverportal/shifts/copy-week', [DriverPortalController::class, 'copyWeek'])->name('driverportal.shifts.copy-week');

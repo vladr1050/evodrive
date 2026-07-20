@@ -174,7 +174,6 @@ class DriverPortalController extends Controller
                 'vehicle_reg_number' => $vehicleRegNumber,
                 'station' => $s->station?->name ?? '-',
                 'station_short' => $s->station?->shortLabel() ?? '-',
-                'station_id' => $s->station_id ? (int) $s->station_id : null,
                 'station_address' => $s->station?->address ?: null,
                 'status' => $s->status->value,
                 'is_mine' => $isMine,
@@ -273,14 +272,10 @@ class DriverPortalController extends Controller
             'currentView' => (string) $weekIndex,
             'weekOptions' => $weekOptions,
             'toggleFavoriteUrl' => route('driverportal.stations.toggle-favorite', ['locale' => $request->route('locale', app()->getLocale())]),
-            'slotsUrl' => route('driverportal.shifts.week-slots', ['locale' => $request->route('locale', app()->getLocale())]),
             'requireStationForFree' => true,
-            'allowedDurations' => $allowedDurations,
-            'initialMode' => in_array($request->get('mode'), ['all', 'mine', 'free'], true) ? $request->get('mode') : null,
             'weekDates' => $weekDates,
             'todayIso' => $todayStart->format('Y-m-d'),
             'lastStationStorageKey' => 'evodrive.driver.lastStationId',
-            'modeStorageKey' => 'evodrive.driver.shiftsMode',
         ];
 
         return view('driverportal.shifts', [
@@ -316,59 +311,6 @@ class DriverPortalController extends Controller
             'ok' => true,
             'favorite_station_ids' => $driver->favoriteStationIds(),
             'is_favorite' => in_array($stationId, $driver->favoriteStationIds(), true),
-        ]);
-    }
-
-    /**
-     * Free slots for one week + station (used by map pin soft-filter without full page reload).
-     */
-    public function weekSlots(Request $request): JsonResponse
-    {
-        $request->validate([
-            'station_id' => 'required|integer|exists:stations,id',
-            'view' => 'nullable|integer|min:0',
-        ]);
-
-        $station = Station::where('is_active', true)->find((int) $request->input('station_id'));
-        if (! $station) {
-            return response()->json(['slots' => [], 'error' => 'inactive_or_missing'], 404);
-        }
-
-        $driver = Auth::guard('driver')->user();
-        $policy = ShiftPolicy::active();
-        if (! $policy) {
-            return response()->json(['slots' => []]);
-        }
-
-        $planningWindowDays = $policy->planning_window_days ?? 14;
-        $tz = $policy->timezone ?: 'Europe/Riga';
-        $nowInTz = now($tz);
-        $todayStart = $nowInTz->copy()->startOfDay();
-        $dayOfWeek = $todayStart->dayOfWeek;
-        $diffToMonday = $dayOfWeek === 0 ? -6 : 1 - $dayOfWeek;
-        $firstWeekMonday = $todayStart->copy()->addDays($diffToMonday);
-        $lastDayInWindow = $todayStart->copy()->addDays($planningWindowDays - 1);
-        $lastWeekMonday = $lastDayInWindow->copy()->subDays($lastDayInWindow->dayOfWeek === 0 ? 6 : $lastDayInWindow->dayOfWeek - 1)->startOfDay();
-        $totalWeeks = (int) max(1, 1 + (int) ($firstWeekMonday->diffInDays($lastWeekMonday) / 7));
-        $weekIndex = max(0, min((int) $request->get('view', 0), $totalWeeks - 1));
-        $startOfWeek = $firstWeekMonday->copy()->addDays($weekIndex * 7)->startOfDay();
-        $days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        $minDate = $todayStart->format('Y-m-d');
-        $maxDate = $todayStart->copy()->addDays(max(0, $planningWindowDays - 1))->format('Y-m-d');
-
-        $slots = app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($startOfWeek, $days, (int) $station->id);
-        $slots = array_values(array_filter($slots, function ($slot) use ($minDate, $maxDate) {
-            $date = $slot['date_iso'] ?? null;
-
-            return $date && $date >= $minDate && $date <= $maxDate;
-        }));
-
-        $driver->rememberRecentStation((int) $station->id);
-
-        return response()->json([
-            'station_id' => (int) $station->id,
-            'view' => (string) $weekIndex,
-            'slots' => $slots,
         ]);
     }
 
