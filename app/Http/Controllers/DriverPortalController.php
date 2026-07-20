@@ -228,10 +228,31 @@ class DriverPortalController extends Controller
             }
         }
         $dayNames = array_column($weekDates, 'name');
-        // Free slots are station-scoped to keep the grid usable as the fleet grows.
-        $availableSlots = ($policy && $selectedStationId)
-            ? app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek($startOfWeek, $dayNames, $selectedStationId)
-            : [];
+        $favoriteStationIds = $driver->favoriteStationIds();
+        $recentStationIds = $driver->recentStationIds();
+
+        // Free slots: one selected station, otherwise all favorite stations (keeps the grid usable).
+        $availableSlots = [];
+        $requireStationForFree = true;
+        if ($policy) {
+            if ($selectedStationId) {
+                $availableSlots = app(ShiftAvailabilityService::class)
+                    ->getAvailableSlotsForWeek($startOfWeek, $dayNames, $selectedStationId);
+                $requireStationForFree = false;
+            } else {
+                $favoriteActiveIds = $stations
+                    ->whereIn('id', $favoriteStationIds)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all();
+                if ($favoriteActiveIds !== []) {
+                    $availableSlots = app(ShiftAvailabilityService::class)
+                        ->getAvailableSlotsForWeek($startOfWeek, $dayNames, $favoriteActiveIds);
+                    $requireStationForFree = false;
+                }
+            }
+        }
         if (! empty($availableSlots)) {
             $availableSlots = array_values(array_filter($availableSlots, function ($slot) use ($minDate, $maxDate) {
                 $date = $slot['date_iso'] ?? null;
@@ -247,8 +268,6 @@ class DriverPortalController extends Controller
             $label = $w === 0 ? __('portal.current_week') : ($w === 1 ? __('portal.next_week') : $mon->format('d').'–'.$sun->format('d').' '.$sun->translatedFormat('M'));
             $weekOptions[] = ['index' => $w, 'label' => $label];
         }
-        $favoriteStationIds = $driver->favoriteStationIds();
-        $recentStationIds = $driver->recentStationIds();
         $stationPayload = $stations->map(function (Station $s) use ($favoriteStationIds) {
             return [
                 'id' => $s->id,
@@ -272,7 +291,8 @@ class DriverPortalController extends Controller
             'currentView' => (string) $weekIndex,
             'weekOptions' => $weekOptions,
             'toggleFavoriteUrl' => route('driverportal.stations.toggle-favorite', ['locale' => $request->route('locale', app()->getLocale())]),
-            'requireStationForFree' => true,
+            'requireStationForFree' => $requireStationForFree,
+            'hasFavoriteStations' => $favoriteStationIds !== [],
             'weekDates' => $weekDates,
             'todayIso' => $todayStart->format('Y-m-d'),
             'lastStationStorageKey' => 'evodrive.driver.lastStationId',

@@ -240,17 +240,24 @@ class ShiftAvailabilityService
      * when at least one vehicle is free. Slots are split only around booked shifts (with downtime).
      * Only windows >= min_duration_hours are shown.
      *
+     * @param  int|array<int>|null  $stationIds  Single id, list of ids, or null for all active stations
      * @return array<int, array{id: string, day: string, start: string, end: string, duration: int, station: string, station_short: string, station_id: int, date_iso: string, vehicles: array, cars_count: int}>
      */
-    public function getAvailableSlotsForWeek(Carbon $weekStart, array $dayNames, ?int $stationId = null): array
+    public function getAvailableSlotsForWeek(Carbon $weekStart, array $dayNames, int|array|null $stationIds = null): array
     {
         $policy = ShiftPolicy::active();
         if (! $policy) {
             return [];
         }
         $stationsQuery = Station::where('is_active', true)->orderBy('name');
-        if ($stationId !== null) {
-            $stationsQuery->where('id', $stationId);
+        if (is_int($stationIds)) {
+            $stationsQuery->where('id', $stationIds);
+        } elseif (is_array($stationIds)) {
+            $ids = array_values(array_unique(array_map('intval', $stationIds)));
+            if ($ids === []) {
+                return [];
+            }
+            $stationsQuery->whereIn('id', $ids);
         }
         $stations = $stationsQuery->get();
         if ($stations->isEmpty()) {

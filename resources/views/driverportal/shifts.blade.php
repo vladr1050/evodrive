@@ -52,7 +52,7 @@
                 filterStation: init.initialFilterStation || 'All',
                 isStationDropdownOpen: false,
                 stationSearch: '',
-                shiftsMode: init.initialFilterStationId ? 'free' : 'mine',
+                shiftsMode: (init.initialFilterStationId || (init.favoriteStationIds || []).length) ? 'free' : 'mine',
                 availableSlots: window.__SHIFTS_AVAILABLE_SLOTS__ || [],
                 stations: init.stations || [],
                 favoriteStationIds: init.favoriteStationIds || [],
@@ -64,6 +64,7 @@
                 selectedDayIso: null,
                 toggleFavoriteUrl: init.toggleFavoriteUrl || '',
                 requireStationForFree: init.requireStationForFree !== false,
+                hasFavoriteStations: !!(init.hasFavoriteStations || (init.favoriteStationIds || []).length),
                 lastStationStorageKey: LAST_KEY,
                 map: null,
                 markerLayer: null,
@@ -89,7 +90,8 @@
 
                     if (this.filterStationId) {
                         try { localStorage.setItem(this.lastStationStorageKey, String(this.filterStationId)); } catch (e) {}
-                    } else {
+                    } else if (!this.hasFavoriteStations) {
+                        // Only restore last single-station filter when there are no favorites yet.
                         try {
                             const last = localStorage.getItem(this.lastStationStorageKey);
                             if (last && this.stations.some(s => String(s.id) === String(last))) {
@@ -109,7 +111,7 @@
                     return this.shiftsBaseUrl + '?' + params.toString();
                 },
                 selectedStationLabel() {
-                    if (!this.filterStationId) return this.labels.allStations;
+                    if (!this.filterStationId) return this.labels.favorites;
                     const st = this.stations.find(s => Number(s.id) === Number(this.filterStationId));
                     return st ? (st.short || st.name) : this.filterStation;
                 },
@@ -185,10 +187,15 @@
                         const data = await res.json();
                         if (data.ok) {
                             this.favoriteStationIds = data.favorite_station_ids || [];
+                            this.hasFavoriteStations = this.favoriteStationIds.length > 0;
                             this.stations = this.stations.map(s => ({
                                 ...s,
                                 is_favorite: this.favoriteStationIds.map(Number).includes(Number(s.id)),
                             }));
+                            // Favorites scope is server-rendered; reload when not pinned to one station.
+                            if (!this.filterStationId) {
+                                window.location = this.weekUrl(this.currentView, null);
+                            }
                         }
                     } catch (e) {}
                 },
@@ -327,7 +334,7 @@
                     </div>
                     <div class="overflow-y-auto max-h-[360px]">
                         <button type="button" @click="clearStationFilter()" class="w-full px-4 py-2.5 text-left text-sm font-bold transition-colors flex items-center justify-between" :class="!filterStationId ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
-                            <span>{{ __('portal.all_stations') }}</span>
+                            <span>{{ __('portal.favorite_stations') }}</span>
                         </button>
                         <template x-if="favoriteStations().length">
                             <div>
@@ -393,7 +400,7 @@
                          x-transition:enter-start="translate-y-full"
                          x-transition:enter-end="translate-y-0">
                         <div class="flex items-center justify-between px-5 pt-4 pb-2">
-                            <span class="text-base font-bold text-slate-900">{{ __('portal.all_stations') }}</span>
+                            <span class="text-base font-bold text-slate-900">{{ __('portal.favorite_stations') }}</span>
                             <button type="button" @click="isStationDropdownOpen = false" class="p-2 text-slate-400 hover:text-slate-700">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
                             </button>
@@ -402,7 +409,7 @@
                             <input type="search" x-model="stationSearch" placeholder="{{ __('portal.search_stations') }}" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400">
                         </div>
                         <div class="overflow-y-auto px-2 pb-8">
-                            <button type="button" @click="clearStationFilter()" class="w-full px-4 py-3 text-left text-sm font-bold rounded-xl" :class="!filterStationId ? 'bg-brand-50 text-brand-600' : 'text-slate-600'">{{ __('portal.all_stations') }}</button>
+                            <button type="button" @click="clearStationFilter()" class="w-full px-4 py-3 text-left text-sm font-bold rounded-xl" :class="!filterStationId ? 'bg-brand-50 text-brand-600' : 'text-slate-600'">{{ __('portal.favorite_stations') }}</button>
                             <template x-if="favoriteStations().length">
                                 <div>
                                     <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.favorites"></div>

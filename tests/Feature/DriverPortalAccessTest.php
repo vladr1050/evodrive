@@ -111,6 +111,59 @@ class DriverPortalAccessTest extends TestCase
         $this->assertSame($station->id, $driver->fresh()->recentStationIds()[0] ?? null);
     }
 
+    public function test_free_slots_use_favorite_stations_when_no_station_filter(): void
+    {
+        $driver = Driver::factory()->create([
+            'portal_preferences' => ['favorite_station_ids' => []],
+        ]);
+        \App\Models\ShiftPolicy::factory()->create([
+            'min_duration_hours' => 4,
+            'allowed_durations_json' => [4, 6, 8],
+            'vehicle_downtime_hours' => 0,
+            'time_slot_minutes' => 60,
+            'timezone' => 'Europe/Riga',
+        ]);
+
+        $favA = \App\Models\Station::factory()->create(['name' => 'Fav A', 'is_active' => true]);
+        $favB = \App\Models\Station::factory()->create(['name' => 'Fav B', 'is_active' => true]);
+        $other = \App\Models\Station::factory()->create(['name' => 'Other', 'is_active' => true]);
+        \App\Models\FleetVehicle::factory()->create(['home_station_id' => $favA->id]);
+        \App\Models\FleetVehicle::factory()->create(['home_station_id' => $favB->id]);
+        \App\Models\FleetVehicle::factory()->create(['home_station_id' => $other->id]);
+
+        $driver->update([
+            'portal_preferences' => [
+                'favorite_station_ids' => [$favA->id, $favB->id],
+            ],
+        ]);
+
+        $response = $this->actingAs($driver, 'driver')
+            ->get('/en/driverportal/shifts');
+
+        $response->assertOk();
+        $this->assertFalse($response->viewData('shiftsPageInit')['requireStationForFree']);
+        $slots = $response->viewData('availableSlots');
+        $stationIds = collect($slots)->pluck('station_id')->unique()->sort()->values()->all();
+        $this->assertEqualsCanonicalizing([$favA->id, $favB->id], $stationIds);
+        $this->assertNotContains($other->id, $stationIds);
+    }
+
+    public function test_free_slots_empty_without_favorites_or_station_filter(): void
+    {
+        $driver = Driver::factory()->create([
+            'portal_preferences' => ['favorite_station_ids' => []],
+        ]);
+        \App\Models\ShiftPolicy::factory()->create();
+        \App\Models\Station::factory()->create();
+
+        $response = $this->actingAs($driver, 'driver')
+            ->get('/en/driverportal/shifts');
+
+        $response->assertOk();
+        $this->assertTrue($response->viewData('shiftsPageInit')['requireStationForFree']);
+        $this->assertSame([], $response->viewData('availableSlots'));
+    }
+
     public function test_authenticated_driver_sees_profile(): void
     {
         $driver = Driver::factory()->create();
