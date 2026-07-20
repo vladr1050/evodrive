@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\ShiftStatus;
 use App\Events\ShiftCancelled;
 use App\Jobs\SendShiftCancellationTelegramNotificationJob;
+use App\Jobs\SendShiftNoShowTelegramNotificationJob;
 use App\Models\Driver;
 use App\Models\FleetVehicle;
 use App\Models\Shift;
@@ -275,6 +276,73 @@ class ShiftCancellationTelegramNotificationTest extends TestCase
             }
 
             return (int) $job->delay >= 60;
+        });
+    }
+
+    public function test_no_show_removal_dispatches_telegram_job_with_snapshot_and_deletes_shift(): void
+    {
+        Queue::fake();
+
+        $this->vehicle->update(['registration_number' => 'NS-9999']);
+        $staff = User::factory()->create(['name' => 'Ops Lead']);
+        $startsAt = Carbon::parse('2030-06-02 08:00:00', 'Europe/Riga');
+        Carbon::setTestNow(Carbon::parse('2030-06-02 09:00:00', 'Europe/Riga'));
+
+        $shift = Shift::factory()->create([
+            'driver_id' => $this->driver->id,
+            'vehicle_id' => $this->vehicle->id,
+            'station_id' => $this->station->id,
+            'starts_at' => $startsAt,
+            'ends_at' => $startsAt->copy()->addHours(7),
+            'status' => ShiftStatus::Booked,
+        ]);
+        $shiftId = $shift->id;
+
+        app(\App\Services\ShiftCancellationService::class)->removeNoShowByStaff($shift, $staff);
+
+        $this->assertDatabaseMissing('shifts', ['id' => $shiftId]);
+
+        Queue::assertPushed(SendShiftNoShowTelegramNotificationJob::class, function (SendShiftNoShowTelegramNotificationJob $job) use ($shiftId, $staff) {
+            $p = $job->payload;
+
+            return (int) $p['shift_id'] === $shiftId
+                && str_contains($p['station_name'], 'Central Station')
+                && str_contains($p['vehicle_line'], 'NS-9999')
+                && str_contains($p['slot_line'], 'Slot freed:')
+                && str_contains($p['driver_line'], $this->driver->name)
+                && str_contains($p['staff_line'], $staff->name)
+                && str_contains($p['staff_line'], 'no-show');
+        });
+
+        Carbon::setTestNow();
+    }
+
+    public function test_no_show_telegram_job_sends_message_to_shifts_chat(): void
+    {
+        Http::fake([
+            'api.telegram.org/*' => Http::response(['ok' => true], 200),
+        ]);
+
+        $job = new SendShiftNoShowTelegramNotificationJob([
+            'shift_id' => 42,
+            'station_name' => 'Central Station',
+            'station_address' => '123 Main St',
+            'vehicle_line' => 'Vehicle: NS-9999',
+            'slot_line' => 'Slot freed: 2030-06-02 08:00-15:00',
+            'driver_line' => 'Driver: Jane Doe',
+            'staff_line' => 'Removed by: Ops Lead (staff, no-show)',
+        ]);
+        $job->handle(TelegramNotifier::fromConfig());
+
+        Http::assertSent(function ($request) {
+            $body = $request->data();
+
+            return str_contains($request->url(), 'sendMessage')
+                && str_contains($body['text'] ?? '', 'No-show removed (vehicle freed)')
+                && str_contains($body['text'] ?? '', 'Central Station')
+                && str_contains($body['text'] ?? '', 'NS-9999')
+                && str_contains($body['text'] ?? '', 'Slot freed:')
+                && str_contains($body['text'] ?? '', 'no-show');
         });
     }
 }

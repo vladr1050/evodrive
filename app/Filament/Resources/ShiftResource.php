@@ -20,7 +20,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class ShiftResource extends Resource
 {
@@ -276,17 +275,11 @@ class ShiftResource extends Resource
                         return $record->status === ShiftStatus::Booked && $record->starts_at->lte(now());
                     })
                     ->action(function (Shift $record): void {
-                        $meta = [
-                            'shift_id' => $record->id,
-                            'station_id' => $record->station_id,
-                            'vehicle_id' => $record->vehicle_id,
-                            'driver_id' => $record->driver_id,
-                            'starts_at' => $record->starts_at?->toIso8601String(),
-                            'ends_at' => $record->ends_at?->toIso8601String(),
-                            'admin_user_id' => auth()->id(),
-                        ];
-                        $record->delete();
-                        Log::info('shift.admin_removed_no_show', $meta);
+                        $user = auth()->user();
+                        if (! $user instanceof User) {
+                            return;
+                        }
+                        app(ShiftCancellationService::class)->removeNoShowByStaff($record, $user);
                         \Filament\Notifications\Notification::make()
                             ->title('Shift removed')
                             ->body('The vehicle is available for booking again according to shift policy.')
