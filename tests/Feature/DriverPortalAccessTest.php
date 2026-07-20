@@ -111,6 +111,31 @@ class DriverPortalAccessTest extends TestCase
         $this->assertSame($station->id, $driver->fresh()->recentStationIds()[0] ?? null);
     }
 
+    public function test_week_slots_json_requires_active_station(): void
+    {
+        $driver = Driver::factory()->create();
+        \App\Models\ShiftPolicy::factory()->create();
+        $station = \App\Models\Station::factory()->create(['is_active' => true]);
+
+        $response = $this->actingAs($driver, 'driver')
+            ->getJson('/en/driverportal/shifts/week-slots?station_id='.$station->id.'&view=0');
+
+        $response->assertOk()
+            ->assertJsonStructure(['station_id', 'view', 'slots']);
+    }
+
+    public function test_week_slots_json_rejects_inactive_station(): void
+    {
+        $driver = Driver::factory()->create();
+        \App\Models\ShiftPolicy::factory()->create();
+        $station = \App\Models\Station::factory()->create(['is_active' => false]);
+
+        $response = $this->actingAs($driver, 'driver')
+            ->getJson('/en/driverportal/shifts/week-slots?station_id='.$station->id.'&view=0');
+
+        $response->assertNotFound();
+    }
+
     public function test_authenticated_driver_sees_profile(): void
     {
         $driver = Driver::factory()->create();

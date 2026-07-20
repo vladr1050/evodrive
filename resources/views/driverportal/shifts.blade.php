@@ -47,17 +47,32 @@
         Alpine.data('shiftsPage', function() {
             const init = window.__SHIFTS_PAGE_INIT__ || {};
             const LAST_KEY = init.lastStationStorageKey || 'evodrive.driver.lastStationId';
+            const MODE_KEY = init.modeStorageKey || 'evodrive.driver.shiftsMode';
+            const resolveInitialMode = () => {
+                if (init.initialMode === 'all' || init.initialMode === 'mine' || init.initialMode === 'free') {
+                    return init.initialMode;
+                }
+                try {
+                    const saved = localStorage.getItem(MODE_KEY);
+                    if (saved === 'all' || saved === 'mine' || saved === 'free') return saved;
+                } catch (e) {}
+                return 'mine';
+            };
             return {
                 filterStationId: init.initialFilterStationId || null,
                 filterStation: init.initialFilterStation || 'All',
                 isStationDropdownOpen: false,
                 stationSearch: '',
-                shiftsMode: init.initialFilterStationId ? 'free' : 'mine',
+                shiftsMode: resolveInitialMode(),
+                filterDuration: null,
+                allowedDurations: init.allowedDurations || [],
+                slotsLoading: false,
                 availableSlots: window.__SHIFTS_AVAILABLE_SLOTS__ || [],
                 stations: init.stations || [],
                 favoriteStationIds: init.favoriteStationIds || [],
                 recentStationIds: init.recentStationIds || [],
                 shiftsBaseUrl: init.shiftsBaseUrl || '',
+                slotsUrl: init.slotsUrl || '',
                 currentView: init.currentView || '0',
                 weekOptions: init.weekOptions || [],
                 weekDates: init.weekDates || [],
@@ -65,6 +80,7 @@
                 toggleFavoriteUrl: init.toggleFavoriteUrl || '',
                 requireStationForFree: init.requireStationForFree !== false,
                 lastStationStorageKey: LAST_KEY,
+                modeStorageKey: MODE_KEY,
                 map: null,
                 markerLayer: null,
                 markersById: {},
@@ -80,6 +96,8 @@
                     selectHint: @json(__('portal.select_station_hint')),
                     mapTitle: @json(__('portal.map_stations')),
                     mapNoCoords: @json(__('portal.map_no_coordinates')),
+                    slotsLoading: @json(__('portal.slots_loading')),
+                    anyDuration: @json(__('portal.filter_any_duration')),
                 },
                 boot() {
                     const today = init.todayIso;
@@ -100,11 +118,24 @@
 
                     this.$nextTick(() => this.initMap());
                 },
+                setMode(mode) {
+                    this.shiftsMode = mode;
+                    try { localStorage.setItem(this.modeStorageKey, mode); } catch (e) {}
+                    // All shifts are server-rendered per station — reload so occupancy matches filter.
+                    if (mode === 'all') {
+                        window.location = this.weekUrl(this.currentView, this.filterStationId);
+                        return;
+                    }
+                    if (typeof history !== 'undefined' && history.replaceState) {
+                        history.replaceState(null, '', this.weekUrl(this.currentView, this.filterStationId));
+                    }
+                },
                 weekUrl(view, stationId) {
                     const params = new URLSearchParams();
                     params.set('view', view);
                     const sid = stationId === undefined ? this.filterStationId : stationId;
                     if (sid) params.set('station_id', sid);
+                    if (this.shiftsMode && this.shiftsMode !== 'mine') params.set('mode', this.shiftsMode);
                     return this.shiftsBaseUrl + '?' + params.toString();
                 },
                 selectedStationLabel() {
@@ -152,18 +183,83 @@
                     });
                     return Object.keys(groups).sort().map(name => ({ name, stations: groups[name] }));
                 },
-                applyStationFilter(stationId) {
+                openStationPicker() {
+                    this.isStationDropdownOpen = true;
+                    this.$nextTick(() => {
+                        const el = this.$refs.stationSearchDesktop || this.$refs.stationSearchMobile;
+                        if (el) el.focus();
+                    });
+                },
+                closeStationPicker() {
                     this.isStationDropdownOpen = false;
                     this.stationSearch = '';
+                },
+                async applyStationFilter(stationId, opts = {}) {
+                    const soft = opts.soft !== false;
+                    const preferFree = !!opts.preferFree;
+                    this.closeStationPicker();
+                    if (preferFree) this.setMode('free');
+
                     if (stationId) {
                         try { localStorage.setItem(this.lastStationStorageKey, String(stationId)); } catch (e) {}
                     } else {
                         try { localStorage.removeItem(this.lastStationStorageKey); } catch (e) {}
                     }
+
+                    const canSoft = soft && this.shiftsMode === 'free' && this.slotsUrl;
+                    if (canSoft) {
+                        this.filterStationId = stationId || null;
+                        const st = stationId
+                            ? this.stations.find(s => Number(s.id) === Number(stationId))
+                            : null;
+                        this.filterStation = st ? st.name : 'All';
+                        if (typeof history !== 'undefined' && history.replaceState) {
+                            history.replaceState(null, '', this.weekUrl(this.currentView, stationId || null));
+                        }
+                        if (stationId) {
+                            await this.loadSlots(stationId);
+                        } else {
+                            this.availableSlots = [];
+                        }
+                        this.refreshMapPins();
+                        return;
+                    }
+
                     window.location = this.weekUrl(this.currentView, stationId || null);
                 },
                 clearStationFilter() {
-                    this.applyStationFilter(null);
+                    this.applyStationFilter(null, { soft: true });
+                },
+                async loadSlots(stationId) {
+                    if (!this.slotsUrl || !stationId) return;
+                    this.slotsLoading = true;
+                    try {
+                        const params = new URLSearchParams({
+                            view: this.currentView,
+                            station_id: String(stationId),
+                        });
+                        const res = await fetch(this.slotsUrl + '?' + params.toString(), {
+                            headers: { 'Accept': 'application/json' },
+                            credentials: 'same-origin',
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.availableSlots = data.slots || [];
+                        }
+                    } catch (e) {}
+                    this.slotsLoading = false;
+                },
+                refreshMapPins() {
+                    Object.keys(this.markersById).forEach((id) => {
+                        const marker = this.markersById[id];
+                        if (marker && marker.setIcon) {
+                            marker.setIcon(this.pinIcon(Number(id) === Number(this.filterStationId)));
+                        }
+                    });
+                    const selected = this.stationsWithCoords().find(s => Number(s.id) === Number(this.filterStationId));
+                    if (selected && this.map) {
+                        this.map.setView([selected.latitude, selected.longitude], Math.max(this.map.getZoom(), 13));
+                    }
                 },
                 async toggleFavorite(stationId, event) {
                     if (event) {
@@ -197,7 +293,11 @@
                     return this.labels.carsMany.replace(':count', String(n));
                 },
                 slotsForDay(dayName) {
-                    return this.availableSlots.filter(s => s.day === dayName);
+                    return this.availableSlots.filter(s => {
+                        if (s.day !== dayName) return false;
+                        if (this.filterDuration != null && (s.duration || 0) < this.filterDuration) return false;
+                        return true;
+                    });
                 },
                 needsStationForFree() {
                     return this.shiftsMode === 'free' && this.requireStationForFree && !this.filterStationId;
@@ -249,8 +349,7 @@
                         });
                         marker.bindTooltip(s.short || s.name, { direction: 'top', offset: [0, -12] });
                         marker.on('click', () => {
-                            if (Number(this.filterStationId) === Number(s.id)) return;
-                            this.applyStationFilter(s.id);
+                            this.applyStationFilter(s.id, { soft: true, preferFree: true });
                         });
                         this.markersById[s.id] = marker;
                         this.markerLayer.addLayer(marker);
@@ -275,7 +374,7 @@
         });
     });
 </script>
-<div x-data="shiftsPage()" x-init="boot()" class="animate-fade-in">
+<div x-data="shiftsPage()" x-init="boot()" @keydown.escape.window="closeStationPicker()" class="animate-fade-in">
     <!-- Header Section (UI 1:1 reference) -->
     <div class="mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div>
@@ -297,8 +396,11 @@
             <div class="relative">
                 <button
                     type="button"
-                    @click="isStationDropdownOpen = !isStationDropdownOpen"
+                    @click="isStationDropdownOpen ? closeStationPicker() : openStationPicker()"
                     class="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm hover:border-brand-300 transition-all min-w-[200px] max-w-[280px] justify-between group"
+                    :aria-expanded="isStationDropdownOpen"
+                    aria-haspopup="listbox"
+                    aria-controls="station-picker-panel"
                 >
                     <div class="flex items-center gap-2 min-w-0">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" :class="filterStationId ? 'text-brand-600' : 'text-slate-400'"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -311,14 +413,16 @@
                 <div
                     x-show="isStationDropdownOpen"
                     x-cloak
-                    @click.away="isStationDropdownOpen = false"
+                    @click.away="closeStationPicker()"
+                    id="station-picker-panel"
+                    role="listbox"
                     class="hidden md:block absolute top-full left-0 mt-2 w-[340px] max-h-[420px] bg-white border border-slate-100 rounded-2xl shadow-xl z-30 overflow-hidden"
                     x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0 transform -translate-y-2"
                     x-transition:enter-end="opacity-100 transform translate-y-0"
                 >
                     <div class="p-3 border-b border-slate-100 sticky top-0 bg-white z-10">
-                        <input type="search" x-model="stationSearch" placeholder="{{ __('portal.search_stations') }}" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400" @click.stop>
+                        <input type="search" x-ref="stationSearchDesktop" x-model="stationSearch" placeholder="{{ __('portal.search_stations') }}" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400" @click.stop @keydown.escape.prevent="closeStationPicker()">
                     </div>
                     <div class="overflow-y-auto max-h-[360px]">
                         <button type="button" @click="clearStationFilter()" class="w-full px-4 py-2.5 text-left text-sm font-bold transition-colors flex items-center justify-between" :class="!filterStationId ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
@@ -329,7 +433,7 @@
                                 <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.favorites"></div>
                                 <template x-for="s in favoriteStations()" :key="'fav-'+s.id">
                                     <div class="flex items-stretch">
-                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                                        <button type="button" @click="applyStationFilter(s.id, { soft: true, preferFree: true })" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
                                             <span class="block truncate" x-text="s.short || s.name"></span>
                                             <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                         </button>
@@ -345,7 +449,7 @@
                                 <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.recent"></div>
                                 <template x-for="s in recentStations()" :key="'rec-'+s.id">
                                     <div class="flex items-stretch">
-                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                                        <button type="button" @click="applyStationFilter(s.id, { soft: true, preferFree: true })" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
                                             <span class="block truncate" x-text="s.short || s.name"></span>
                                             <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                         </button>
@@ -361,7 +465,7 @@
                                 <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="group.name"></div>
                                 <template x-for="s in group.stations" :key="'g-'+s.id">
                                     <div class="flex items-stretch">
-                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                                        <button type="button" @click="applyStationFilter(s.id, { soft: true, preferFree: true })" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
                                             <span class="block truncate" x-text="s.short || s.name"></span>
                                             <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                         </button>
@@ -382,19 +486,19 @@
                     class="md:hidden fixed inset-0 z-40"
                     x-transition.opacity
                 >
-                    <div class="absolute inset-0 bg-slate-900/40" @click="isStationDropdownOpen = false"></div>
+                    <div class="absolute inset-0 bg-slate-900/40" @click="closeStationPicker()"></div>
                     <div class="absolute bottom-0 left-0 right-0 max-h-[85vh] bg-white rounded-t-3xl shadow-2xl flex flex-col"
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="translate-y-full"
                          x-transition:enter-end="translate-y-0">
                         <div class="flex items-center justify-between px-5 pt-4 pb-2">
                             <span class="text-base font-bold text-slate-900">{{ __('portal.all_stations') }}</span>
-                            <button type="button" @click="isStationDropdownOpen = false" class="p-2 text-slate-400 hover:text-slate-700">
+                            <button type="button" @click="closeStationPicker()" class="p-2 text-slate-400 hover:text-slate-700">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
                             </button>
                         </div>
                         <div class="px-5 pb-3">
-                            <input type="search" x-model="stationSearch" placeholder="{{ __('portal.search_stations') }}" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400">
+                            <input type="search" x-ref="stationSearchMobile" x-model="stationSearch" placeholder="{{ __('portal.search_stations') }}" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400" @keydown.escape.prevent="closeStationPicker()">
                         </div>
                         <div class="overflow-y-auto px-2 pb-8">
                             <button type="button" @click="clearStationFilter()" class="w-full px-4 py-3 text-left text-sm font-bold rounded-xl" :class="!filterStationId ? 'bg-brand-50 text-brand-600' : 'text-slate-600'">{{ __('portal.all_stations') }}</button>
@@ -403,7 +507,7 @@
                                     <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.favorites"></div>
                                     <template x-for="s in favoriteStations()" :key="'mfav-'+s.id">
                                         <div class="flex items-stretch">
-                                            <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0" :class="filterStationId === s.id ? 'text-brand-600' : 'text-slate-700'">
+                                            <button type="button" @click="applyStationFilter(s.id, { soft: true, preferFree: true })" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0" :class="filterStationId === s.id ? 'text-brand-600' : 'text-slate-700'">
                                                 <span class="block truncate" x-text="s.short || s.name"></span>
                                                 <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                             </button>
@@ -419,7 +523,7 @@
                                     <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.recent"></div>
                                     <template x-for="s in recentStations()" :key="'mrec-'+s.id">
                                         <div class="flex items-stretch">
-                                            <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0">
+                                            <button type="button" @click="applyStationFilter(s.id, { soft: true, preferFree: true })" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0">
                                                 <span class="block truncate" x-text="s.short || s.name"></span>
                                                 <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                             </button>
@@ -435,7 +539,7 @@
                                     <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="group.name"></div>
                                     <template x-for="s in group.stations" :key="'mg-'+s.id">
                                         <div class="flex items-stretch">
-                                            <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0" :class="filterStationId === s.id ? 'text-brand-600' : 'text-slate-700'">
+                                            <button type="button" @click="applyStationFilter(s.id, { soft: true, preferFree: true })" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0" :class="filterStationId === s.id ? 'text-brand-600' : 'text-slate-700'">
                                                 <span class="block truncate" x-text="s.short || s.name"></span>
                                                 <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                             </button>
@@ -471,21 +575,31 @@
         </div>
     @endif
 
-    <!-- Mode toggle: All shifts / My shifts / Free slots -->
-    <div class="mb-6 flex flex-wrap items-center gap-2 sm:gap-4 bg-white p-2 rounded-3xl border border-slate-100 shadow-sm w-fit max-w-full">
-        <button type="button" @click="shiftsMode = 'all'" :class="shiftsMode === 'all' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-4 sm:px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            {{ __('portal.all_shifts') }}
-        </button>
-        <button type="button" @click="shiftsMode = 'mine'" :class="shiftsMode === 'mine' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-4 sm:px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
+    <!-- Mode toggle: My (home) / Free / All -->
+    <div class="mb-4 flex flex-wrap items-center gap-2 sm:gap-4 bg-white p-2 rounded-3xl border border-slate-100 shadow-sm w-fit max-w-full" role="tablist" aria-label="{{ __('portal.shifts') }}">
+        <button type="button" role="tab" @click="setMode('mine')" :aria-selected="shiftsMode === 'mine'" :class="shiftsMode === 'mine' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-4 sm:px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             {{ __('portal.my_shifts_tab') }}
         </button>
-        <button type="button" @click="shiftsMode = 'free'" :class="shiftsMode === 'free' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-4 sm:px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
+        <button type="button" role="tab" @click="setMode('free')" :aria-selected="shiftsMode === 'free'" :class="shiftsMode === 'free' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-4 sm:px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
             {{ __('portal.show_free_slots') }}
         </button>
+        <button type="button" role="tab" @click="setMode('all')" :aria-selected="shiftsMode === 'all'" :class="shiftsMode === 'all' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'" class="px-4 sm:px-6 py-2.5 rounded-2xl text-sm font-bold transition-all flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            {{ __('portal.all_shifts') }}
+        </button>
     </div>
+
+    <div x-show="shiftsMode === 'free' && allowedDurations.length" x-cloak class="mb-4 flex flex-wrap items-center gap-2">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 mr-1">{{ __('portal.filter_duration') }}</span>
+        <button type="button" @click="filterDuration = null" class="px-3 py-1.5 rounded-xl text-xs font-bold border transition-all" :class="filterDuration == null ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'">{{ __('portal.filter_any_duration') }}</button>
+        <template x-for="h in allowedDurations" :key="'dur-'+h">
+            <button type="button" @click="filterDuration = h" class="px-3 py-1.5 rounded-xl text-xs font-bold border transition-all" :class="filterDuration === h ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'" x-text="h + 'h'"></button>
+        </template>
+    </div>
+
+    <div x-show="slotsLoading" x-cloak class="mb-4 text-sm font-medium text-brand-700" x-text="labels.slotsLoading"></div>
 
     <div x-show="needsStationForFree()" x-cloak class="mb-6 p-4 rounded-2xl border border-dashed border-brand-300 bg-brand-50/50 text-sm text-brand-800 font-medium">
         <p x-text="labels.selectPrompt"></p>
@@ -550,9 +664,9 @@
                                 </button>
                             </div>
                             <div class="space-y-3 min-h-[200px]">
-                                <div x-show="shiftsMode === 'all'" class="space-y-3" x-cloak>
+                                <div x-show="shiftsMode === 'all'" class="space-y-2" x-cloak>
                                     @foreach($dayShiftsAll as $shift)
-                                        @include('driverportal.components.shift-block', ['shift' => $shift])
+                                        @include('driverportal.components.shift-block-compact', ['shift' => $shift])
                                     @endforeach
                                 </div>
                                 <div x-show="shiftsMode === 'mine'" class="space-y-3" x-cloak>
