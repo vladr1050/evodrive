@@ -569,25 +569,28 @@
                                     <template x-for="slot in slotsForDay('{{ $dayInfo['name'] }}')" :key="slot.id">
                                         <button
                                             type="button"
-                                            class="w-full text-left px-2 py-1.5 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 hover:bg-brand-50 hover:border-brand-500 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                            class="w-full text-left px-2 py-1.5 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 hover:bg-brand-50 hover:border-brand-500 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                                             @click="window.openCreateModalFromSlot && window.openCreateModalFromSlot(slot)"
                                             :title="(slot.station_short || slot.station || '') + ' · ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
-                                            :aria-label="slot.start + '–' + slot.end + ', ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
+                                            :aria-label="slot.start + '–' + slot.end + ', ' + (slot.duration || 0) + 'h, ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
                                         >
-                                            <div class="flex items-baseline justify-between gap-1 min-w-0">
-                                                <span class="text-xs font-bold text-brand-700 tabular-nums leading-tight truncate">
-                                                    <span x-text="slot.start"></span><span class="text-brand-400 font-semibold">–</span><span x-text="slot.end"></span><span class="text-brand-400" x-show="slot.end_date_iso">+1</span>
-                                                </span>
-                                                <span class="text-[10px] font-bold text-brand-500 shrink-0 tabular-nums" x-text="(slot.duration || '') + 'h'"></span>
+                                            {{-- From – To: stacked so both times always fit in narrow day columns --}}
+                                            <div class="text-xs font-bold text-brand-700 tabular-nums leading-tight">
+                                                <div class="whitespace-nowrap" x-text="slot.start"></div>
+                                                <div class="whitespace-nowrap text-brand-600">
+                                                    <span class="text-brand-400 font-semibold">–</span><span x-text="slot.end"></span><span class="text-brand-400" x-show="slot.end_date_iso">+1</span>
+                                                </div>
                                             </div>
-                                            <div class="mt-1 flex items-center justify-between gap-1 min-w-0">
-                                                <span class="text-[10px] font-bold text-slate-600 truncate" x-text="carsShort(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"></span>
-                                                <span class="text-[9px] font-bold uppercase tracking-wide text-brand-600 shrink-0">{{ __('portal.book_now') }}</span>
+                                            <div class="mt-1 text-[10px] font-bold text-brand-500 tabular-nums" x-text="(slot.duration || 0) + 'h'"></div>
+                                            <div class="mt-1 space-y-0.5">
+                                                <template x-for="(v, vi) in (slot.vehicles || [])" :key="slot.id + '-v-' + vi">
+                                                    <div class="text-[10px] font-semibold text-slate-700 tabular-nums leading-tight whitespace-nowrap" x-text="v.number || v.model"></div>
+                                                </template>
                                             </div>
                                             <div
                                                 x-show="!filterStationId"
                                                 x-cloak
-                                                class="mt-0.5 text-[9px] font-medium text-brand-600/80 truncate"
+                                                class="mt-1 text-[9px] font-medium text-brand-600/80 break-words"
                                                 x-text="slot.station_short || slot.station"
                                             ></div>
                                         </button>
