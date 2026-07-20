@@ -44,12 +44,12 @@ class StationResource extends Resource
                             ->maxLength(100),
                         Forms\Components\TextInput::make('latitude')
                             ->numeric()
-                            ->step(0.0000001)
+                            ->step('any')
                             ->minValue(-90)
                             ->maxValue(90),
                         Forms\Components\TextInput::make('longitude')
                             ->numeric()
-                            ->step(0.0000001)
+                            ->step('any')
                             ->minValue(-180)
                             ->maxValue(180),
                         Forms\Components\Select::make('is_active')
