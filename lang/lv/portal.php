@@ -47,6 +47,8 @@ return [
     'all_stations' => 'Visas stacijas',
     'search_stations' => 'Meklēt stacijas…',
     'favorite_stations' => 'Izlase',
+    'favorite_stations_filter' => 'Visa izlase',
+    'favorite_stations_filter_hint' => 'Rādīt visas atzīmētās stacijas',
     'recent_stations' => 'Nesenās',
     'other_stations' => 'Citas',
     'select_station_prompt' => 'Pievienojiet izlases stacijas, lai redzētu brīvos slotus',

@@ -47,6 +47,8 @@ return [
     'all_stations' => 'Все станции',
     'search_stations' => 'Поиск станций…',
     'favorite_stations' => 'Избранные',
+    'favorite_stations_filter' => 'Все избранные',
+    'favorite_stations_filter_hint' => 'Показать все отмеченные станции',
     'recent_stations' => 'Недавние',
     'other_stations' => 'Другие',
     'select_station_prompt' => 'Добавьте избранные станции, чтобы видеть свободные слоты',

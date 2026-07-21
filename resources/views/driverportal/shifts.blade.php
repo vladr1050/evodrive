@@ -357,8 +357,48 @@
                         <input type="search" x-model="stationSearch" placeholder="{{ __('portal.search_stations') }}" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400" @click.stop>
                     </div>
                     <div class="overflow-y-auto max-h-[360px]">
-                        <button type="button" @click="clearStationFilter()" class="w-full px-4 py-2.5 text-left text-sm font-bold transition-colors flex items-center justify-between" :class="!filterStationId ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
-                            <span>{{ __('portal.favorite_stations') }}</span>
+                        <button
+                            type="button"
+                            @click="clearStationFilter()"
+                            class="w-full px-3 py-2.5 text-left transition-colors flex items-center gap-3 border-b border-slate-100"
+                            :class="!filterStationId ? 'bg-brand-50' : 'hover:bg-slate-50'"
+                        >
+                            <span
+                                class="flex h-9 w-9 items-center justify-center rounded-xl shrink-0"
+                                :class="!filterStationId ? 'bg-brand-600 text-white' : 'bg-amber-50 text-amber-500 ring-1 ring-amber-200'"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block text-sm font-bold" :class="!filterStationId ? 'text-brand-700' : 'text-slate-800'">{{ __('portal.favorite_stations_filter') }}</span>
+                                <span class="block text-xs font-medium text-slate-400">{{ __('portal.favorite_stations_filter_hint') }}</span>
+                            </span>
+                            <svg
+                                x-show="!filterStationId"
+                                x-cloak
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2.5"
+                                class="shrink-0 text-brand-600"
+                                aria-hidden="true"
+                            ><polyline points="20 6 9 17 4 12"/></svg>
+                            <svg
+                                x-show="!!filterStationId"
+                                x-cloak
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                class="shrink-0 text-slate-300"
+                                aria-hidden="true"
+                            ><polyline points="9 18 15 12 9 6"/></svg>
                         </button>
                         <template x-if="favoriteStations().length">
                             <div>
@@ -433,7 +473,49 @@
                             <input type="search" x-model="stationSearch" placeholder="{{ __('portal.search_stations') }}" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400">
                         </div>
                         <div class="overflow-y-auto px-2 pb-8">
-                            <button type="button" @click="clearStationFilter()" class="w-full px-4 py-3 text-left text-sm font-bold rounded-xl" :class="!filterStationId ? 'bg-brand-50 text-brand-600' : 'text-slate-600'">{{ __('portal.favorite_stations') }}</button>
+                            <button
+                                type="button"
+                                @click="clearStationFilter()"
+                                class="w-full px-3 py-3 text-left transition-colors flex items-center gap-3 rounded-2xl"
+                                :class="!filterStationId ? 'bg-brand-50 ring-1 ring-brand-200' : 'hover:bg-slate-50'"
+                            >
+                                <span
+                                    class="flex h-10 w-10 items-center justify-center rounded-xl shrink-0"
+                                    :class="!filterStationId ? 'bg-brand-600 text-white' : 'bg-amber-50 text-amber-500 ring-1 ring-amber-200'"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                </span>
+                                <span class="min-w-0 flex-1">
+                                    <span class="block text-sm font-bold" :class="!filterStationId ? 'text-brand-700' : 'text-slate-800'">{{ __('portal.favorite_stations_filter') }}</span>
+                                    <span class="block text-xs font-medium text-slate-400">{{ __('portal.favorite_stations_filter_hint') }}</span>
+                                </span>
+                                <svg
+                                    x-show="!filterStationId"
+                                    x-cloak
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="18"
+                                    height="18"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2.5"
+                                    class="shrink-0 text-brand-600"
+                                    aria-hidden="true"
+                                ><polyline points="20 6 9 17 4 12"/></svg>
+                                <svg
+                                    x-show="!!filterStationId"
+                                    x-cloak
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    class="shrink-0 text-slate-300"
+                                    aria-hidden="true"
+                                ><polyline points="9 18 15 12 9 6"/></svg>
+                            </button>
                             <template x-if="favoriteStations().length">
                                 <div>
                                     <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.favorites"></div>
@@ -539,8 +621,11 @@
                         x-show="filterStationId"
                         x-cloak
                         @click="clearStationFilter()"
-                        class="text-xs font-bold text-slate-500 hover:text-brand-600"
-                    >{{ __('portal.clear_station_filter') }}</button>
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-600 text-white hover:bg-brand-700 shadow-sm transition-colors"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                        {{ __('portal.clear_station_filter') }}
+                    </button>
                 </div>
                 <div id="shifts-stations-map" class="shifts-map" role="application" aria-label="{{ __('portal.map_stations') }}"></div>
             </div>

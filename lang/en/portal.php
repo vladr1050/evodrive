@@ -47,6 +47,8 @@ return [
     'all_stations' => 'All Stations',
     'search_stations' => 'Search stations…',
     'favorite_stations' => 'Favorites',
+    'favorite_stations_filter' => 'All favorites',
+    'favorite_stations_filter_hint' => 'Show every starred station',
     'recent_stations' => 'Recent',
     'other_stations' => 'Other',
     'select_station_prompt' => 'Add favorite stations to see free slots',
