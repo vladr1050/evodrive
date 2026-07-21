@@ -188,10 +188,14 @@ class DriverPortalController extends Controller
         $selectedStationId = null;
         $initialFilterStationId = null;
         $initialFilterStation = 'All';
-        if ($stationId && $stations->contains('id', (int) $stationId)) {
-            $selectedStationId = (int) $stationId;
+        $stationIdInt = is_numeric($stationId) ? (int) $stationId : null;
+        $matchedStation = $stationIdInt
+            ? $stations->firstWhere('id', $stationIdInt)
+            : null;
+        if ($matchedStation) {
+            $selectedStationId = $stationIdInt;
             $initialFilterStationId = $selectedStationId;
-            $initialFilterStation = $stations->firstWhere('id', $selectedStationId)->name;
+            $initialFilterStation = $matchedStation->name;
             $driver->rememberRecentStation($selectedStationId);
         }
 

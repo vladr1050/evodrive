@@ -9,7 +9,12 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <style>
-    .shifts-map { width: 100%; height: 200px; border-radius: 1rem; z-index: 0; background: #e2e8f0; }
+    /* Keep Leaflet panes (z-index 200–800) inside the map so they don't steal clicks from the station picker. */
+    .shifts-map {
+        width: 100%; height: 200px; border-radius: 1rem;
+        z-index: 0; isolation: isolate; position: relative;
+        background: #e2e8f0;
+    }
     @media (min-width: 1280px) {
         .shifts-map { height: min(420px, calc(100vh - 14rem)); min-height: 280px; }
     }
@@ -38,7 +43,7 @@
         color: #fff !important;
         font-weight: 700 !important;
     }
-    .leaflet-container { font: inherit; }
+    .leaflet-container { font: inherit; z-index: 0 !important; }
 </style>
 <script>
     window.__SHIFTS_AVAILABLE_SLOTS__ = @json($availableSlots ?? []);
@@ -48,7 +53,9 @@
             const init = window.__SHIFTS_PAGE_INIT__ || {};
             const LAST_KEY = init.lastStationStorageKey || 'evodrive.driver.lastStationId';
             return {
-                filterStationId: init.initialFilterStationId || null,
+                filterStationId: init.initialFilterStationId != null && init.initialFilterStationId !== ''
+                    ? Number(init.initialFilterStationId)
+                    : null,
                 filterStation: init.initialFilterStation || 'All',
                 isStationDropdownOpen: false,
                 stationSearch: '',
@@ -105,15 +112,20 @@
                 },
                 weekUrl(view, stationId) {
                     const params = new URLSearchParams();
-                    params.set('view', view);
+                    params.set('view', String(view));
                     const sid = stationId === undefined ? this.filterStationId : stationId;
-                    if (sid) params.set('station_id', sid);
+                    if (sid != null && sid !== '' && !Number.isNaN(Number(sid))) {
+                        params.set('station_id', String(Number(sid)));
+                    }
                     return this.shiftsBaseUrl + '?' + params.toString();
                 },
                 selectedStationLabel() {
                     if (!this.filterStationId) return this.labels.favorites;
                     const st = this.stations.find(s => Number(s.id) === Number(this.filterStationId));
                     return st ? (st.short || st.name) : this.filterStation;
+                },
+                isStationSelected(stationId) {
+                    return this.filterStationId != null && Number(this.filterStationId) === Number(stationId);
                 },
                 stationsWithCoords() {
                     return this.stations.filter(s =>
@@ -158,12 +170,25 @@
                 applyStationFilter(stationId) {
                     this.isStationDropdownOpen = false;
                     this.stationSearch = '';
-                    if (stationId) {
-                        try { localStorage.setItem(this.lastStationStorageKey, String(stationId)); } catch (e) {}
+                    const nextId = (stationId === null || stationId === undefined || stationId === '')
+                        ? null
+                        : Number(stationId);
+                    if (nextId != null && Number.isNaN(nextId)) {
+                        return;
+                    }
+                    // Already on this filter — no reload needed.
+                    if (nextId === null && this.filterStationId == null) {
+                        return;
+                    }
+                    if (nextId != null && Number(this.filterStationId) === nextId) {
+                        return;
+                    }
+                    if (nextId != null) {
+                        try { localStorage.setItem(this.lastStationStorageKey, String(nextId)); } catch (e) {}
                     } else {
                         try { localStorage.removeItem(this.lastStationStorageKey); } catch (e) {}
                     }
-                    window.location = this.weekUrl(this.currentView, stationId || null);
+                    window.location.assign(this.weekUrl(this.currentView, nextId));
                 },
                 clearStationFilter() {
                     this.applyStationFilter(null);
@@ -261,7 +286,6 @@
                         });
                         marker.bindTooltip(s.short || s.name, { direction: 'top', offset: [0, -12] });
                         marker.on('click', () => {
-                            if (Number(this.filterStationId) === Number(s.id)) return;
                             this.applyStationFilter(s.id);
                         });
                         this.markersById[s.id] = marker;
@@ -306,7 +330,7 @@
             </div>
 
             <!-- Station picker: search + favorites + provider groups (desktop panel / mobile sheet) -->
-            <div class="relative">
+            <div class="relative z-50">
                 <button
                     type="button"
                     @click="isStationDropdownOpen = !isStationDropdownOpen"
@@ -323,8 +347,8 @@
                 <div
                     x-show="isStationDropdownOpen"
                     x-cloak
-                    @click.away="isStationDropdownOpen = false"
-                    class="hidden md:block absolute top-full left-0 mt-2 w-[340px] max-h-[420px] bg-white border border-slate-100 rounded-2xl shadow-xl z-30 overflow-hidden"
+                    @click.outside="isStationDropdownOpen = false"
+                    class="hidden md:block absolute top-full left-0 mt-2 w-[340px] max-h-[420px] bg-white border border-slate-100 rounded-2xl shadow-xl z-50 overflow-hidden"
                     x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0 transform -translate-y-2"
                     x-transition:enter-end="opacity-100 transform translate-y-0"
@@ -341,7 +365,7 @@
                                 <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.favorites"></div>
                                 <template x-for="s in favoriteStations()" :key="'fav-'+s.id">
                                     <div class="flex items-stretch">
-                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="isStationSelected(s.id) ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
                                             <span class="block truncate" x-text="s.short || s.name"></span>
                                             <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                         </button>
@@ -357,7 +381,7 @@
                                 <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.recent"></div>
                                 <template x-for="s in recentStations()" :key="'rec-'+s.id">
                                     <div class="flex items-stretch">
-                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="isStationSelected(s.id) ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
                                             <span class="block truncate" x-text="s.short || s.name"></span>
                                             <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                         </button>
@@ -373,7 +397,7 @@
                                 <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="group.name"></div>
                                 <template x-for="s in group.stations" :key="'g-'+s.id">
                                     <div class="flex items-stretch">
-                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="filterStationId === s.id ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
+                                        <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-2.5 text-left text-sm font-bold transition-colors min-w-0" :class="isStationSelected(s.id) ? 'bg-brand-50 text-brand-600' : 'text-slate-600 hover:bg-slate-50'">
                                             <span class="block truncate" x-text="s.short || s.name"></span>
                                             <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                         </button>
@@ -391,7 +415,7 @@
                 <div
                     x-show="isStationDropdownOpen"
                     x-cloak
-                    class="md:hidden fixed inset-0 z-40"
+                    class="md:hidden fixed inset-0 z-50"
                     x-transition.opacity
                 >
                     <div class="absolute inset-0 bg-slate-900/40" @click="isStationDropdownOpen = false"></div>
@@ -415,7 +439,7 @@
                                     <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="labels.favorites"></div>
                                     <template x-for="s in favoriteStations()" :key="'mfav-'+s.id">
                                         <div class="flex items-stretch">
-                                            <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0" :class="filterStationId === s.id ? 'text-brand-600' : 'text-slate-700'">
+                                            <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0" :class="isStationSelected(s.id) ? 'text-brand-600' : 'text-slate-700'">
                                                 <span class="block truncate" x-text="s.short || s.name"></span>
                                                 <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                             </button>
@@ -447,7 +471,7 @@
                                     <div class="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400" x-text="group.name"></div>
                                     <template x-for="s in group.stations" :key="'mg-'+s.id">
                                         <div class="flex items-stretch">
-                                            <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0" :class="filterStationId === s.id ? 'text-brand-600' : 'text-slate-700'">
+                                            <button type="button" @click="applyStationFilter(s.id)" class="flex-1 px-4 py-3 text-left text-sm font-bold min-w-0" :class="isStationSelected(s.id) ? 'text-brand-600' : 'text-slate-700'">
                                                 <span class="block truncate" x-text="s.short || s.name"></span>
                                                 <span class="block text-xs font-normal text-slate-400 truncate" x-text="s.address || s.name"></span>
                                             </button>
@@ -506,7 +530,7 @@
 
     <!-- Split: map filter + week schedule -->
     <div class="flex flex-col xl:grid xl:grid-cols-12 gap-4 xl:gap-5 items-start">
-        <aside class="w-full xl:col-span-4 xl:sticky xl:top-4 space-y-3">
+        <aside class="w-full xl:col-span-4 xl:sticky xl:top-4 space-y-3 relative z-0">
             <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
                 <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
                     <span class="text-sm font-bold text-slate-800" x-text="labels.mapTitle"></span>
@@ -564,7 +588,7 @@
                             <div class="space-y-1.5 min-h-[120px]">
                                 <div x-show="shiftsMode === 'all'" class="space-y-1.5" x-cloak>
                                     @foreach($dayShiftsAll as $shift)
-                                        @include('driverportal.components.shift-block', ['shift' => $shift, 'hideStation' => (bool) $selectedStationId])
+                                        @include('driverportal.components.shift-block', ['shift' => $shift, 'hideStation' => false])
                                     @endforeach
                                 </div>
                                 <div x-show="shiftsMode === 'mine'" class="space-y-1.5" x-cloak>
@@ -592,8 +616,6 @@
                                                 </template>
                                             </div>
                                             <div
-                                                x-show="!filterStationId"
-                                                x-cloak
                                                 class="mt-1 text-[9px] font-medium text-brand-600/80 leading-snug break-normal [overflow-wrap:anywhere]"
                                                 x-text="slot.station_address || slot.station_short || slot.station"
                                             ></div>
