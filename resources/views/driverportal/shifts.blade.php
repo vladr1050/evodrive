@@ -233,22 +233,6 @@
                     const n = count || 0;
                     return this.labels.carsShort.replace(':count', String(n));
                 },
-                vehicleToneStyle(tone) {
-                    const tones = [
-                        { border: '#2563eb', bg: 'rgba(37, 99, 235, 0.10)', text: '#1d4ed8' },
-                        { border: '#0d9488', bg: 'rgba(13, 148, 136, 0.10)', text: '#0f766e' },
-                        { border: '#d97706', bg: 'rgba(217, 119, 6, 0.10)', text: '#b45309' },
-                        { border: '#db2777', bg: 'rgba(219, 39, 119, 0.10)', text: '#be185d' },
-                        { border: '#4f46e5', bg: 'rgba(79, 70, 229, 0.10)', text: '#4338ca' },
-                        { border: '#059669', bg: 'rgba(5, 150, 105, 0.10)', text: '#047857' },
-                    ];
-                    const t = tones[Number(tone) % tones.length] || tones[0];
-                    return {
-                        borderColor: t.border,
-                        backgroundColor: t.bg,
-                        color: t.text,
-                    };
-                },
                 slotsForDay(dayName) {
                     return this.availableSlots.filter(s => s.day === dayName);
                 },
@@ -701,22 +685,21 @@
                                     <template x-for="slot in slotsForDay('{{ $dayInfo['name'] }}')" :key="slot.id">
                                         <button
                                             type="button"
-                                            class="w-full text-left px-2 py-1.5 rounded-lg border border-dashed transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500/40 border-l-4"
-                                            :style="vehicleToneStyle(slot.vehicle_tone ?? 0)"
+                                            class="w-full text-left px-2 py-1.5 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 hover:bg-brand-50 hover:border-brand-500 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500/40"
                                             @click="window.openCreateModalFromSlot && window.openCreateModalFromSlot(slot)"
                                             :title="(slot.station_address || slot.station_short || slot.station || '') + ' · ' + ((slot.vehicles && slot.vehicles[0] && (slot.vehicles[0].number || slot.vehicles[0].model)) || '')"
                                             :aria-label="slot.start + '–' + slot.end + ', ' + (slot.duration || 0) + 'h, ' + ((slot.vehicles && slot.vehicles[0] && (slot.vehicles[0].number || slot.vehicles[0].model)) || '')"
                                         >
                                             {{-- From – To on one line --}}
-                                            <div class="text-[11px] font-bold tabular-nums leading-tight whitespace-nowrap" :style="{ color: 'inherit' }">
-                                                <span x-text="slot.start"></span><span class="font-semibold opacity-60">–</span><span x-text="slot.end"></span><span class="opacity-60" x-show="slot.end_date_iso">+1</span>
+                                            <div class="text-[11px] font-bold text-brand-700 tabular-nums leading-tight whitespace-nowrap">
+                                                <span x-text="slot.start"></span><span class="text-brand-400 font-semibold">–</span><span x-text="slot.end"></span><span class="text-brand-400" x-show="slot.end_date_iso">+1</span>
                                             </div>
-                                            <div class="mt-1 text-[10px] font-bold tabular-nums opacity-80" x-text="(slot.duration || 0) + 'h'"></div>
-                                            <div class="mt-1 text-[10px] font-semibold tabular-nums leading-tight whitespace-nowrap text-slate-800">
+                                            <div class="mt-1 text-[10px] font-bold text-brand-500 tabular-nums" x-text="(slot.duration || 0) + 'h'"></div>
+                                            <div class="mt-1 text-[10px] font-semibold text-slate-700 tabular-nums leading-tight whitespace-nowrap">
                                                 <span x-text="(slot.vehicles && slot.vehicles[0] && (slot.vehicles[0].number || slot.vehicles[0].model)) || '—'"></span>
                                             </div>
                                             <div
-                                                class="mt-1 text-[9px] font-medium text-slate-500 leading-snug break-normal [overflow-wrap:anywhere]"
+                                                class="mt-1 text-[9px] font-medium text-brand-600/80 leading-snug break-normal [overflow-wrap:anywhere]"
                                                 x-text="slot.station_address || slot.station_short || slot.station"
                                             ></div>
                                         </button>
