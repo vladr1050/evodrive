@@ -236,12 +236,12 @@ class ShiftAvailabilityService
     }
 
     /**
-     * Get available free slots for a week. Returns continuous time windows per station per day
-     * when at least one vehicle is free. Slots are split only around booked shifts (with downtime).
-     * Only windows >= min_duration_hours are shown.
+     * Get available free slots for a week.
+     * One card per vehicle per free window (not unioned across cars at a station).
+     * Windows follow that vehicle's booked shifts, downtime, service blocks, and shift policy.
      *
      * @param  int|array<int>|null  $stationIds  Single id, list of ids, or null for all active stations
-     * @return array<int, array{id: string, day: string, start: string, end: string, duration: int, station: string, station_short: string, station_id: int, date_iso: string, vehicles: array, cars_count: int}>
+     * @return array<int, array{id: string, day: string, start: string, end: string, duration: int, station: string, station_short: string, station_address: ?string, station_id: int, date_iso: string, vehicle_id: int, vehicle_tone: int, vehicles: array, cars_count: int}>
      */
     public function getAvailableSlotsForWeek(Carbon $weekStart, array $dayNames, int|array|null $stationIds = null): array
     {
@@ -265,7 +265,6 @@ class ShiftAvailabilityService
         }
         $tz = $policy->timezone ?? 'Europe/Riga';
         $minDurationHours = (float) ($policy->min_duration_hours ?? 4);
-        $allowedDurations = $policy->allowedDurations();
         $slotMinutes = $policy->time_slot_minutes ?? 15;
         $downtimeMinutes = (int) round($policy->vehicle_downtime_hours * 60);
         $nowInTz = now($tz);
@@ -275,11 +274,12 @@ class ShiftAvailabilityService
         $weekEndUtc = $weekEnd->copy()->utc();
         $vehicles = FleetVehicle::whereIn('home_station_id', $stations->pluck('id'))
             ->where('status', VehicleStatus::Active)
+            ->orderBy('id')
             ->get(['id', 'home_station_id', 'brand', 'model', 'registration_number', 'label']);
-        $vehiclesByStation = $vehicles->groupBy('home_station_id')->map(fn ($v) => $v->pluck('id')->values()->all())->all();
+        $vehiclesByStation = $vehicles->groupBy('home_station_id');
         $vehiclesById = $vehicles->keyBy('id');
-        $allVehicleIds = array_values(array_unique($vehicles->pluck('id')->all()));
-        if (empty($allVehicleIds)) {
+        $allVehicleIds = $vehicles->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+        if ($allVehicleIds === []) {
             return [];
         }
 
@@ -296,19 +296,16 @@ class ShiftAvailabilityService
         $serviceBlocksByVehicle = $this->fetchServiceBlocksForVehicles($allVehicleIds, $weekStartUtc, $weekEndUtc);
 
         $dayEndMinutes = 24 * 60;
+        // freeByDay[dayIndex][vehicleId] = intervals for that vehicle only
         $freeByDay = [];
         for ($dayIndex = 0; $dayIndex < 7; $dayIndex++) {
             $dayStart = $weekStart->copy()->addDays($dayIndex)->setTimezone($tz)->startOfDay();
             $dayEnd = $dayStart->copy()->endOfDay();
             $isToday = $dayStart->isSameDay($nowInTz);
             $freeByDay[$dayIndex] = [];
-            foreach ($stations as $station) {
-                $stationVehicleIds = $vehiclesByStation[$station->id] ?? [];
-                if (empty($stationVehicleIds)) {
-                    continue;
-                }
-                $freeByDay[$dayIndex][$station->id] = $this->computeStationFreeIntervals(
-                    $stationVehicleIds,
+            foreach ($allVehicleIds as $vehicleId) {
+                $freeByDay[$dayIndex][$vehicleId] = $this->computeStationFreeIntervals(
+                    [$vehicleId],
                     $shifts,
                     $serviceBlocksByVehicle,
                     $dayStart,
@@ -333,82 +330,128 @@ class ShiftAvailabilityService
             $dayName = $dayNames[$dayIndex] ?? 'Day'.($dayIndex + 1);
 
             foreach ($stations as $station) {
-                $freeIntervals = $freeByDay[$dayIndex][$station->id] ?? [];
-                foreach ($freeIntervals as [$startMin, $endMin]) {
-                    $durationHours = ($endMin - $startMin) / 60.0;
-                    if ($durationHours < $minDurationHours) {
-                        continue;
-                    }
-                    // Display full interval (ignore Allowed durations); booking will still enforce policy
-                    $suggestedDuration = (int) floor($durationHours);
-                    $durationMin = $suggestedDuration * 60;
-                    $maxStartMin = $endMin - $durationMin;
-                    $startMinAligned = (int) (floor($startMin / $slotMinutes) * $slotMinutes);
-                    // Use a step that won't skip over valid starts when alignment pushed start earlier (e.g. slotMinutes=480 → 19:00 free but aligned to 16:00)
-                    $stepMin = $slotMinutes <= 60 ? $slotMinutes : 60;
-                    $slotAdded = false;
-                    for ($startMinTry = $startMinAligned; $startMinTry <= $maxStartMin && ! $slotAdded; $startMinTry += $stepMin) {
-                        $endMinTry = $startMinTry + $durationMin;
-                        $h1 = (int) floor($startMinTry / 60);
-                        $m1 = $startMinTry % 60;
-                        $h2 = (int) floor($endMinTry / 60);
-                        $m2 = $endMinTry % 60;
-                        $slotStart = sprintf('%02d:%02d', $h1, $m1);
-                        $slotEnd = sprintf('%02d:%02d', $h2, $m2);
-                        $slotStartsAt = Carbon::parse($dateIso.' '.$slotStart, $tz);
-                        $slotEndsAt = Carbon::parse($dateIso.' '.$slotEnd, $tz);
-                        if ($slotEndsAt->lte($slotStartsAt)) {
-                            $slotEndsAt->addDay();
-                        }
-                        if ($slotStartsAt->lte($nowInTz)) {
+                $stationVehicles = ($vehiclesByStation[$station->id] ?? collect())->values();
+                foreach ($stationVehicles as $toneIndex => $vehicle) {
+                    $vehicleId = (int) $vehicle->id;
+                    $freeIntervals = $freeByDay[$dayIndex][$vehicleId] ?? [];
+                    foreach ($freeIntervals as [$startMin, $endMin]) {
+                        $durationHours = ($endMin - $startMin) / 60.0;
+                        if ($durationHours < $minDurationHours) {
                             continue;
                         }
-                        $availableVehicleIds = $this->availableVehicleIdsForSlot(
-                            $station->id,
-                            $vehiclesByStation[$station->id] ?? [],
-                            $shifts,
-                            $slotStartsAt,
-                            $slotEndsAt,
-                            $policy
-                        );
-                        if (empty($availableVehicleIds)) {
-                            continue;
-                        }
-                        $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
-                        $slots[] = [
-                            'id' => 'as'.(++$slotId),
-                            'day' => $dayName,
-                            'start' => $slotStart,
-                            'end' => $slotEnd,
-                            'duration' => $suggestedDuration,
-                            'station' => $station->name,
-                            'station_short' => $station->shortLabel(),
-                            'station_address' => $station->address ?: null,
-                            'station_id' => $station->id,
-                            'date_iso' => $dateIso,
-                            'vehicles' => $vehiclesDisplay,
-                            'cars_count' => count($vehiclesDisplay),
-                        ];
-                        $slotAdded = true;
-                    }
-                }
-
-                if ($dayIndex < 6) {
-                    $nextIntervals = $freeByDay[$dayIndex + 1][$station->id] ?? [];
-                    $nextDayStart = $weekStart->copy()->addDays($dayIndex + 1)->setTimezone($tz)->startOfDay();
-                    if ($nextDayStart->copy()->endOfDay()->lt($nowInTz)) {
-                        // next day is past, skip overnight that starts today
-                    } else {
-                        foreach ($freeIntervals as [$startMin, $endMin]) {
-                            if ($endMin < $dayEndMinutes) {
+                        $suggestedDuration = (int) floor($durationHours);
+                        $durationMin = $suggestedDuration * 60;
+                        $maxStartMin = $endMin - $durationMin;
+                        $startMinAligned = (int) (floor($startMin / $slotMinutes) * $slotMinutes);
+                        $stepMin = $slotMinutes <= 60 ? $slotMinutes : 60;
+                        $slotAdded = false;
+                        for ($startMinTry = $startMinAligned; $startMinTry <= $maxStartMin && ! $slotAdded; $startMinTry += $stepMin) {
+                            $endMinTry = $startMinTry + $durationMin;
+                            $h1 = (int) floor($startMinTry / 60);
+                            $m1 = $startMinTry % 60;
+                            $h2 = (int) floor($endMinTry / 60);
+                            $m2 = $endMinTry % 60;
+                            $slotStart = sprintf('%02d:%02d', $h1, $m1);
+                            $slotEnd = sprintf('%02d:%02d', $h2, $m2);
+                            $slotStartsAt = Carbon::parse($dateIso.' '.$slotStart, $tz);
+                            $slotEndsAt = Carbon::parse($dateIso.' '.$slotEnd, $tz);
+                            if ($slotEndsAt->lte($slotStartsAt)) {
+                                $slotEndsAt->addDay();
+                            }
+                            if ($slotStartsAt->lte($nowInTz)) {
                                 continue;
                             }
-                            $tailMinutes = $dayEndMinutes - $startMin;
-                            foreach ($nextIntervals as [$nextStart, $nextEnd]) {
-                                if ($nextStart > 0) {
+                            if (! $this->vehicleIsAvailableForWindow($vehicleId, $shifts, $serviceBlocksByVehicle, $slotStartsAt, $slotEndsAt, $policy)) {
+                                continue;
+                            }
+                            $slots[] = $this->formatVehicleFreeSlot(
+                                ++$slotId,
+                                $dayName,
+                                $slotStart,
+                                $slotEnd,
+                                $suggestedDuration,
+                                $station,
+                                $dateIso,
+                                $vehicleId,
+                                (int) $toneIndex,
+                                $vehiclesById,
+                                null
+                            );
+                            $slotAdded = true;
+                        }
+                    }
+
+                    if ($dayIndex < 6) {
+                        $nextIntervals = $freeByDay[$dayIndex + 1][$vehicleId] ?? [];
+                        $nextDayStart = $weekStart->copy()->addDays($dayIndex + 1)->setTimezone($tz)->startOfDay();
+                        if (! $nextDayStart->copy()->endOfDay()->lt($nowInTz)) {
+                            foreach ($freeIntervals as [$startMin, $endMin]) {
+                                if ($endMin < $dayEndMinutes) {
                                     continue;
                                 }
-                                $combinedMinutes = $tailMinutes + $nextEnd;
+                                $tailMinutes = $dayEndMinutes - $startMin;
+                                foreach ($nextIntervals as [$nextStart, $nextEnd]) {
+                                    if ($nextStart > 0) {
+                                        continue;
+                                    }
+                                    $combinedMinutes = $tailMinutes + $nextEnd;
+                                    if ($combinedMinutes < $minDurationHours * 60) {
+                                        continue;
+                                    }
+                                    $suggestedDuration = (int) floor($combinedMinutes / 60);
+                                    if ($suggestedDuration < $minDurationHours) {
+                                        continue;
+                                    }
+                                    $totalMin = $suggestedDuration * 60;
+                                    if ($totalMin <= $tailMinutes) {
+                                        continue;
+                                    }
+                                    $endMinNext = $totalMin - $tailMinutes;
+                                    $h1 = (int) floor($startMin / 60);
+                                    $m1 = $startMin % 60;
+                                    $h2 = (int) floor($endMinNext / 60);
+                                    $m2 = $endMinNext % 60;
+                                    $slotStart = sprintf('%02d:%02d', $h1, $m1);
+                                    $slotEnd = sprintf('%02d:%02d', $h2, $m2);
+                                    $slotStartsAt = Carbon::parse($dateIso.' '.$slotStart, $tz);
+                                    $slotEndsAt = Carbon::parse($nextDayStart->format('Y-m-d').' '.$slotEnd, $tz);
+                                    if (! $this->vehicleIsAvailableForWindow($vehicleId, $shifts, $serviceBlocksByVehicle, $slotStartsAt, $slotEndsAt, $policy)) {
+                                        continue;
+                                    }
+                                    $slots[] = $this->formatVehicleFreeSlot(
+                                        ++$slotId,
+                                        $dayName,
+                                        $slotStart,
+                                        $slotEnd,
+                                        $suggestedDuration,
+                                        $station,
+                                        $dateIso,
+                                        $vehicleId,
+                                        (int) $toneIndex,
+                                        $vehiclesById,
+                                        $nextDayStart->format('Y-m-d')
+                                    );
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    $prevDaySkipped = $dayIndex >= 1 && $weekStart->copy()->addDays($dayIndex - 1)->setTimezone($tz)->endOfDay()->lt($nowInTz);
+                    if ($dayIndex >= 1 && $prevDaySkipped) {
+                        $prevIntervals = $freeByDay[$dayIndex - 1][$vehicleId] ?? [];
+                        $prevDayStart = $weekStart->copy()->addDays($dayIndex - 1)->setTimezone($tz)->startOfDay();
+                        $prevDateIso = $prevDayStart->format('Y-m-d');
+                        foreach ($freeIntervals as [$startMin, $endMin]) {
+                            if ($startMin > 0) {
+                                continue;
+                            }
+                            foreach ($prevIntervals as [$prevStart, $prevEnd]) {
+                                if ($prevEnd < $dayEndMinutes) {
+                                    continue;
+                                }
+                                $tailMinutes = $dayEndMinutes - $prevStart;
+                                $combinedMinutes = $tailMinutes + $endMin;
                                 if ($combinedMinutes < $minDurationHours * 60) {
                                     continue;
                                 }
@@ -420,122 +463,116 @@ class ShiftAvailabilityService
                                 if ($totalMin <= $tailMinutes) {
                                     continue;
                                 }
-                                $endMinNext = $totalMin - $tailMinutes;
-                                $h1 = (int) floor($startMin / 60);
-                                $m1 = $startMin % 60;
-                                $h2 = (int) floor($endMinNext / 60);
-                                $m2 = $endMinNext % 60;
+                                $endMinThis = $totalMin - $tailMinutes;
+                                $h1 = (int) floor($prevStart / 60);
+                                $m1 = $prevStart % 60;
+                                $h2 = (int) floor($endMinThis / 60);
+                                $m2 = $endMinThis % 60;
                                 $slotStart = sprintf('%02d:%02d', $h1, $m1);
                                 $slotEnd = sprintf('%02d:%02d', $h2, $m2);
-                                $slotStartsAt = Carbon::parse($dateIso.' '.$slotStart, $tz);
-                                $slotEndsAt = Carbon::parse($nextDayStart->format('Y-m-d').' '.$slotEnd, $tz);
-                                $availableVehicleIds = $this->availableVehicleIdsForSlot(
-                                    $station->id,
-                                    $vehiclesByStation[$station->id] ?? [],
-                                    $shifts,
-                                    $slotStartsAt,
-                                    $slotEndsAt,
-                                    $policy
-                                );
-                                if (empty($availableVehicleIds)) {
+                                $slotStartsAt = Carbon::parse($prevDateIso.' '.$slotStart, $tz);
+                                $slotEndsAt = Carbon::parse($dateIso.' '.$slotEnd, $tz);
+                                if ($slotEndsAt->lte($nowInTz)) {
                                     continue;
                                 }
-                                $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
-                                $slots[] = [
-                                    'id' => 'as'.(++$slotId),
-                                    'day' => $dayName,
-                                    'start' => $slotStart,
-                                    'end' => $slotEnd,
-                                    'duration' => $suggestedDuration,
-                                    'station' => $station->name,
-                                    'station_short' => $station->shortLabel(),
-                                    'station_address' => $station->address ?: null,
-                                    'station_id' => $station->id,
-                                    'date_iso' => $dateIso,
-                                    'end_date_iso' => $nextDayStart->format('Y-m-d'),
-                                    'vehicles' => $vehiclesDisplay,
-                                    'cars_count' => count($vehiclesDisplay),
-                                ];
+                                if (! $this->vehicleIsAvailableForWindow($vehicleId, $shifts, $serviceBlocksByVehicle, $slotStartsAt, $slotEndsAt, $policy)) {
+                                    continue;
+                                }
+                                $slots[] = $this->formatVehicleFreeSlot(
+                                    ++$slotId,
+                                    $dayName,
+                                    $slotStart,
+                                    $slotEnd,
+                                    $suggestedDuration,
+                                    $station,
+                                    $prevDateIso,
+                                    $vehicleId,
+                                    (int) $toneIndex,
+                                    $vehiclesById,
+                                    $dateIso
+                                );
                                 break;
                             }
-                        }
-                    }
-                }
-
-                // Overnight slot that *ends* on this day (started previous day): show in current day column only when previous day was skipped (past), so the slot is still visible mid-week
-                $prevDaySkipped = $dayIndex >= 1 && $weekStart->copy()->addDays($dayIndex - 1)->setTimezone($tz)->endOfDay()->lt($nowInTz);
-                if ($dayIndex >= 1 && $prevDaySkipped) {
-                    $prevIntervals = $freeByDay[$dayIndex - 1][$station->id] ?? [];
-                    $prevDayStart = $weekStart->copy()->addDays($dayIndex - 1)->setTimezone($tz)->startOfDay();
-                    $prevDateIso = $prevDayStart->format('Y-m-d');
-                    foreach ($freeIntervals as [$startMin, $endMin]) {
-                        if ($startMin > 0) {
-                            continue;
-                        }
-                        foreach ($prevIntervals as [$prevStart, $prevEnd]) {
-                            if ($prevEnd < $dayEndMinutes) {
-                                continue;
-                            }
-                            $tailMinutes = $dayEndMinutes - $prevStart;
-                            $combinedMinutes = $tailMinutes + $endMin;
-                            if ($combinedMinutes < $minDurationHours * 60) {
-                                continue;
-                            }
-                            $suggestedDuration = (int) floor($combinedMinutes / 60);
-                            if ($suggestedDuration < $minDurationHours) {
-                                continue;
-                            }
-                            $totalMin = $suggestedDuration * 60;
-                            if ($totalMin <= $tailMinutes) {
-                                continue;
-                            }
-                            $endMinThis = $totalMin - $tailMinutes;
-                            $h1 = (int) floor($prevStart / 60);
-                            $m1 = $prevStart % 60;
-                            $h2 = (int) floor($endMinThis / 60);
-                            $m2 = $endMinThis % 60;
-                            $slotStart = sprintf('%02d:%02d', $h1, $m1);
-                            $slotEnd = sprintf('%02d:%02d', $h2, $m2);
-                            $slotStartsAt = Carbon::parse($prevDateIso.' '.$slotStart, $tz);
-                            $slotEndsAt = Carbon::parse($dateIso.' '.$slotEnd, $tz);
-                            if ($slotEndsAt->lte($nowInTz)) {
-                                continue;
-                            }
-                            $availableVehicleIds = $this->availableVehicleIdsForSlot(
-                                $station->id,
-                                $vehiclesByStation[$station->id] ?? [],
-                                $shifts,
-                                $slotStartsAt,
-                                $slotEndsAt,
-                                $policy
-                            );
-                            if (empty($availableVehicleIds)) {
-                                continue;
-                            }
-                            $vehiclesDisplay = $this->formatVehiclesForSlot($availableVehicleIds, $vehiclesById);
-                            $slots[] = [
-                                'id' => 'as'.(++$slotId),
-                                'day' => $dayName,
-                                'start' => $slotStart,
-                                'end' => $slotEnd,
-                                'duration' => $suggestedDuration,
-                                'station' => $station->name,
-                                'station_short' => $station->shortLabel(),
-                                'station_address' => $station->address ?: null,
-                                'station_id' => $station->id,
-                                'date_iso' => $prevDateIso,
-                                'end_date_iso' => $dateIso,
-                                'vehicles' => $vehiclesDisplay,
-                                'cars_count' => count($vehiclesDisplay),
-                            ];
-                            break;
                         }
                     }
                 }
             }
         }
 
+        usort($slots, function (array $a, array $b): int {
+            return [$a['date_iso'], $a['start'], $a['station_id'], $a['vehicle_id']]
+                <=> [$b['date_iso'], $b['start'], $b['station_id'], $b['vehicle_id']];
+        });
+
         return $slots;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, FleetVehicle>  $vehiclesById
+     * @return array{id: string, day: string, start: string, end: string, duration: int, station: string, station_short: string, station_address: ?string, station_id: int, date_iso: string, vehicle_id: int, vehicle_tone: int, vehicles: array, cars_count: int, end_date_iso?: string}
+     */
+    protected function formatVehicleFreeSlot(
+        int $slotId,
+        string $dayName,
+        string $slotStart,
+        string $slotEnd,
+        int $suggestedDuration,
+        Station $station,
+        string $dateIso,
+        int $vehicleId,
+        int $toneIndex,
+        Collection $vehiclesById,
+        ?string $endDateIso
+    ): array {
+        $vehiclesDisplay = $this->formatVehiclesForSlot([$vehicleId], $vehiclesById);
+        $slot = [
+            'id' => 'as'.$slotId,
+            'day' => $dayName,
+            'start' => $slotStart,
+            'end' => $slotEnd,
+            'duration' => $suggestedDuration,
+            'station' => $station->name,
+            'station_short' => $station->shortLabel(),
+            'station_address' => $station->address ?: null,
+            'station_id' => (int) $station->id,
+            'date_iso' => $dateIso,
+            'vehicle_id' => $vehicleId,
+            'vehicle_tone' => $toneIndex % 6,
+            'vehicles' => $vehiclesDisplay,
+            'cars_count' => 1,
+        ];
+        if ($endDateIso !== null) {
+            $slot['end_date_iso'] = $endDateIso;
+        }
+
+        return $slot;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, Shift>>  $shiftsByVehicle
+     * @param  \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, FleetVehicleServiceBlock>>  $serviceBlocksByVehicle
+     */
+    protected function vehicleIsAvailableForWindow(
+        int $vehicleId,
+        Collection $shiftsByVehicle,
+        Collection $serviceBlocksByVehicle,
+        Carbon $startsAt,
+        Carbon $endsAt,
+        ShiftPolicy $policy
+    ): bool {
+        $startsAtUtc = $startsAt->copy()->utc();
+        $endsAtUtc = $endsAt->copy()->utc();
+        $blocked = false;
+        foreach ($serviceBlocksByVehicle->get($vehicleId, collect()) as $block) {
+            if ($block->starts_at->lt($endsAtUtc) && $block->ends_at->gt($startsAtUtc)) {
+                $blocked = true;
+                break;
+            }
+        }
+        $serviceBlockedSet = $blocked ? [$vehicleId => true] : [];
+        $shifts = $shiftsByVehicle->get($vehicleId, collect());
+
+        return $this->vehicleAvailableForWithShifts($shifts, $startsAtUtc, $endsAtUtc, $policy, $vehicleId, $serviceBlockedSet);
     }
 
     /**

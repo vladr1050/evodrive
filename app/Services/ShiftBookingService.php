@@ -21,7 +21,7 @@ class ShiftBookingService
     /**
      * @throws ShiftBookingException
      */
-    public function bookShift(int $driverId, int $stationId, Carbon $startsAt, float $durationHours): Shift
+    public function bookShift(int $driverId, int $stationId, Carbon $startsAt, float $durationHours, ?int $preferredVehicleId = null): Shift
     {
         $policy = ShiftPolicy::active();
         if (! $policy) {
@@ -39,7 +39,7 @@ class ShiftBookingService
             throw ShiftBookingException::driverShiftOverlap();
         }
 
-        return DB::transaction(function () use ($driverId, $stationId, $startsAtUtc, $endsAtUtc, $policy) {
+        return DB::transaction(function () use ($driverId, $stationId, $startsAtUtc, $endsAtUtc, $policy, $preferredVehicleId) {
             Driver::query()->whereKey($driverId)->lockForUpdate()->firstOrFail();
 
             if (Shift::driverHasOverlappingBookedShift($driverId, $startsAtUtc, $endsAtUtc)) {
@@ -50,7 +50,8 @@ class ShiftBookingService
                 $stationId,
                 $startsAtUtc,
                 $endsAtUtc,
-                $policy
+                $policy,
+                $preferredVehicleId
             );
             if (! $vehicleId) {
                 throw ShiftBookingException::noVehiclesAvailable();
@@ -81,9 +82,15 @@ class ShiftBookingService
      * Select one available vehicle under row lock. Returns vehicle id or null.
      * Uses lockForUpdate() so concurrent bookings block; recheck via vehicleAvailableFor()
      * inside the same transaction ensures no double-booking under race conditions.
+     * When $preferredVehicleId is set and available at this station, it is chosen first.
      */
-    protected function selectAvailableVehicleUnderLock(int $stationId, Carbon $startsAt, Carbon $endsAt, ShiftPolicy $policy): ?int
-    {
+    protected function selectAvailableVehicleUnderLock(
+        int $stationId,
+        Carbon $startsAt,
+        Carbon $endsAt,
+        ShiftPolicy $policy,
+        ?int $preferredVehicleId = null
+    ): ?int {
         $vehicleIds = FleetVehicle::where('home_station_id', $stationId)
             ->where('status', \App\Enums\VehicleStatus::Active)
             ->pluck('id');
@@ -93,6 +100,16 @@ class ShiftBookingService
         }
 
         $locked = FleetVehicle::whereIn('id', $vehicleIds->all())->lockForUpdate()->get();
+        if ($preferredVehicleId !== null) {
+            $preferred = $locked->firstWhere('id', $preferredVehicleId);
+            if ($preferred
+                && (int) $preferred->home_station_id === (int) $stationId
+                && $this->availabilityService->vehicleAvailableFor($preferred->id, $startsAt, $endsAt, $policy)
+            ) {
+                return (int) $preferred->id;
+            }
+        }
+
         foreach ($locked as $vehicle) {
             if ($this->availabilityService->vehicleAvailableFor($vehicle->id, $startsAt, $endsAt, $policy)) {
                 return $vehicle->id;

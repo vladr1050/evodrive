@@ -407,6 +407,7 @@ class DriverPortalController extends Controller
             'date' => 'required|date_format:Y-m-d',
             'start_time' => 'required|date_format:H:i',
             'duration_hours' => 'required|numeric|min:1',
+            'preferred_vehicle_id' => 'nullable|integer|exists:fleet_vehicles,id',
         ]);
         $driver = Auth::guard('driver')->user();
         try {
@@ -432,11 +433,15 @@ class DriverPortalController extends Controller
                 ], 422);
             }
             $durationHours = (float) $request->input('duration_hours');
+            $preferredVehicleId = $request->filled('preferred_vehicle_id')
+                ? (int) $request->input('preferred_vehicle_id')
+                : null;
             $shift = app(ShiftBookingService::class)->bookShift(
                 $driver->id,
                 (int) $request->input('station_id'),
                 $startsAt,
-                $durationHours
+                $durationHours,
+                $preferredVehicleId
             );
 
             return response()->json([

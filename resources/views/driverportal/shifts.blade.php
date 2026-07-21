@@ -233,6 +233,22 @@
                     const n = count || 0;
                     return this.labels.carsShort.replace(':count', String(n));
                 },
+                vehicleToneStyle(tone) {
+                    const tones = [
+                        { border: '#2563eb', bg: 'rgba(37, 99, 235, 0.10)', text: '#1d4ed8' },
+                        { border: '#0d9488', bg: 'rgba(13, 148, 136, 0.10)', text: '#0f766e' },
+                        { border: '#d97706', bg: 'rgba(217, 119, 6, 0.10)', text: '#b45309' },
+                        { border: '#db2777', bg: 'rgba(219, 39, 119, 0.10)', text: '#be185d' },
+                        { border: '#4f46e5', bg: 'rgba(79, 70, 229, 0.10)', text: '#4338ca' },
+                        { border: '#059669', bg: 'rgba(5, 150, 105, 0.10)', text: '#047857' },
+                    ];
+                    const t = tones[Number(tone) % tones.length] || tones[0];
+                    return {
+                        borderColor: t.border,
+                        backgroundColor: t.bg,
+                        color: t.text,
+                    };
+                },
                 slotsForDay(dayName) {
                     return this.availableSlots.filter(s => s.day === dayName);
                 },
@@ -575,7 +591,7 @@
                 {{ __('portal.copy_prev_week') }}
             </button>
 
-            <button type="button" data-testid="shift-create-btn" onclick="document.getElementById('create-modal').classList.remove('hidden'); window.updateStartTimeOptions&&window.updateStartTimeOptions();" class="bg-brand-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-brand-600/20 hover:bg-brand-700 active:scale-95 transition-all flex items-center gap-2">
+            <button type="button" data-testid="shift-create-btn" onclick="var p=document.getElementById('create-preferred-vehicle'); if(p)p.value=''; document.getElementById('create-modal').classList.remove('hidden'); window.updateStartTimeOptions&&window.updateStartTimeOptions();" class="bg-brand-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-brand-600/20 hover:bg-brand-700 active:scale-95 transition-all flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
                 {{ __('portal.create_shift') }}
             </button>
@@ -685,23 +701,22 @@
                                     <template x-for="slot in slotsForDay('{{ $dayInfo['name'] }}')" :key="slot.id">
                                         <button
                                             type="button"
-                                            class="w-full text-left px-2 py-1.5 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 hover:bg-brand-50 hover:border-brand-500 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                                            class="w-full text-left px-2 py-1.5 rounded-lg border border-dashed transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500/40 border-l-4"
+                                            :style="vehicleToneStyle(slot.vehicle_tone ?? 0)"
                                             @click="window.openCreateModalFromSlot && window.openCreateModalFromSlot(slot)"
-                                            :title="(slot.station_address || slot.station_short || slot.station || '') + ' · ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
-                                            :aria-label="slot.start + '–' + slot.end + ', ' + (slot.duration || 0) + 'h, ' + carsLabel(slot.cars_count || (slot.vehicles ? slot.vehicles.length : 0))"
+                                            :title="(slot.station_address || slot.station_short || slot.station || '') + ' · ' + ((slot.vehicles && slot.vehicles[0] && (slot.vehicles[0].number || slot.vehicles[0].model)) || '')"
+                                            :aria-label="slot.start + '–' + slot.end + ', ' + (slot.duration || 0) + 'h, ' + ((slot.vehicles && slot.vehicles[0] && (slot.vehicles[0].number || slot.vehicles[0].model)) || '')"
                                         >
                                             {{-- From – To on one line --}}
-                                            <div class="text-[11px] font-bold text-brand-700 tabular-nums leading-tight whitespace-nowrap">
-                                                <span x-text="slot.start"></span><span class="text-brand-400 font-semibold">–</span><span x-text="slot.end"></span><span class="text-brand-400" x-show="slot.end_date_iso">+1</span>
+                                            <div class="text-[11px] font-bold tabular-nums leading-tight whitespace-nowrap" :style="{ color: 'inherit' }">
+                                                <span x-text="slot.start"></span><span class="font-semibold opacity-60">–</span><span x-text="slot.end"></span><span class="opacity-60" x-show="slot.end_date_iso">+1</span>
                                             </div>
-                                            <div class="mt-1 text-[10px] font-bold text-brand-500 tabular-nums" x-text="(slot.duration || 0) + 'h'"></div>
-                                            <div class="mt-1 space-y-0.5">
-                                                <template x-for="(v, vi) in (slot.vehicles || [])" :key="slot.id + '-v-' + vi">
-                                                    <div class="text-[10px] font-semibold text-slate-700 tabular-nums leading-tight whitespace-nowrap" x-text="v.number || v.model"></div>
-                                                </template>
+                                            <div class="mt-1 text-[10px] font-bold tabular-nums opacity-80" x-text="(slot.duration || 0) + 'h'"></div>
+                                            <div class="mt-1 text-[10px] font-semibold tabular-nums leading-tight whitespace-nowrap text-slate-800">
+                                                <span x-text="(slot.vehicles && slot.vehicles[0] && (slot.vehicles[0].number || slot.vehicles[0].model)) || '—'"></span>
                                             </div>
                                             <div
-                                                class="mt-1 text-[9px] font-medium text-brand-600/80 leading-snug break-normal [overflow-wrap:anywhere]"
+                                                class="mt-1 text-[9px] font-medium text-slate-500 leading-snug break-normal [overflow-wrap:anywhere]"
                                                 x-text="slot.station_address || slot.station_short || slot.station"
                                             ></div>
                                         </button>
@@ -752,6 +767,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
             </button>
             <h3 class="text-2xl font-bold text-slate-900 mb-6">{{ __('portal.create_shift') }}</h3>
+            <input type="hidden" id="create-preferred-vehicle" value="">
             <div class="space-y-6">
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -924,7 +940,9 @@
         function openCreateModalForDate(isoDate) {
             document.getElementById('create-modal').classList.remove('hidden');
             var dateEl = document.getElementById('create-date');
+            var preferredEl = document.getElementById('create-preferred-vehicle');
             if (dateEl && isoDate) dateEl.value = isoDate;
+            if (preferredEl) preferredEl.value = '';
             updateStartTimeOptions();
             document.getElementById('availability-message').classList.add('hidden');
             document.getElementById('confirm-shift-btn').disabled = true;
@@ -935,10 +953,12 @@
             var stationEl = document.getElementById('create-station');
             var startEl = document.getElementById('create-start');
             var durationEl = document.getElementById('create-duration');
+            var preferredEl = document.getElementById('create-preferred-vehicle');
             if (dateEl && slot.date_iso) dateEl.value = slot.date_iso;
             if (stationEl && slot.station_id) stationEl.value = String(slot.station_id);
             if (startEl && slot.start) startEl.value = slot.start;
             if (durationEl && slot.duration) durationEl.value = String(slot.duration);
+            if (preferredEl) preferredEl.value = slot.vehicle_id ? String(slot.vehicle_id) : '';
             updateStartTimeOptions();
             document.getElementById('availability-message').classList.add('hidden');
             document.getElementById('confirm-shift-btn').disabled = true;
@@ -949,13 +969,17 @@
         document.getElementById('create-date')?.addEventListener('change', updateStartTimeOptions);
 
         function getPayload() {
-            return {
+            var preferredEl = document.getElementById('create-preferred-vehicle');
+            var preferred = preferredEl && preferredEl.value ? parseInt(preferredEl.value, 10) : null;
+            var payload = {
                 station_id: parseInt(document.getElementById('create-station').value, 10),
                 date: document.getElementById('create-date').value,
                 start_time: document.getElementById('create-start').value,
                 duration_hours: parseInt(document.getElementById('create-duration').value, 10),
                 _token: csrf
             };
+            if (preferred) payload.preferred_vehicle_id = preferred;
+            return payload;
         }
 
         function isDateInPlanningWindow() {
