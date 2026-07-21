@@ -45,6 +45,6 @@
         {{ $vehiclePlate ?: $vehicleFallback }}
     </div>
     @unless($hideStation)
-        <div class="mt-1 text-[9px] font-medium {{ $isMyShift ? 'text-green-700/80' : 'text-slate-500' }} whitespace-nowrap overflow-visible">{{ $stationLabel }}</div>
+        <div class="mt-1 text-[9px] font-medium {{ $isMyShift ? 'text-green-700/80' : 'text-slate-500' }} leading-snug break-normal [overflow-wrap:anywhere]">{{ $stationLabel }}</div>
     @endunless
 </div>
