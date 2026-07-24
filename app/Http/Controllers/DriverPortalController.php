@@ -162,6 +162,7 @@ class DriverPortalController extends Controller
             $vehicleLabel = $vehicle?->label ?? '-';
             $isTesla = $vehicle && (stripos((string) $vehicle->brand, 'Tesla') !== false || stripos((string) $vehicle->model, 'Tesla') !== false);
             $vehicleRegNumber = ($isTesla && ! empty($vehicle->registration_number)) ? $vehicle->registration_number : null;
+            $driverName = trim((string) ($s->driver?->name ?? ''));
 
             return [
                 'id' => (string) $s->id,
@@ -175,6 +176,7 @@ class DriverPortalController extends Controller
                 'station' => $s->station?->name ?? '-',
                 'station_short' => $s->station?->shortLabel() ?? '-',
                 'station_address' => $s->station?->address ?: null,
+                'driver_name' => $driverName !== '' ? $driverName : null,
                 'status' => $s->status->value,
                 'is_mine' => $isMine,
                 'cancellable' => $cancellable,
@@ -210,7 +212,7 @@ class DriverPortalController extends Controller
         $shiftsBaseQuery = Shift::whereIn('status', [ShiftStatus::Booked, ShiftStatus::Completed])
             ->where('starts_at', '<', $weekRangeEndExclusive)
             ->where('ends_at', '>', $weekRangeStart)
-            ->with(['vehicle', 'station'])
+            ->with(['vehicle', 'station', 'driver'])
             ->orderBy('starts_at');
         if ($selectedStationId) {
             $shiftsBaseQuery->where('station_id', $selectedStationId);

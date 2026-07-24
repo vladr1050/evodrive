@@ -1,4 +1,4 @@
-@props(['shift', 'hideStation' => false])
+@props(['shift', 'hideStation' => false, 'showDriver' => false])
 @php
     $isMine = (bool) ($shift['is_mine'] ?? false);
     $isMyShift = $isMine && (($shift['status'] ?? '') === 'booked');
@@ -12,14 +12,16 @@
         : null;
     $vehicleFallback = explode(' ', $shift['vehicle'] ?? '')[0] ?? $shift['vehicle'] ?? '-';
     $hideStation = (bool) $hideStation;
+    $showDriver = (bool) $showDriver;
+    $driverName = trim((string) ($shift['driver_name'] ?? ''));
     $hasActions = $editable || $extendable || $cancellable;
 @endphp
-{{-- Layout: time · duration(+actions) · plate · address on one line --}}
+{{-- Layout: time · duration(+actions) · plate · address · optional driver --}}
 <div
     class="shift-card relative w-full text-left px-2 py-1.5 rounded-lg border {{ $isMyShift ? 'bg-green-50 border-green-300' : 'bg-slate-100/80 border-slate-200' }}"
     data-shift-id="{{ $shift['id'] ?? '' }}"
     data-station-name="{{ $shift['station'] ?? '' }}"
-    title="{{ $stationLabel }} · {{ $shift['vehicle'] ?? '' }}"
+    title="{{ $stationLabel }}{{ $driverName !== '' ? ' · '.$driverName : '' }} · {{ $shift['vehicle'] ?? '' }}"
 >
     <div class="text-[11px] font-bold {{ $isMyShift ? 'text-green-800' : 'text-slate-800' }} tabular-nums leading-tight whitespace-nowrap">
         {{ $shift['start'] }}<span class="{{ $isMyShift ? 'text-green-500' : 'text-slate-400' }} font-semibold">–</span>{{ $shift['end'] }}
@@ -47,4 +49,7 @@
     @unless($hideStation)
         <div class="mt-1 text-[9px] font-medium {{ $isMyShift ? 'text-green-700/80' : 'text-slate-500' }} leading-snug break-normal [overflow-wrap:anywhere]">{{ $stationLabel }}</div>
     @endunless
+    @if($showDriver && $driverName !== '')
+        <div class="mt-0.5 text-[9px] font-semibold {{ $isMyShift ? 'text-green-800/90' : 'text-slate-600' }} leading-snug break-normal [overflow-wrap:anywhere]">{{ $driverName }}</div>
+    @endif
 </div>

@@ -673,7 +673,7 @@
                             <div class="space-y-1.5 min-h-[120px]">
                                 <div x-show="shiftsMode === 'all'" class="space-y-1.5" x-cloak>
                                     @foreach($dayShiftsAll as $shift)
-                                        @include('driverportal.components.shift-block', ['shift' => $shift, 'hideStation' => false])
+                                        @include('driverportal.components.shift-block', ['shift' => $shift, 'hideStation' => false, 'showDriver' => true])
                                     @endforeach
                                 </div>
                                 <div x-show="shiftsMode === 'mine'" class="space-y-1.5" x-cloak>
