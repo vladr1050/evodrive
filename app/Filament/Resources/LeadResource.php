@@ -98,6 +98,11 @@ class LeadResource extends Resource
                 Tables\Columns\TextColumn::make('id')->sortable(),
                 Tables\Columns\TextColumn::make('phone')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('atd_number')
+                    ->label('ATD Card Number')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('intent')->badge()->color(fn ($state) => match ($state) {
                     'work' => 'success', 'rent' => 'info', default => 'gray',
                 }),
