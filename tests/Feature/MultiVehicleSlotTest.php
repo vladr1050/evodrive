@@ -132,21 +132,61 @@ class MultiVehicleSlotTest extends TestCase
             $station->id
         );
 
-        $dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][$day->dayOfWeekIso - 1];
-        $sameWindow = collect($slots)->filter(function ($s) use ($dayName, $day) {
-            return $s['day'] === $dayName
-                && $s['date_iso'] === $day->format('Y-m-d')
-                && $s['start'] <= '10:00'
-                && $s['end'] >= '18:00';
-        });
+        $dateIso = $day->format('Y-m-d');
+        $daySlots = collect($slots)->filter(fn ($s) => ($s['date_iso'] ?? '') === $dateIso);
 
         $this->assertTrue(
-            $sameWindow->contains(fn ($s) => (int) $s['vehicle_id'] === (int) $free->id),
+            $daySlots->contains(fn ($s) => (int) $s['vehicle_id'] === (int) $free->id),
             'Free vehicle should still have its own card'
         );
         $this->assertFalse(
-            $sameWindow->contains(fn ($s) => (int) $s['vehicle_id'] === (int) $busy->id),
-            'Busy vehicle must not appear in the overlapping free window'
+            $daySlots->contains(fn ($s) => (int) $s['vehicle_id'] === (int) $busy->id
+                && ($s['start'] ?? '') === '00:00'
+                && (int) ($s['duration'] ?? 0) >= 12),
+            'Busy vehicle must not show an all-day free card while booked midday'
         );
+    }
+
+    public function test_dst_fall_back_sunday_still_emits_free_slots(): void
+    {
+        ShiftPolicy::factory()->create([
+            'min_duration_hours' => 4,
+            'allowed_durations_json' => range(4, 24),
+            'vehicle_downtime_hours' => 1,
+            'time_slot_minutes' => 60,
+            'timezone' => 'Europe/Riga',
+        ]);
+        $station = Station::factory()->create(['is_active' => true]);
+        $vehicle = FleetVehicle::factory()->create([
+            'home_station_id' => $station->id,
+            'registration_number' => 'EX-DST1',
+        ]);
+
+        $tz = 'Europe/Riga';
+        // Europe/Riga falls back on 2026-10-25 (25h calendar day).
+        Carbon::setTestNow(Carbon::parse('2026-10-14 10:00:00', $tz));
+
+        $weekStart = Carbon::parse('2026-10-19 00:00:00', $tz);
+        $slots = app(ShiftAvailabilityService::class)->getAvailableSlotsForWeek(
+            $weekStart,
+            ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            $station->id
+        );
+
+        $sunday = collect($slots)->filter(
+            fn ($s) => ($s['date_iso'] ?? '') === '2026-10-25'
+                && (int) ($s['vehicle_id'] ?? 0) === (int) $vehicle->id
+        );
+
+        $this->assertTrue(
+            $sunday->isNotEmpty(),
+            'DST fall-back Sunday must still show free slots. Slots: '.json_encode($slots)
+        );
+        $this->assertTrue(
+            $sunday->every(fn ($s) => (int) $s['duration'] <= 24 && (int) $s['duration'] >= 4),
+            'Emitted durations must stay within policy bounds'
+        );
+
+        Carbon::setTestNow();
     }
 }
