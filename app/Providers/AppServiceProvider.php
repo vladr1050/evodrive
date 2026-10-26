@@ -51,11 +51,25 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer('*', function ($view) {
             $locale = app()->getLocale();
-            $utmKeys = ['utm_source', 'utm_campaign', 'utm_medium', 'utm_content', 'utm_term'];
+            $utmKeys = [
+                'utm_source',
+                'utm_campaign',
+                'utm_medium',
+                'utm_content',
+                'utm_term',
+                'gclid',
+                'fbclid',
+                'ttclid',
+            ];
             $utm = [];
+            $request = request();
             foreach ($utmKeys as $key) {
-                $value = request($key, session($key));
-                if (is_string($value) && $value !== '') {
+                $queryValue = $request->query($key);
+                if (is_string($queryValue) && $queryValue !== '' && $request->hasSession()) {
+                    $request->session()->put($key, $queryValue);
+                }
+                $value = $request->query($key, $request->hasSession() ? $request->session()->get($key) : null);
+                if (is_string($value) && $value !== '' && str_starts_with($key, 'utm_')) {
                     $utm[$key] = $value;
                 }
             }
