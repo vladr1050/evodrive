@@ -46,6 +46,7 @@
     </style>
 </head>
 <body class="bg-slate-50 selection:bg-brand-600 selection:text-white overflow-hidden" x-data="{ isSidebarOpen: false }">
+    @include('components.analytics-body')
     <div class="flex h-screen overflow-hidden">
         {{-- Mobile Sidebar Overlay --}}
         <div

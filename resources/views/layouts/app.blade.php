@@ -28,6 +28,7 @@
     </style>
 </head>
 <body class="w-full overflow-x-hidden bg-white text-slate-900 selection:bg-brand-600 selection:text-white min-h-screen flex flex-col">
+    @include('components.analytics-body')
     @if(!isset($hideNav) || !$hideNav)
         @include('components.navbar')
     @endif

@@ -2,6 +2,21 @@
 
 @section('title', __('apply.done'))
 
+@push('scripts')
+<script>
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+        event: 'generate_lead',
+        lead_source: 'evodrive_apply',
+        utm_source: @json(session('utm_source')),
+        utm_medium: @json(session('utm_medium')),
+        utm_campaign: @json(session('utm_campaign')),
+        utm_content: @json(session('utm_content')),
+        utm_term: @json(session('utm_term')),
+    });
+</script>
+@endpush
+
 @section('content')
 <div class="min-h-screen bg-white flex items-center justify-center p-6">
     <div class="max-w-md w-full bg-white rounded-[40px] p-12 text-center space-y-8 shadow-2xl shadow-slate-200/50 border border-slate-100">

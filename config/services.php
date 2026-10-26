@@ -35,8 +35,9 @@ return [
         ],
     ],
 
-    'google_analytics' => [
-        'measurement_id' => env('GOOGLE_ANALYTICS_ID', 'G-NTWCKVPZ63'),
+    // Direct GA4 snippet removed — load GA4 (and Meta/TikTok/Ads) via GTM only.
+    'google_tag_manager' => [
+        'container_id' => env('GTM_CONTAINER_ID'),
     ],
 
 ];

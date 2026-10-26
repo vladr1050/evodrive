@@ -161,6 +161,20 @@ class ApplyFlowTest extends TestCase
         $this->assertSame('cpc', $lead->utm_medium);
     }
 
+    public function test_utm_params_persist_in_session_from_landing_to_apply(): void
+    {
+        $this->get('/en?utm_source=meta&utm_medium=paid&utm_campaign=drivers');
+
+        $this->assertSame('meta', session('utm_source'));
+        $this->assertSame('paid', session('utm_medium'));
+        $this->assertSame('drivers', session('utm_campaign'));
+
+        $apply = $this->get('/en/apply');
+        $apply->assertOk();
+        $apply->assertSee('name="utm_source"', false);
+        $apply->assertSee('value="meta"', false);
+    }
+
     public function test_rent_intent_succeeds_with_empty_work_only_hidden_fields(): void
     {
         $this->get('/en/apply');

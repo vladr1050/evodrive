@@ -21,7 +21,7 @@
             <input type="hidden" name="step" id="step-input" value="1">
             <input type="text" name="website_url" class="absolute -left-[9999px]" tabindex="-1" autocomplete="off">
             @foreach(['utm_source','utm_campaign','utm_medium','utm_content','utm_term'] as $utm)
-                <input type="hidden" name="{{ $utm }}" value="{{ request($utm) }}">
+                <input type="hidden" name="{{ $utm }}" value="{{ request($utm, session($utm)) }}">
             @endforeach
             @if(!empty($sessionData['rent_car_id']))
                 <input type="hidden" name="rent_car_id" value="{{ $sessionData['rent_car_id'] }}">

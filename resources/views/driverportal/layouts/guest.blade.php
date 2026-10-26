@@ -26,6 +26,7 @@
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col items-center justify-center p-4 py-8 text-slate-900 selection:bg-brand-600 selection:text-white overflow-y-auto">
+    @include('components.analytics-body')
     @yield('content')
 </body>
 </html>
