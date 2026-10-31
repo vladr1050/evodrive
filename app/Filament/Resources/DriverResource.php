@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\DriverStatus;
+use App\Filament\Actions\ExportDriverWorkedShiftsAction;
 use App\Filament\Resources\DriverResource\Pages;
 use App\Filament\Resources\DriverResource\RelationManagers\ShiftEventsRelationManager;
 use App\Models\Driver;
@@ -153,6 +154,7 @@ class DriverResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                ExportDriverWorkedShiftsAction::makeTableAction(),
                 Tables\Actions\Action::make('resetPassword')
                     ->label('Reset password')
                     ->icon('heroicon-o-key')
